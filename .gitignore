@@ -1,0 +1,11 @@
+# 构建 / 输出目录
+build/
+/Bin/
+
+# IDE 配置目录
+/.vscode/
+
+# 文档 / 设计文档
+/docs/
+
+CLAUDE.local.md
