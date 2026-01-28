@@ -15,6 +15,18 @@
 #define MARK_RECT_WIDTH 3
 #define MARK_RECT_HEIGHT 8
 
+// 虚拟Mark默认偏移量（mm）
+#define VIRTUAL_MARK_STATIC_X 10
+#define VIRTUAL_MARK_STATIC_Y -10
+
+// 绘图颜色定义（选择灰度值较低的颜色，提高白色背景下的对比度）
+#define COLOR_COORDINATE_AXIS     Qt::black        // 坐标轴 (灰度0)
+#define COLOR_BASE_PLATFORM       Qt::blue         // 目标平台 (灰度64)
+#define COLOR_REALTIME_PLATFORM   Qt::darkGreen    // 对象平台 (灰度64)
+#define COLOR_MARK1               Qt::red          // Mark1 (灰度64)
+#define COLOR_MARK2               Qt::darkMagenta  // Mark2 (灰度64)
+#define COLOR_VIRTUAL_MARK        Qt::darkCyan     // 虚拟Mark (灰度96)
+
 SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QWidget(parent)
 {
@@ -23,6 +35,7 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     realTimePlatform = {0, 0, 0};
     mark1 = {0, 0, 0, true};
     mark2 = {0, 0, 0, true};
+    virtualMark = {0, 0, 0, true};
 
     m_Ratio = 200.0;
     m_markSpacing = 20.0;
@@ -190,6 +203,20 @@ void SimulationPlatform::setupUI()
     mark2Layout->addWidget(mark2FollowRealTimeCheckBox, 3, 0);
     mark2Layout->addWidget(ShowMark2CheckBox, 3, 1);
 
+    // VirtualMark控制组
+    virtualMarkXEdit = new QLineEdit(this);
+    virtualMarkYEdit = new QLineEdit(this);
+    showVirtualMarkCheckBox = new QCheckBox("显示", this);
+    showVirtualMarkCheckBox->setChecked(true);
+
+    QGroupBox *virtualMarkGroup = new QGroupBox("虚拟Mark", this);
+    QGridLayout *virtualMarkLayout = new QGridLayout(virtualMarkGroup);
+    virtualMarkLayout->addWidget(new QLabel("X偏移 (mm):", this), 0, 0);
+    virtualMarkLayout->addWidget(virtualMarkXEdit, 0, 1);
+    virtualMarkLayout->addWidget(new QLabel("Y偏移 (mm):", this), 1, 0);
+    virtualMarkLayout->addWidget(virtualMarkYEdit, 1, 1);
+    virtualMarkLayout->addWidget(showVirtualMarkCheckBox, 2, 0, 1, 2);
+
     // Mark中心间距、屏幕缩放系数
     markCenterDistanceEdit = new QLineEdit(this);
     ScreenRatio = new QLineEdit(this);
@@ -215,11 +242,12 @@ void SimulationPlatform::setupUI()
     otherLayout->addWidget(ShowPlatformDL, 3, 0);
     otherLayout->addWidget(ShowPlatformDR, 3, 1);
 
-    // 将四个控制组添加到控制布局中
+    // 将控制组添加到控制布局中
     controlLayout->addWidget(baseGroup);
     controlLayout->addWidget(realTimeGroup);
     controlLayout->addWidget(mark1Group);
     controlLayout->addWidget(mark2Group);
+    controlLayout->addWidget(virtualMarkGroup);
     controlLayout->addWidget(otherGroup);
 
     // 添加控制组到模拟平台页面布局
@@ -252,6 +280,9 @@ void SimulationPlatform::setupUI()
     mark2YEdit->setText(QString::number(mark2.y));
     mark2AngleEdit->setText(QString::number(mark2.angle));
 
+    virtualMarkXEdit->setText(QString::number(virtualMark.x));
+    virtualMarkYEdit->setText(QString::number(virtualMark.y));
+
     markCenterDistanceEdit->setText(QString::number(m_markSpacing));
     ScreenRatio->setText(QString::number(m_Ratio));
 }
@@ -276,6 +307,9 @@ void SimulationPlatform::setupValidators()
     mark2XEdit->setValidator(validator);
     mark2YEdit->setValidator(validator);
     mark2AngleEdit->setValidator(validator);
+
+    virtualMarkXEdit->setValidator(validator);
+    virtualMarkYEdit->setValidator(validator);
 }
 
 void SimulationPlatform::setupConnections()
@@ -307,6 +341,11 @@ void SimulationPlatform::setupConnections()
             { update(); });
     connect(ShowMark2CheckBox, &QRadioButton::clicked, this, [this]()
             { update(); });
+
+    connect(virtualMarkXEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateVirtualMark);
+    connect(virtualMarkYEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateVirtualMark);
+    connect(showVirtualMarkCheckBox, &QCheckBox::clicked, this, [this]()
+            { canvas->update(); });
 
     connect(markCenterDistanceEdit, &QLineEdit::editingFinished, this, [this]()
             {
@@ -387,6 +426,13 @@ void SimulationPlatform::updateMark2()
     mark2.y = mark2YEdit->text().toDouble();
     mark2.angle = mark2AngleEdit->text().toDouble();
     mark2.followPlatform = mark2FollowRealTimeCheckBox->isChecked();
+    canvas->update();
+}
+
+void SimulationPlatform::updateVirtualMark()
+{
+    virtualMark.x = virtualMarkXEdit->text().toDouble();
+    virtualMark.y = virtualMarkYEdit->text().toDouble();
     canvas->update();
 }
 
@@ -477,6 +523,8 @@ void SimulationPlatform::applyStyle()
     applyLineEdit(mark2XEdit);
     applyLineEdit(mark2YEdit);
     applyLineEdit(mark2AngleEdit);
+    applyLineEdit(virtualMarkXEdit);
+    applyLineEdit(virtualMarkYEdit);
     applyLineEdit(markCenterDistanceEdit);
     applyLineEdit(ScreenRatio);
 
@@ -488,6 +536,7 @@ void SimulationPlatform::applyStyle()
     applyCheck(ShowMark1CheckBox);
     applyCheck(mark2FollowRealTimeCheckBox);
     applyCheck(ShowMark2CheckBox);
+    applyCheck(showVirtualMarkCheckBox);
 
     auto applyRadio = [&](QWidget *w)
     { if (w) w->setStyleSheet(RadioStyleSheet); };
@@ -518,13 +567,13 @@ void SimulationPlatform::drawCanvas(QPainter &painter)
     // 绘制基准平台
     if (showBasePlatformCheckBox->isChecked())
     {
-        drawPlatform(painter, basePlatform, Qt::blue);
+        drawPlatform(painter, basePlatform, COLOR_BASE_PLATFORM);
     }
 
     // 绘制实时平台
     if (showRealTimePlatformCheckBox->isChecked())
     {
-        drawPlatform(painter, realTimePlatform, Qt::green);
+        drawPlatform(painter, realTimePlatform, COLOR_REALTIME_PLATFORM);
     }
 
     // 绘制Mark1
@@ -537,6 +586,12 @@ void SimulationPlatform::drawCanvas(QPainter &painter)
     if (ShowMark2CheckBox->isChecked())
     {
         drawMark2(painter);
+    }
+
+    // 绘制VirtualMark
+    if (showVirtualMarkCheckBox->isChecked())
+    {
+        drawVirtualMark(painter);
     }
 }
 
@@ -567,7 +622,7 @@ void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
 {
     painter.save();
 
-    QPen pen(Qt::black, 1, Qt::SolidLine);
+    QPen pen(COLOR_COORDINATE_AXIS, 1, Qt::SolidLine);
     painter.setPen(pen);
 
     // 绘制X轴和Y轴
@@ -693,9 +748,9 @@ void SimulationPlatform::drawMark1(QPainter &painter)
     QPointF pos = transformPoint(QPointF(finalX, finalY));
 
     // 设置画笔
-    QPen pen(Qt::red, 1);
+    QPen pen(COLOR_MARK1, 1);
     painter.setPen(pen);
-    painter.setBrush(Qt::red);
+    painter.setBrush(COLOR_MARK1);
 
     // 保存当前变换
     painter.save();
@@ -757,9 +812,9 @@ void SimulationPlatform::drawMark2(QPainter &painter)
     QPointF pos = transformPoint(QPointF(finalX, finalY));
 
     // 设置画笔
-    QPen pen(Qt::magenta, 1);
+    QPen pen(COLOR_MARK2, 1);
     painter.setPen(pen);
-    painter.setBrush(Qt::magenta);
+    painter.setBrush(COLOR_MARK2);
 
     // 保存当前变换
     painter.save();
@@ -794,6 +849,70 @@ void SimulationPlatform::drawMark2(QPainter &painter)
     // painter.drawText(pos.x() + 10, pos.y() + 20, "Mark2");
 
     // painter.restore();
+}
+
+void SimulationPlatform::drawVirtualMark(QPainter &painter)
+{
+    painter.save();
+
+    // 1. 计算Mark2的最终位置和角度
+    double mark2FinalX, mark2FinalY, mark2FinalAngle;
+    if (mark2.followPlatform)
+    {
+        mark2FinalX = realTimePlatform.x + mark2.x;
+        mark2FinalY = realTimePlatform.y + mark2.y;
+        mark2FinalAngle = realTimePlatform.angle + mark2.angle;
+    }
+    else
+    {
+        mark2FinalX = mark2.x;
+        mark2FinalY = mark2.y;
+        mark2FinalAngle = mark2.angle;
+    }
+
+    QPointF pos = transformPoint(QPointF(mark2FinalX, mark2FinalY));
+
+    // 设置画笔
+    QPen pen(COLOR_VIRTUAL_MARK, 2);
+    painter.setPen(pen);
+
+    // 移动到Mark2中心位置并旋转
+    painter.translate(pos.x(), pos.y());
+    painter.rotate(mark2FinalAngle);
+
+    // 计算参数
+    double spacing = m_markSpacing / 2 * m_scale;   // Mark2左右侧的中心间距
+    // 最终偏移量 = 默认偏移量 + 用户设定值
+    double offsetX = (VIRTUAL_MARK_STATIC_X + virtualMark.x) * m_scale;  // X偏移（向外为正）
+    double offsetY = (VIRTUAL_MARK_STATIC_Y + virtualMark.y) * m_scale;  // Y偏移（向上为正）
+    double rectWidth = MARK_RECT_WIDTH * m_scale;   // 矩形宽度
+    double rectHeight = MARK_RECT_HEIGHT * m_scale; // 矩形高度
+
+    painter.setBrush(COLOR_VIRTUAL_MARK);
+
+    // 绘制左侧十字Mark（相对左侧Mark2向外、向上偏移）
+    // 左侧Mark2中心在 (-spacing, 0)，向外偏移即X减小，向上偏移即Y减小（屏幕坐标）
+    double leftCenterX = -spacing - offsetX;
+    double leftCenterY = -offsetY;
+    // 水平矩形（宽为rectHeight，高为rectWidth，居中）
+    painter.drawRect(QRectF(leftCenterX - rectHeight / 2, leftCenterY - rectWidth / 2,
+                            rectHeight, rectWidth));
+    // 垂直矩形（宽为rectWidth，高为rectHeight，居中）
+    painter.drawRect(QRectF(leftCenterX - rectWidth / 2, leftCenterY - rectHeight / 2,
+                            rectWidth, rectHeight));
+
+    // 绘制右侧十字Mark（相对右侧Mark2向外、向上偏移）
+    // 右侧Mark2中心在 (spacing, 0)，向外偏移即X增大，向上偏移即Y减小（屏幕坐标）
+    double rightCenterX = spacing + offsetX;
+    double rightCenterY = -offsetY;
+    // 水平矩形
+    painter.drawRect(QRectF(rightCenterX - rectHeight / 2, rightCenterY - rectWidth / 2,
+                            rectHeight, rectWidth));
+    // 垂直矩形
+    painter.drawRect(QRectF(rightCenterX - rectWidth / 2, rightCenterY - rectHeight / 2,
+                            rectWidth, rectHeight));
+
+    painter.restore();
 }
 
 QPointF SimulationPlatform::rotatePoint(const QPointF &point, double angle)

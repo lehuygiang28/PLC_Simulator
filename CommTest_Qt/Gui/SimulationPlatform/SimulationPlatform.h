@@ -79,6 +79,7 @@ private slots:
     void updateRealTimePlatform();
     void updateMark1();
     void updateMark2();
+    void updateVirtualMark();
 
 private:
     // UI控件
@@ -106,6 +107,10 @@ private:
     QLineEdit *mark2AngleEdit;
     QCheckBox *mark2FollowRealTimeCheckBox;
     QCheckBox *ShowMark2CheckBox;
+
+    QLineEdit *virtualMarkXEdit;
+    QLineEdit *virtualMarkYEdit;
+    QCheckBox *showVirtualMarkCheckBox;
     
     QLineEdit* markCenterDistanceEdit;
     QLineEdit* ScreenRatio;
@@ -151,6 +156,7 @@ private:
     Platform realTimePlatform;
     Mark mark1;
     Mark mark2;
+    Mark virtualMark;
     
     // 绘图相关
     QPoint m_origin; // 坐标原点
@@ -170,6 +176,7 @@ private:
     void drawPlatform(QPainter &painter, const Platform &platform, QColor color);
     void drawMark1(QPainter &painter);
     void drawMark2(QPainter &painter);
+    void drawVirtualMark(QPainter &painter);
     QPointF rotatePoint(const QPointF &point, double angle);
     QPointF transformPoint(const QPointF &point);
     QPointF inverseTransformPoint(const QPointF &point);
