@@ -12,6 +12,7 @@
 #include <QObject>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QAbstractItemView>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -165,6 +166,8 @@ private:
     std::vector<DataTypeConvert> m_vecRegisterVal;  ///< 寄存器数据缓存
     int m_nIntStat;                   ///< 整数显示状态 0=十进制, 1=十六进制
     bool m_bShouldFlash;              ///< 是否允许闪烁效果
+    int m_nEditRow;                   ///< 当前正在编辑的行(-1 表示无),刷新时跳过保护
+    int m_nEditCol;                   ///< 当前正在编辑的列(-1 表示无),刷新时跳过保护
 };
 
 #endif // REGISTERTABLEMANAGER_H

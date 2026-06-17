@@ -1,4 +1,5 @@
 #include "RegisterTableManager.h"
+#include <QApplication>
 
 RegisterTableManager::RegisterTableManager(
     QTableWidget* tableWidget,
@@ -14,6 +15,8 @@ RegisterTableManager::RegisterTableManager(
     , m_parentWidget(parent)
     , m_nIntStat(0)
     , m_bShouldFlash(true)
+    , m_nEditRow(-1)
+    , m_nEditCol(-1)
 {
     // 初始化寄存器数据缓存
     int dataCellCount = REGISTER_TABLE_ROW_COUNT * (REGISTER_TABLE_COLUMN_COUNT / 2);
@@ -151,15 +154,17 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
     {
     case RegisterDataType::eDataTypeChar8:
     {
+        // 每个单元格对应 1 个 Int16(2 个字符),Int16 下标与 Int16 分支一致使用 ndataIndex % 4
+        int nInt16Index = ndataIndex % 4;
         int nCurChar = 0;
         while (nCurChar < 2 && pItem->text().length() > nCurChar)
         {
-            int ncharIndex = ndataIndex % 8 + nCurChar;
+            int ncharIndex = nInt16Index * 2 + nCurChar;
             char nchar = pItem->text().at(nCurChar).toLatin1();
             m_vecRegisterVal[nRegisterValIndex].u_chars[ncharIndex] = nchar;
             nCurChar++;
         }
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[0]);
+        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
     }
     break;
     case RegisterDataType::eDataTypeInt16:
@@ -190,17 +195,21 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
             bool bOk = false;
             nVal = pItem->text().toInt(&bOk, 16);
         }
-        m_vecRegisterVal[nRegisterValIndex].u_Int32[ndataIndex % 2] = nVal;
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[0]);
-        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[1]);
+        // 每个 Int32 占 2 个 Int16:子下标按 ndataIndex%4 推导,与 display/读取端保持一致
+        int nInt16Index = ndataIndex % 4;
+        m_vecRegisterVal[nRegisterValIndex].u_Int32[nInt16Index / 2] = nVal;
+        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
+        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
     }
     break;
     case RegisterDataType::eDataTypeFloat:
     {
         float nVal = pItem->text().toFloat();
-        m_vecRegisterVal[nRegisterValIndex].u_float[ndataIndex % 2] = nVal;
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[0]);
-        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[1]);
+        // 每个 float 占 2 个 Int16:子下标按 ndataIndex%4 推导,与 display/读取端保持一致
+        int nInt16Index = ndataIndex % 4;
+        m_vecRegisterVal[nRegisterValIndex].u_float[nInt16Index / 2] = nVal;
+        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
+        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
     }
     break;
     case RegisterDataType::eDataTypeDouble:
@@ -386,6 +395,20 @@ void RegisterTableManager::displayRegisterVals()
     int nCurIndex = m_dataTypeCombo->currentIndex();
     if (nCurIndex < 0) return;
 
+    // 记录当前正在编辑的单元格,刷新时跳过它,避免覆盖用户未提交的输入
+    // (写文本会触发 dataChanged -> setEditorData,把编辑器内容重置为最新值,导致输入被"复原")
+    // QAbstractItemView::state() 为 protected,无法直接判断编辑态;
+    // 编辑器打开时它是 viewport 的子控件且持有焦点,据此识别正在编辑的格
+    m_nEditRow = -1;
+    m_nEditCol = -1;
+    QWidget* focusWidget = QApplication::focusWidget();
+    if (focusWidget && m_tableWidget->viewport()->isAncestorOf(focusWidget))
+    {
+        QModelIndex editIndex = m_tableWidget->currentIndex();
+        m_nEditRow = editIndex.row();
+        m_nEditCol = editIndex.column();
+    }
+
     m_bShouldFlash = false;
 
     QVariant data = m_dataTypeCombo->itemData(nCurIndex);
@@ -398,6 +421,8 @@ void RegisterTableManager::displayRegisterVals()
     {
         for (int row = 0; row < rowCount; row++)
         {
+            if (row == m_nEditRow && col == m_nEditCol) continue;  // 跳过正在编辑的格
+
             QTableWidgetItem* item = m_tableWidget->item(row, col);
             if (item)
             {
@@ -447,9 +472,12 @@ void RegisterTableManager::displayRegisterVals_Char8()
                 .arg(QChar(currentData->u_chars[nRealDataCount++]))
                 .arg(QChar(currentData->u_chars[nRealDataCount++])));
 
-            m_tableWidget->item(row, col)->setText(strInfo);
-            m_tableWidget->item(row, col)->setFlags(
-                m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+            if (!(row == m_nEditRow && col == m_nEditCol))
+            {
+                m_tableWidget->item(row, col)->setText(strInfo);
+                m_tableWidget->item(row, col)->setFlags(
+                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+            }
 
             if (nRealDataCount == 8)
             {
@@ -489,9 +517,12 @@ void RegisterTableManager::displayRegisterVals_Int16()
                 strInfo = QString("%1").arg(currentData->u_Int16[nRealDataCount++]);
             }
 
-            m_tableWidget->item(row, col)->setText(strInfo);
-            m_tableWidget->item(row, col)->setFlags(
-                m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+            if (!(row == m_nEditRow && col == m_nEditCol))
+            {
+                m_tableWidget->item(row, col)->setText(strInfo);
+                m_tableWidget->item(row, col)->setFlags(
+                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+            }
 
             if (nRealDataCount == 4)
             {
@@ -536,9 +567,12 @@ void RegisterTableManager::displayRegisterVals_Int32()
                     strInfo = QString("%1").arg(currentData->u_Int32[nRealDataCount++]);
                 }
 
-                m_tableWidget->item(row, col)->setText(strInfo);
-                m_tableWidget->item(row, col)->setFlags(
-                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+                if (!(row == m_nEditRow && col == m_nEditCol))
+                {
+                    m_tableWidget->item(row, col)->setText(strInfo);
+                    m_tableWidget->item(row, col)->setFlags(
+                        m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+                }
 
                 if (nRealDataCount == 2)
                 {
@@ -575,9 +609,12 @@ void RegisterTableManager::displayRegisterVals_Float()
             {
                 QString strInfo = QString("%1").arg(currentData->u_float[nRealDataCount++]);
 
-                m_tableWidget->item(row, col)->setText(strInfo);
-                m_tableWidget->item(row, col)->setFlags(
-                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+                if (!(row == m_nEditRow && col == m_nEditCol))
+                {
+                    m_tableWidget->item(row, col)->setText(strInfo);
+                    m_tableWidget->item(row, col)->setFlags(
+                        m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+                }
 
                 if (nRealDataCount == 2)
                 {
@@ -613,9 +650,12 @@ void RegisterTableManager::displayRegisterVals_Double()
             {
                 QString strInfo = QString("%1").arg(currentData->u_double);
 
-                m_tableWidget->item(row, col)->setText(strInfo);
-                m_tableWidget->item(row, col)->setFlags(
-                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+                if (!(row == m_nEditRow && col == m_nEditCol))
+                {
+                    m_tableWidget->item(row, col)->setText(strInfo);
+                    m_tableWidget->item(row, col)->setFlags(
+                        m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
+                }
 
                 nRegisterCount++;
                 if (nRegisterCount >= static_cast<int>(m_vecRegisterVal.size()))
