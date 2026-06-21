@@ -1,5 +1,6 @@
 #include "SubMainWindow.h"
 #include <QCoreApplication>
+#include <QFrame>
 
 #ifdef _WIN32
 #ifdef _DEBUG
@@ -8,24 +9,30 @@
 #endif
 
 SubMainWindow::SubMainWindow(QWidget* parent)
-    : QDialog(parent) 
+    : QDialog(parent)
 {
-	//setWindowFlags(windowFlags() | Qt::Tool);
+	// 注:窗口标志(独立窗口、隐藏最小/最大/关闭按钮)在主窗口创建小窗处统一设置
 
-	// 初始化布局（3列2行放6个按钮，第3行放退出按钮）
-	QGridLayout* gridLayout = new QGridLayout(this);
+	// 初始化布局（所有按钮垂直排列：6个脚本按钮竖排，退出按钮置底）
+	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // 创建6个按钮并添加到网格布局
-    for (int i = 0; i < 6; ++i) 
+    // 创建6个按钮并垂直添加
+    for (int i = 0; i < 6; ++i)
     {
         btn[i] = new QPushButton(this);
-        // 布局位置：第i/3行，第i%3列（0-2列，0-1行）
-        gridLayout->addWidget(btn[i], i / 3, i % 3);
+        mainLayout->addWidget(btn[i]);
     }
 
-    // 创建退出小窗的按钮（跨3列显示）
+    // 脚本按钮与退出按钮之间:间距 + 细分隔线,明确区分两类操作
+    mainLayout->addSpacing(4);
+    QFrame* separator = new QFrame(this);
+    separator->setObjectName("hSeparator");
+    mainLayout->addWidget(separator);
+    mainLayout->addSpacing(4);
+
+    // 创建退出小窗的按钮（置于底部）
     btnExit = new QPushButton("退出小窗", this);
-    gridLayout->addWidget(btnExit, 2, 0, 1, 3); // 第2行，0列，占1行3列
+    mainLayout->addWidget(btnExit);
 
 	// 退出按钮点击：隐藏小窗并显示主窗口（通过信号通知主窗口）
     connect(btnExit, &QPushButton::clicked, this, [this]() {
@@ -40,11 +47,13 @@ SubMainWindow::SubMainWindow(QWidget* parent)
     connect(btn[4], &QPushButton::clicked, this, &SubMainWindow::onButton5Clicked);
     connect(btn[5], &QPushButton::clicked, this, &SubMainWindow::onButton6Clicked);
 
-    gridLayout->setContentsMargins(8,8,8,8);
-    gridLayout->setHorizontalSpacing(8);
-    gridLayout->setVerticalSpacing(8);
+    mainLayout->setContentsMargins(8, 8, 8, 8);
+    mainLayout->setSpacing(8);
 
-    applyStyle();
+    // 最小宽度:保证标题栏文字(含版本号与"子窗口")完整显示
+    setMinimumWidth(340);
+
+    // 按钮样式由全局主题样式表(ThemeManager)统一控制,不再设置局部样式
 }
 
 void SubMainWindow::setButtonTexts(const QStringList& texts)
@@ -92,37 +101,4 @@ void SubMainWindow::onButton6Clicked()
 {
     //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script6.lua";
     emit executeLuaScript(6);
-}
-
-void SubMainWindow::applyStyle()
-{
-    const QString buttonStyleSheet =
-        "QPushButton {"
-        "    background-color: #F0F0F0;"
-        "    color: #212121;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 6px;"
-        "    padding: 6px 12px;"
-        "    font-weight: 500;"
-        "    font-size: 11pt;"
-        "    outline: none;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #E8E8E8;"
-        "    border: 1px solid #4CA3E0;"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: #D0D0D0;"
-        "    border: 1px solid #2E7BA8;"
-        "}"
-        "QPushButton:disabled {"
-        "    background-color: #E0E0E0;"
-        "    color: #808080;"
-        "    border: 1px solid #DDDDDD;"
-        "}";
-
-    for (int i = 0; i < 6; ++i) {
-        if (btn[i]) btn[i]->setStyleSheet(buttonStyleSheet);
-    }
-    if (btnExit) btnExit->setStyleSheet(buttonStyleSheet);
 }

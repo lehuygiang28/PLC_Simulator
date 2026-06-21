@@ -160,6 +160,9 @@ QMenu::indicator:checked { color: @accent; }
 /* 状态栏 */
 QStatusBar { background-color: @surface; color: @text2; border-top: 1px solid @border; }
 
+/* 通用细分隔线(objectName=hSeparator,跟随主题)*/
+QFrame#hSeparator { background-color: @border; border: none; min-height: 1px; max-height: 1px; }
+
 /* 滚动条 */
 QScrollBar:vertical { background: @bg; width: 11px; margin: 0; }
 QScrollBar:horizontal { background: @bg; height: 11px; margin: 0; }

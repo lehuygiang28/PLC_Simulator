@@ -284,8 +284,8 @@ void CommTest_Qt::InitializeMember()
 	m_subWindow = std::make_unique<SubMainWindow>();
 	// 将当前窗口的名称设置为小窗名称
 	m_subWindow->setWindowTitle(this->windowTitle() + " - 子窗口");
-	m_subWindow->setWindowFlags(Qt::Window); // 设置为独立窗口
-	m_subWindow->createWinId();
+	// 独立窗口,标题栏保留标题与最小化按钮(支持任务栏最小化/还原),不显示最大化/关闭按钮
+	m_subWindow->setWindowFlags(Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
 	// 初始化模拟平台窗口
 	m_simulationPlatform = new SimulationPlatform(this);
 	// 将当前窗口的名称设置为模拟平台窗口名称
@@ -307,19 +307,9 @@ void CommTest_Qt::InitializeMember()
             m_simulationPlatform->setWindowState(state);
         } });
 
-	// 监听子窗口状态变化
-	auto subHandle = m_subWindow->windowHandle();
-	if (subHandle)
-	{
-		connect(subHandle, &QWindow::windowStateChanged, this, [this](Qt::WindowState state)
-				{
-            // 子窗口状态变化
-            if (m_subWindow->isVisible()) {
-                // 只有子窗口显示时才同步
-                m_simulationPlatform->setWindowState(state);
-            }
-			m_subWindow->activateWindow(); });
-	}
+	// 监听子窗口状态变化:用事件过滤器捕获 QEvent::WindowStateChange
+	// (QWidget 级事件,不依赖原生句柄,无需提前 createWinId;状态联动逻辑见 eventFilter)
+	m_subWindow->installEventFilter(this);
 
 	// 协议设置相关
 	{
@@ -1305,9 +1295,14 @@ void CommTest_Qt::OnThemeSelected(Theme theme)
 
 bool CommTest_Qt::eventFilter(QObject *watched, QEvent *event)
 {
-	if (watched == ui->table_RegisterData)
+	// 小窗最小化/还原时,模拟平台跟随其窗口状态(主窗口隐藏、仅小窗显示的场景)
+	if (watched == m_subWindow.get() && event->type() == QEvent::WindowStateChange)
 	{
-		return QMainWindow::eventFilter(watched, event);
+		if (m_subWindow->isVisible())
+		{
+			m_simulationPlatform->setWindowState(m_subWindow->windowState());
+		}
+		m_subWindow->activateWindow();
 	}
 	return QMainWindow::eventFilter(watched, event);
 }
