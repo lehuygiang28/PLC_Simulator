@@ -16,6 +16,51 @@
 namespace {
 constexpr int kLineNumLeftPad = 10;  // 行号区左侧留白
 constexpr int kLineNumRightPad = 8;  // 行号与正文之间留白
+
+// 前导空白的视觉列数:空格记 1 列,Tab 补足到下一个 IndentWidth 列
+int leadingColumns(const QString &text)
+{
+    int col = 0;
+    int i = 0;
+    while (i < text.size()) {
+        const QChar ch = text.at(i);
+        if (ch == ' ') {
+            col += 1;
+        } else if (ch == '\t') {
+            col += CodeEditor::IndentWidth - (col % CodeEditor::IndentWidth);
+        } else {
+            break;
+        }
+        ++i;
+    }
+    return col;
+}
+
+// 该块应绘制的缩进参考线级数。空行取前后最近非空行缩进的较大值,实现跨空行衔接
+// (取较大值可保证最内层竖线在 elseif/else 等中途回退处仍连续不断开)。
+int indentGuideLevels(const QTextBlock &block)
+{
+    const QString text = block.text();
+    if (!text.trimmed().isEmpty()) {
+        return leadingColumns(text) / CodeEditor::IndentWidth;
+    }
+
+    int prev = 0;
+    for (QTextBlock b = block.previous(); b.isValid(); b = b.previous()) {
+        if (!b.text().trimmed().isEmpty()) {
+            prev = leadingColumns(b.text()) / CodeEditor::IndentWidth;
+            break;
+        }
+    }
+    int next = 0;
+    for (QTextBlock b = block.next(); b.isValid(); b = b.next()) {
+        if (!b.text().trimmed().isEmpty()) {
+            next = leadingColumns(b.text()) / CodeEditor::IndentWidth;
+            break;
+        }
+    }
+    return qMax(prev, next);
+}
 }
 
 // CodeEditor 实现
@@ -168,6 +213,36 @@ void CodeEditor::changeEvent(QEvent *event)
     if (event->type() == QEvent::FontChange) {
         // Tab 视觉列宽与缩进单位保持一致(IndentWidth 个空格宽),随字体自动重算
         setTabStopDistance(IndentWidth * fontMetrics().horizontalAdvance(' '));
+    }
+}
+
+void CodeEditor::paintEvent(QPaintEvent *event)
+{
+    // 先正常绘制文字,再在缩进空白处叠画参考线(便于阅读 if/while 等多行块结构)
+    QPlainTextEdit::paintEvent(event);
+
+    QPainter painter(viewport());
+    painter.setPen(ThemeManager::instance().color("@divider"));
+
+    const qreal charW = fontMetrics().horizontalAdvance(' ');
+    const qreal x0 = contentOffset().x() + document()->documentMargin();
+
+    QTextBlock block = firstVisibleBlock();
+    while (block.isValid()) {
+        const QRectF geo = blockBoundingGeometry(block).translated(contentOffset());
+        if (geo.top() > event->rect().bottom()) {
+            break;
+        }
+        if (block.isVisible() && geo.bottom() >= event->rect().top()) {
+            const int levels = indentGuideLevels(block);  // 含跨空行衔接
+            const int top = qRound(geo.top());
+            const int bottom = qRound(geo.bottom());
+            for (int lv = 0; lv < levels; ++lv) {
+                const int x = qRound(x0 + lv * IndentWidth * charW);
+                painter.drawLine(x, top, x, bottom);
+            }
+        }
+        block = block.next();
     }
 }
 

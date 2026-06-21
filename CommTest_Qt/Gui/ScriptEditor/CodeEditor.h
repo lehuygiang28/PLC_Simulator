@@ -32,6 +32,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;  // Tab/Shift+Tab 缩进处理(转空格)
     void changeEvent(QEvent *event) override;        // 字体变化时按 IndentWidth 同步 Tab 视觉列宽
+    void paintEvent(QPaintEvent *event) override;    // 在文字之上叠画缩进参考线
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
