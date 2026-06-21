@@ -51,7 +51,6 @@ private:
     void InitialSignalConnect();
     void InitialLineEditValidator();
     void InitialAllConfigs();
-    void InitialGuiStyle();
 
     // 协议相关
     void CreateCurrentProtocol();
