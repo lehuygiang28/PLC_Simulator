@@ -421,6 +421,27 @@ void CommTest_Qt::InitialSignalConnect()
 	QAction *changelogAction = helpMenu->addAction("更新日志(&U)");
 	connect(aboutAction, &QAction::triggered, this, &CommTest_Qt::OnShowAboutDialog);
 	connect(changelogAction, &QAction::triggered, this, &CommTest_Qt::OnShowChangeLog);
+
+	// 视图菜单:主题切换
+	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
+	QMenu* themeMenu = viewMenu->addMenu("主题");
+	m_actLightTheme = themeMenu->addAction("浅色");
+	m_actDarkTheme = themeMenu->addAction("深色");
+	m_actLightTheme->setCheckable(true);
+	m_actDarkTheme->setCheckable(true);
+	QActionGroup* themeGroup = new QActionGroup(this);
+	themeGroup->setExclusive(true);
+	themeGroup->addAction(m_actLightTheme);
+	themeGroup->addAction(m_actDarkTheme);
+
+	// 同步当前主题的勾选状态
+	Theme cur = ThemeManager::instance().currentTheme();
+	m_actLightTheme->setChecked(cur == Theme::Light);
+	m_actDarkTheme->setChecked(cur == Theme::Dark);
+
+	connect(m_actLightTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Light); });
+	connect(m_actDarkTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
+
 	// 连接小窗口的显示主窗口信号到主窗口的show()槽
 	connect(m_subWindow.get(), &SubMainWindow::showMainWindow, this, &CommTest_Qt::show);
 
@@ -1270,6 +1291,15 @@ void CommTest_Qt::OnShowChangeLog()
 	layout->addLayout(btnLayout);
 
 	licenseDialog->exec();
+}
+
+void CommTest_Qt::OnThemeSelected(Theme theme)
+{
+	ThemeManager::instance().applyTheme(theme);
+	if (m_configManager != nullptr)
+	{
+		m_configManager->SaveThemePref(static_cast<int>(theme));
+	}
 }
 
 bool CommTest_Qt::eventFilter(QObject *watched, QEvent *event)
