@@ -4,7 +4,12 @@ QWidget {
     background-color: @bg;
     color: @text;
     font-family: "Microsoft YaHei", "Segoe UI";
-    font-size: 9pt;
+    font-size: 10pt;
+}
+
+/* 静态文本/单选/复选背景透明,透出所在卡片底色,避免在卡片上出现灰色方块 */
+QLabel, QRadioButton, QCheckBox {
+    background: transparent;
 }
 
 QToolTip {
@@ -28,7 +33,7 @@ QGroupBox::title {
     left: 12px;
     padding: 0 6px;
     color: @accent;
-    font-weight: 600;
+    font-weight: bold;
 }
 
 /* 按钮 */
@@ -75,13 +80,11 @@ QComboBox {
     font-size: 10pt;
 }
 QComboBox:hover { border: 1px solid @accent; }
-QComboBox::drop-down { width: 20px; border: 0; }
+QComboBox::drop-down { width: 22px; border: 0; background: transparent; }
 QComboBox::down-arrow {
-    width: 0; height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid @text2;
-    margin-right: 6px;
+    image: url(:/qss/arrow-down.svg);
+    width: 12px;
+    height: 12px;
 }
 QComboBox QAbstractItemView {
     background-color: @surface;
@@ -102,8 +105,10 @@ QRadioButton::indicator, QCheckBox::indicator {
 QRadioButton::indicator { border-radius: 8px; }
 QCheckBox::indicator { border-radius: 4px; }
 QRadioButton::indicator:checked {
-    border: 4px solid @accent;
-    background-color: #ffffff;
+    border: 1px solid @accentDark;
+    border-radius: 8px;
+    background-color: @accent;
+    image: url(:/qss/radio-dot.svg);
 }
 QCheckBox::indicator:checked {
     background-color: @accent;
@@ -119,7 +124,6 @@ QTextEdit, QPlainTextEdit {
     border: 1px solid @border;
     border-radius: 6px;
     padding: 4px;
-    font-family: "Consolas", "Courier New", monospace;
     font-size: 10pt;
 }
 

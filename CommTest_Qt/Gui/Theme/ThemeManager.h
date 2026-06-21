@@ -12,6 +12,7 @@
 #include <QObject>
 #include <QString>
 #include <QMap>
+#include <QPalette>
 
 /**
  * @brief 主题枚举(数值与配置持久化一致:0=浅色, 1=深色)
@@ -50,6 +51,9 @@ private:
     Q_DISABLE_COPY(ThemeManager)
 
     const QMap<QString, QString>& palette(Theme theme) const;
+
+    /// 由颜色表构建 QPalette(覆盖样式表够不到的原生绘制部分)
+    QPalette buildQtPalette(Theme theme) const;
 
     Theme m_current = Theme::Dark;
     QMap<QString, QString> m_light;

@@ -61,14 +61,7 @@ void RegisterTableManager::initTable()
     }
 
     m_tableWidget->setAlternatingRowColors(true);
-
-    m_tableWidget->setStyleSheet(
-        "QTableWidget {"
-        "   background-color: rgb(255, 255, 255);"
-        "   alternate-background-color: rgb(240, 240, 240);"
-        "   gridline-color: rgb(200, 200, 200);"
-        "}"
-    );
+    // 表格外观由全局主题样式表(ThemeManager)统一控制,此处不再设置局部样式
 }
 
 void RegisterTableManager::updateTableInfo(int nStart, bool bInitialize)

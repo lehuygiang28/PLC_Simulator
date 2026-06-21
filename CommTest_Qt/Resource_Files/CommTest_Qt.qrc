@@ -5,5 +5,7 @@
     <qresource prefix="/qss">
         <file>style_template.qss</file>
         <file>check.svg</file>
+        <file>arrow-down.svg</file>
+        <file>radio-dot.svg</file>
     </qresource>
 </RCC>

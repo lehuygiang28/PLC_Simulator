@@ -86,9 +86,39 @@ QString ThemeManager::buildStyleSheet(Theme theme) const
     return sheet;
 }
 
+QPalette ThemeManager::buildQtPalette(Theme theme) const
+{
+    const QMap<QString, QString>& c = palette(theme);
+    auto col = [&c](const QString& key) { return QColor(c.value(key)); };
+
+    QPalette p;
+    p.setColor(QPalette::Window,          col("@bg"));
+    p.setColor(QPalette::WindowText,      col("@text"));
+    p.setColor(QPalette::Base,            col("@input"));
+    p.setColor(QPalette::AlternateBase,   col("@altRow"));
+    p.setColor(QPalette::ToolTipBase,     col("@surface"));
+    p.setColor(QPalette::ToolTipText,     col("@text"));
+    p.setColor(QPalette::Text,            col("@text"));
+    p.setColor(QPalette::PlaceholderText, col("@text2"));
+    p.setColor(QPalette::Button,          col("@surface2"));
+    p.setColor(QPalette::ButtonText,      col("@text"));
+    p.setColor(QPalette::BrightText,      QColor("#ffffff"));
+    p.setColor(QPalette::Highlight,       col("@accent"));
+    p.setColor(QPalette::HighlightedText, QColor("#ffffff"));
+    // 禁用态
+    p.setColor(QPalette::Disabled, QPalette::WindowText, col("@disabledText"));
+    p.setColor(QPalette::Disabled, QPalette::Text,       col("@disabledText"));
+    p.setColor(QPalette::Disabled, QPalette::ButtonText, col("@disabledText"));
+    p.setColor(QPalette::Disabled, QPalette::Base,       col("@disabledBg"));
+    p.setColor(QPalette::Disabled, QPalette::Button,     col("@disabledBg"));
+    return p;
+}
+
 void ThemeManager::applyTheme(Theme theme)
 {
     m_current = theme;
+    // 先设调色板(覆盖原生绘制部分),再设样式表(覆盖可定制部分)
+    qApp->setPalette(buildQtPalette(theme));
     qApp->setStyleSheet(buildStyleSheet(theme));
     emit themeChanged(theme);
 }
