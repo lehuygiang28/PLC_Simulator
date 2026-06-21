@@ -424,6 +424,7 @@ void CommTest_Qt::InitialSignalConnect()
 
 	// 视图菜单:主题切换
 	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
+	ui->menuBar->insertMenu(helpMenu->menuAction(), viewMenu);
 	QMenu* themeMenu = viewMenu->addMenu("主题");
 	m_actLightTheme = themeMenu->addAction("浅色");
 	m_actDarkTheme = themeMenu->addAction("深色");
