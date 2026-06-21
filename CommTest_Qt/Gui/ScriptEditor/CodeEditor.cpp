@@ -11,6 +11,7 @@
 
 #include <QPainter>
 #include <QTextBlock>
+#include <QKeyEvent>
 
 namespace {
 constexpr int kLineNumLeftPad = 10;  // 行号区左侧留白
@@ -99,6 +100,75 @@ void CodeEditor::highlightCurrentLine()
 
     // 光标移动后重画行号区,使当前行号高亮跟随光标
     lineNumberArea->update();
+}
+
+void CodeEditor::keyPressEvent(QKeyEvent *event)
+{
+    const int key = event->key();
+    const Qt::KeyboardModifiers mods = event->modifiers();
+
+    // Tab(无修饰):缩进 —— 有选区则整体右移,无选区则补足到下一个制表位
+    if (key == Qt::Key_Tab && mods == Qt::NoModifier) {
+        QTextCursor cursor = textCursor();
+        if (cursor.hasSelection()) {
+            const int endBlock = document()->findBlock(cursor.selectionEnd()).blockNumber();
+            QTextBlock block = document()->findBlock(cursor.selectionStart());
+            cursor.beginEditBlock();
+            while (block.isValid() && block.blockNumber() <= endBlock) {
+                QTextCursor c(block);
+                c.insertText(QString(IndentWidth, ' '));
+                block = block.next();
+            }
+            cursor.endEditBlock();
+        } else {
+            const int col = cursor.positionInBlock();
+            const int spaces = IndentWidth - (col % IndentWidth);
+            cursor.insertText(QString(spaces, ' '));
+        }
+        event->accept();
+        return;
+    }
+
+    // Shift+Tab(多数平台为 Key_Backtab):反缩进 —— 选中行(或当前行)整体左移一级
+    if (key == Qt::Key_Backtab || (key == Qt::Key_Tab && (mods & Qt::ShiftModifier))) {
+        QTextCursor cursor = textCursor();
+        const int startPos = cursor.hasSelection() ? cursor.selectionStart() : cursor.position();
+        const int endPos = cursor.hasSelection() ? cursor.selectionEnd() : cursor.position();
+        const int endBlock = document()->findBlock(endPos).blockNumber();
+        QTextBlock block = document()->findBlock(startPos);
+        cursor.beginEditBlock();
+        while (block.isValid() && block.blockNumber() <= endBlock) {
+            const QString text = block.text();
+            int remove = 0;
+            if (text.startsWith('\t')) {
+                remove = 1;  // 一个 Tab 视为一级缩进
+            } else {
+                while (remove < IndentWidth && remove < text.size() && text.at(remove) == ' ') {
+                    ++remove;
+                }
+            }
+            if (remove > 0) {
+                QTextCursor c(block);
+                c.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, remove);
+                c.removeSelectedText();
+            }
+            block = block.next();
+        }
+        cursor.endEditBlock();
+        event->accept();
+        return;
+    }
+
+    QPlainTextEdit::keyPressEvent(event);
+}
+
+void CodeEditor::changeEvent(QEvent *event)
+{
+    QPlainTextEdit::changeEvent(event);
+    if (event->type() == QEvent::FontChange) {
+        // Tab 视觉列宽与缩进单位保持一致(IndentWidth 个空格宽),随字体自动重算
+        setTabStopDistance(IndentWidth * fontMetrics().horizontalAdvance(' '));
+    }
 }
 
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)

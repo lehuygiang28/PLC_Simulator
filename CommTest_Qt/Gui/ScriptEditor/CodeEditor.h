@@ -22,11 +22,16 @@ class CodeEditor : public QPlainTextEdit
 public:
     CodeEditor(QWidget *parent = nullptr);
 
+    // 缩进宽度(空格数):Tab 转为该数量空格,亦决定 Tab 的视觉列宽。单一来源,供编辑器内部与外部复用。
+    static constexpr int IndentWidth = 4;
+
     void lineNumberAreaPaintEvent(QPaintEvent *event);
     int lineNumberAreaWidth();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;  // Tab/Shift+Tab 缩进处理(转空格)
+    void changeEvent(QEvent *event) override;        // 字体变化时按 IndentWidth 同步 Tab 视觉列宽
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);

@@ -39,7 +39,7 @@ ScriptEditor::ScriptEditor(QWidget *parent, IScriptRunner* pScriptRunner)
     font.setStyleHint(QFont::Monospace);
     font.setFixedPitch(true);
     font.setPointSize(10);
-    editor->setFont(font);
+    editor->setFont(font);  // CodeEditor 会在字体变化时按 IndentWidth 自动同步 Tab 视觉列宽
 
     createMenus();
     setupHighlighter();
