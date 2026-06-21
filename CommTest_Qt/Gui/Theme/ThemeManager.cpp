@@ -70,6 +70,11 @@ const QMap<QString, QString>& ThemeManager::palette(Theme theme) const
     return (theme == Theme::Dark) ? m_dark : m_light;
 }
 
+QColor ThemeManager::color(const QString& token) const
+{
+    return QColor(palette(m_current).value(token));
+}
+
 QString ThemeManager::buildStyleSheet(Theme theme) const
 {
     QFile f(":/qss/style_template.qss");

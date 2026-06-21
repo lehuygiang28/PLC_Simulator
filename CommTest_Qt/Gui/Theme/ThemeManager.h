@@ -49,6 +49,10 @@ public:
     /// 供运行时新建的顶层窗口在显示时调用,确保标题栏跟随主题。
     void applyTitleBar(QWidget* window);
 
+    /// 取当前主题下某个颜色 token 的实际色值(如 color("@text2"))。
+    /// 供代码编辑器等需离散取色、qss 够不到的自绘场景复用同一套主题色。
+    QColor color(const QString& token) const;
+
 signals:
     void themeChanged(Theme theme);
 

@@ -7,9 +7,15 @@
  */
 
 #include "CodeEditor.h"
+#include "ThemeManager.h"
 
 #include <QPainter>
 #include <QTextBlock>
+
+namespace {
+constexpr int kLineNumLeftPad = 10;  // 行号区左侧留白
+constexpr int kLineNumRightPad = 8;  // 行号与正文之间留白
+}
 
 // CodeEditor 实现
 CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent)
@@ -33,7 +39,7 @@ int CodeEditor::lineNumberAreaWidth()
         ++digits;
     }
 
-    int space = 3 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
+    int space = kLineNumLeftPad + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits + kLineNumRightPad;
 
     return space;
 }
@@ -67,44 +73,58 @@ void CodeEditor::highlightCurrentLine()
     QList<QTextEdit::ExtraSelection> extraSelections;
 
     if (!isReadOnly()) {
-        // 当前行高亮
+        ThemeManager &tm = ThemeManager::instance();
+
+        // 当前行高亮:跟随主题的柔和底色
         QTextEdit::ExtraSelection lineSelection;
-        lineSelection.format.setBackground(QColor(0xE8, 0xE8, 0xFF)); // #E8E8FF
+        lineSelection.format.setBackground(tm.color("@altRow"));
         lineSelection.format.setProperty(QTextFormat::FullWidthSelection, true);
         lineSelection.cursor = textCursor();
         lineSelection.cursor.clearSelection();
         extraSelections.append(lineSelection);
 
-        // 选中文本高亮
+        // 选中文本高亮:深浅主题各取一档,保证文字仍可读
         if (textCursor().hasSelection()) {
             QTextEdit::ExtraSelection textSelection;
-            textSelection.format.setBackground(QColor(Qt::yellow).lighter(160));
+            const QColor selColor = (tm.currentTheme() == Theme::Dark)
+                                        ? QColor(0x4a, 0x45, 0x28)   // 暗金,深底可读
+                                        : QColor(0xff, 0xf3, 0x99);  // 淡黄
+            textSelection.format.setBackground(selColor);
             textSelection.cursor = textCursor();
             extraSelections.append(textSelection);
         }
     }
 
     setExtraSelections(extraSelections);
+
+    // 光标移动后重画行号区,使当前行号高亮跟随光标
+    lineNumberArea->update();
 }
 
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event)
 {
+    ThemeManager &tm = ThemeManager::instance();
+
     QPainter painter(lineNumberArea);
-    // 行号区域背景色 #E4E4E4
-    painter.fillRect(event->rect(), QColor(0xE4, 0xE4, 0xE4));
+    // 不自绘行号区背景,沿用控件自身底色,仅以文字颜色区分
 
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
     int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
     int bottom = top + qRound(blockBoundingRect(block).height());
 
-    // 行号文本颜色 #808080
-    painter.setPen(QColor(0x80, 0x80, 0x80));
+    // 行号文本:当前行用亮色,其余用次级文字色(仅靠文字颜色区分,不绘制底色)
+    const QColor dimPen = tm.color("@text2");
+    const QColor brightPen = tm.color("@text");
+    const int curLine = textCursor().blockNumber();
 
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
+            const bool isCurrent = (blockNumber == curLine);
+            painter.setPen(isCurrent ? brightPen : dimPen);
             QString number = QString::number(blockNumber + 1);
-            painter.drawText(0, top, lineNumberArea->width(), fontMetrics().height(),
+            // 右对齐并留出与正文之间的间隙,使行号不贴紧代码
+            painter.drawText(0, top, lineNumberArea->width() - kLineNumRightPad, fontMetrics().height(),
                            Qt::AlignRight, number);
         }
 
