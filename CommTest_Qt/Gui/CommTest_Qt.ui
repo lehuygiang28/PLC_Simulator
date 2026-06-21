@@ -10,12 +10,6 @@
     <height>971</height>
    </rect>
   </property>
-  <property name="maximumSize">
-   <size>
-    <width>1350</width>
-    <height>1100</height>
-   </size>
-  </property>
   <property name="windowTitle">
    <string>CommTest_Qt</string>
   </property>
@@ -27,19 +21,16 @@
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout_2">
     <item>
-     <widget class="QGroupBox" name="grpbox_Comm">
+     <widget class="QWidget" name="grpbox_Comm">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
-      <property name="title">
-       <string>通信</string>
-      </property>
       <layout class="QGridLayout" name="gridLayout_3">
        <item row="1" column="1">
-        <widget class="QGroupBox" name="grpbox_RegisterSetting">
+        <widget class="CollapsibleGroupBox" name="grpbox_RegisterSetting">
          <property name="enabled">
           <bool>true</bool>
          </property>
@@ -221,7 +212,7 @@
         </widget>
        </item>
        <item row="0" column="1">
-        <widget class="QGroupBox" name="grpbox_Server">
+        <widget class="CollapsibleGroupBox" name="grpbox_Server">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -382,7 +373,22 @@
         </widget>
        </item>
        <item row="2" column="1">
-        <widget class="QTextEdit" name="text_CommLog"/>
+        <widget class="CollapsibleGroupBox" name="grpbox_CommLog">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="title">
+          <string>通信日志</string>
+         </property>
+         <layout class="QVBoxLayout" name="commLogLayout">
+          <item>
+           <widget class="QTextEdit" name="text_CommLog"/>
+          </item>
+         </layout>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -391,6 +397,12 @@
      <layout class="QVBoxLayout" name="OperationLayout">
       <item>
        <widget class="QTableWidget" name="table_RegisterData">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
         <property name="rowCount">
          <number>20</number>
         </property>
@@ -436,13 +448,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="groupBox">
-        <property name="title">
-         <string>操作</string>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QGroupBox" name="grpbox_LuaScript">
+       <layout class="QHBoxLayout" name="operationRowLayout">
+        <item>
+         <widget class="CollapsibleGroupBox" name="grpbox_LuaScript">
            <property name="minimumSize">
             <size>
              <width>370</width>
@@ -841,7 +849,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QGroupBox" name="grpbox_PlatformSimulation">
+          <widget class="CollapsibleGroupBox" name="grpbox_PlatformSimulation">
            <property name="minimumSize">
             <size>
              <width>210</width>
@@ -1067,7 +1075,6 @@
           </widget>
          </item>
         </layout>
-       </widget>
       </item>
      </layout>
     </item>
@@ -1086,6 +1093,14 @@
   <widget class="QStatusBar" name="statusBar"/>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <customwidgets>
+  <customwidget>
+   <class>CollapsibleGroupBox</class>
+   <extends>QGroupBox</extends>
+   <header>CollapsibleGroupBox.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../Resource_Files/CommTest_Qt.qrc"/>
  </resources>
