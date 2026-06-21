@@ -14,6 +14,8 @@
 #include <QMap>
 #include <QPalette>
 
+class QWidget;
+
 /**
  * @brief 主题枚举(数值与配置持久化一致:0=浅色, 1=深色)
  */
@@ -43,8 +45,17 @@ public:
     /// 由模板与颜色表生成最终样式表(无残留 @token)
     QString buildStyleSheet(Theme theme) const;
 
+    /// 按当前主题设置窗口原生标题栏深浅(Windows DWM);非 Windows 为空操作。
+    /// 供运行时新建的顶层窗口在显示时调用,确保标题栏跟随主题。
+    void applyTitleBar(QWidget* window);
+
 signals:
     void themeChanged(Theme theme);
+
+protected:
+    /// 应用级事件过滤器:任意顶层窗口显示(QEvent::Show)时自动设置原生标题栏深浅,
+    /// 避免每个窗口各自重写 showEvent(单点维护,新增窗口零样板)。
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     explicit ThemeManager(QObject* parent = nullptr);

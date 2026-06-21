@@ -9,10 +9,28 @@
 #include "ThemeManager.h"
 
 #include <QApplication>
+#include <QWidget>
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
 #include <QRegularExpression>
+#include <QEvent>
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <dwmapi.h>
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+// 旧版 Windows 10(1809~1903)使用的属性值
+#define DWMWA_USE_IMMERSIVE_DARK_MODE_OLD 19
+#endif
 
 ThemeManager& ThemeManager::instance()
 {
@@ -41,6 +59,10 @@ ThemeManager::ThemeManager(QObject* parent)
         {"@altRow",        "#f6f7f9"}, {"@addrBg",    "#f0f2f5"}, {"@disabledText", "#a0a4ab"},
         {"@disabledBg",    "#eef0f2"}
     };
+
+    // 安装应用级事件过滤器:任意顶层窗口显示时统一设置标题栏深浅,
+    // 避免每个窗口各自重写 showEvent(详见 eventFilter)。
+    qApp->installEventFilter(this);
 }
 
 const QMap<QString, QString>& ThemeManager::palette(Theme theme) const
@@ -114,16 +136,69 @@ QPalette ThemeManager::buildQtPalette(Theme theme) const
     return p;
 }
 
+void ThemeManager::applyTitleBar(QWidget* window)
+{
+#ifdef _WIN32
+    if (window == nullptr)
+    {
+        return;
+    }
+    HWND hwnd = reinterpret_cast<HWND>(window->winId()); // winId() 会按需创建原生句柄
+    if (hwnd == nullptr)
+    {
+        return;
+    }
+    BOOL dark = (m_current == Theme::Dark) ? TRUE : FALSE;
+    // 优先用新属性值(Win10 2004+/Win11),失败回退旧值(Win10 1809~1903)
+    if (FAILED(DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark))))
+    {
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &dark, sizeof(dark));
+    }
+    // 对已显示的窗口触发非客户区重绘,使标题栏立即更新
+    if (window->isVisible())
+    {
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    }
+#else
+    Q_UNUSED(window);
+#endif
+}
+
 void ThemeManager::applyTheme(Theme theme)
 {
     m_current = theme;
     // 先设调色板(覆盖原生绘制部分),再设样式表(覆盖可定制部分)
     qApp->setPalette(buildQtPalette(theme));
     qApp->setStyleSheet(buildStyleSheet(theme));
+    // 原生标题栏深浅(Windows DWM,qss 管不到):应用到所有顶层窗口
+    const QWidgetList topWindows = qApp->topLevelWidgets();
+    for (QWidget* w : topWindows)
+    {
+        if (w->isWindow())
+        {
+            applyTitleBar(w);
+        }
+    }
     emit themeChanged(theme);
 }
 
 void ThemeManager::toggle()
 {
     applyTheme(m_current == Theme::Dark ? Theme::Light : Theme::Dark);
+}
+
+bool ThemeManager::eventFilter(QObject* watched, QEvent* event)
+{
+    // 顶层窗口显示瞬间:设置其原生标题栏深浅,使所有窗口(含运行时新建)统一跟随主题。
+    // 先做 O(1) 类型判断,绝大多数事件直接放行,开销可忽略。
+    if (event->type() == QEvent::Show)
+    {
+        QWidget* w = qobject_cast<QWidget*>(watched);
+        if (w != nullptr && w->isWindow())
+        {
+            applyTitleBar(w);
+        }
+    }
+    return QObject::eventFilter(watched, event);
 }

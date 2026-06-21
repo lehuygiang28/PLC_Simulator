@@ -213,6 +213,11 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     Qt${QT_VERSION}::SerialPort
 )
 
+# Windows DWM(深色原生标题栏 DwmSetWindowAttribute)
+if(WIN32)
+    target_link_libraries(${TARGET_NAME} PRIVATE dwmapi)
+endif()
+
 
 # ========== 第二步：仅在 Debug 配置下链接 VLD（适配多配置生成器） ==========
 if(WIN32 AND VLD_FOUND)
