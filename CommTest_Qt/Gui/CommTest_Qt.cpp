@@ -1099,7 +1099,7 @@ void CommTest_Qt::OnShowAboutDialog()
 	// 应用名称（居中）
 	QLabel *nameLabel = new QLabel(APP_NAME, &aboutDialog);
 	nameLabel->setAlignment(Qt::AlignCenter);
-	nameLabel->setStyleSheet("font-size: 18pt; font-weight: bold; color: #333333;");
+	nameLabel->setStyleSheet("font-size: 18pt; font-weight: bold;");
 	mainLayout->addWidget(nameLabel);
 
 	// 版本信息（居中）
@@ -1113,46 +1113,26 @@ void CommTest_Qt::OnShowAboutDialog()
 							  
 	QLabel *versionLabel = new QLabel(versionInfo, &aboutDialog);
 	versionLabel->setAlignment(Qt::AlignCenter);
-	versionLabel->setStyleSheet("font-size: 10pt; color: #666666;");
+	versionLabel->setObjectName("secondaryText");
 	mainLayout->addWidget(versionLabel);
 
-	// 分隔线
+	// 分隔线(复用主题细分隔线)
 	QFrame *line = new QFrame(&aboutDialog);
-	line->setFrameShape(QFrame::HLine);
-	line->setFrameShadow(QFrame::Sunken);
-	line->setStyleSheet("background-color: #CCCCCC;");
+	line->setObjectName("hSeparator");
 	mainLayout->addWidget(line);
 
 	// 应用描述（靠左）
 	QLabel *descLabel = new QLabel(APP_DESCRIPTION, &aboutDialog);
 	descLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 	descLabel->setWordWrap(true);
-	descLabel->setStyleSheet("font-size: 10pt; color: #333333;");
 	mainLayout->addWidget(descLabel);
 
 	mainLayout->addStretch();
 
-	// 按钮样式
-	QString buttonStyle =
-		"QPushButton {"
-		"    background-color: #4CA3E0;"
-		"    color: white;"
-		"    border: none;"
-		"    border-radius: 4px;"
-		"    font-size: 10pt;"
-		"}"
-		"QPushButton:hover {"
-		"    background-color: #3A8BC8;"
-		"}"
-		"QPushButton:pressed {"
-		"    background-color: #2E7BA8;"
-		"}";
-
-	// 第三方许可按钮
+	// 第三方许可按钮(样式跟随全局主题)
 	QPushButton *licenseButton = new QPushButton("第三方许可", &aboutDialog);
 	licenseButton->setFixedSize(100, 30);
-	licenseButton->setStyleSheet(buttonStyle);
-	connect(licenseButton, &QPushButton::clicked, [this, buttonStyle]() {
+	connect(licenseButton, &QPushButton::clicked, [this]() {
 		// 读取第三方许可证文件（与可执行文件在同一目录）
 		QString licensePath = QCoreApplication::applicationDirPath() + "/THIRD_PARTY_LICENSES.txt";
 		QFile licenseFile(licensePath);
@@ -1182,12 +1162,10 @@ void CommTest_Qt::OnShowAboutDialog()
 		QTextEdit *textEdit = new QTextEdit(licenseDialog);
 		textEdit->setReadOnly(true);
 		textEdit->setPlainText(licenseContent);
-		textEdit->setStyleSheet("font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt;");
 		layout->addWidget(textEdit);
 
 		QPushButton *closeBtn = new QPushButton("关闭", licenseDialog);
 		closeBtn->setFixedSize(80, 30);
-		closeBtn->setStyleSheet(buttonStyle);
 		connect(closeBtn, &QPushButton::clicked, licenseDialog, &QDialog::accept);
 
 		QHBoxLayout *btnLayout = new QHBoxLayout();
@@ -1216,9 +1194,9 @@ void CommTest_Qt::OnShowAboutDialog()
 	QLabel *copyrightLabel = new QLabel(APP_COPYRIGHT_RC, &aboutDialog);
 	QLabel *linkLabel = new QLabel(APP_DOMAIN, &aboutDialog);
 	copyrightLabel->setAlignment(Qt::AlignCenter);
-	copyrightLabel->setStyleSheet("font-size: 8pt; color: #808080;");
+	copyrightLabel->setObjectName("captionText");
 	linkLabel->setAlignment(Qt::AlignCenter);
-	linkLabel->setStyleSheet("font-size: 8pt; color: #808080;");
+	linkLabel->setObjectName("captionText");
 	mainLayout->addWidget(copyrightLabel);
 	mainLayout->addWidget(linkLabel);
 
@@ -1240,23 +1218,7 @@ void CommTest_Qt::OnShowChangeLog()
 			LogContent = "There is no changeog.";
 		}
 
-		// 按钮样式
-	QString buttonStyle =
-		"QPushButton {"
-		"    background-color: #4CA3E0;"
-		"    color: white;"
-		"    border: none;"
-		"    border-radius: 4px;"
-		"    font-size: 10pt;"
-		"}"
-		"QPushButton:hover {"
-		"    background-color: #3A8BC8;"
-		"}"
-		"QPushButton:pressed {"
-		"    background-color: #2E7BA8;"
-		"}";
-
-	// 显示许可证对话框
+	// 显示更新日志对话框(样式跟随全局主题)
 	QDialog *licenseDialog = new QDialog(this);
 	licenseDialog->setWindowTitle("更新日志");
 	licenseDialog->setFixedSize(520, 500);
@@ -1267,12 +1229,10 @@ void CommTest_Qt::OnShowChangeLog()
 	QTextEdit *textEdit = new QTextEdit(licenseDialog);
 	textEdit->setReadOnly(true);
 	textEdit->setPlainText(LogContent);
-	textEdit->setStyleSheet("font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt;");
 	layout->addWidget(textEdit);
 
 	QPushButton *closeBtn = new QPushButton("关闭", licenseDialog);
 	closeBtn->setFixedSize(80, 30);
-	closeBtn->setStyleSheet(buttonStyle);
 	connect(closeBtn, &QPushButton::clicked, licenseDialog, &QDialog::accept);
 
 	QHBoxLayout *btnLayout = new QHBoxLayout();

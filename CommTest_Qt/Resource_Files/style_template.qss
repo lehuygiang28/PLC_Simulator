@@ -163,6 +163,10 @@ QStatusBar { background-color: @surface; color: @text2; border-top: 1px solid @b
 /* 通用细分隔线(objectName=hSeparator,跟随主题)*/
 QFrame#hSeparator { background-color: @border; border: none; min-height: 1px; max-height: 1px; }
 
+/* 对话框次级/脚注文字(版本、版权等弱化显示,跟随主题) */
+QLabel#secondaryText { color: @text2; }
+QLabel#captionText { color: @text2; font-size: 8pt; }
+
 /* 滚动条 */
 QScrollBar:vertical { background: @bg; width: 11px; margin: 0; }
 QScrollBar:horizontal { background: @bg; height: 11px; margin: 0; }
