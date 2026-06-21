@@ -68,8 +68,15 @@ QString ThemeManager::buildStyleSheet(Theme theme) const
         sheet.replace(key, colors.value(key));
     }
 
-    // 调试期校验:不应有残留 @token
+    // 校验:不应有残留 @token(调试期断言,发布期仅告警)
+#ifdef QT_DEBUG
     Q_ASSERT(!sheet.contains('@'));
+#else
+    if (sheet.contains('@'))
+    {
+        qWarning() << "ThemeManager: 样式表存在未替换的 @token";
+    }
+#endif
     return sheet;
 }
 
