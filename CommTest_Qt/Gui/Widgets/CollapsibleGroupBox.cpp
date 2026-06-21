@@ -15,6 +15,7 @@
 CollapsibleGroupBox::CollapsibleGroupBox(QWidget* parent)
     : QGroupBox(parent)
 {
+    setCheckable(false);  // 防御:不使用原生 checkable 指示器
     // 延迟到首次显示时记录原始标题并加箭头前缀
 }
 
@@ -51,18 +52,30 @@ void CollapsibleGroupBox::setCollapsed(bool collapsed)
     }
     m_collapsed = collapsed;
 
-    const QList<QWidget*> kids = findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly);
-    for (QWidget* w : kids)
-    {
-        w->setVisible(!collapsed);
-    }
-
     if (collapsed)
     {
+        m_hiddenOnCollapse.clear();
+        const QList<QWidget*> kids = findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly);
+        for (QWidget* w : kids)
+        {
+            if (w->isVisible())
+            {
+                w->hide();
+                m_hiddenOnCollapse.append(w);
+            }
+        }
         setMaximumHeight(headerHeight());
     }
     else
     {
+        for (const QPointer<QWidget>& w : m_hiddenOnCollapse)
+        {
+            if (w)
+            {
+                w->show();
+            }
+        }
+        m_hiddenOnCollapse.clear();
         setMaximumHeight(QWIDGETSIZE_MAX);
     }
     refreshTitlePrefix();

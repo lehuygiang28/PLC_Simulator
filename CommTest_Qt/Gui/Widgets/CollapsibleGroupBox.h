@@ -10,6 +10,7 @@
 #define COLLAPSIBLEGROUPBOX_H
 
 #include <QGroupBox>
+#include <QPointer>
 
 /**
  * @brief 可折叠分组框
@@ -40,6 +41,8 @@ private:
     QString m_baseTitle;
     bool    m_collapsed = false;
     bool    m_titleCaptured = false;
+
+    QList<QPointer<QWidget>> m_hiddenOnCollapse;  // 折叠时被本控件隐藏的子控件,展开时仅恢复这些
 };
 
 #endif // COLLAPSIBLEGROUPBOX_H
