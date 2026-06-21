@@ -1,4 +1,4 @@
-/* 主界面统一样式模板:颜色以 @token 占位,由 ThemeManager 按主题替换 */
+/* 主界面统一样式模板:颜色以占位符书写,由 ThemeManager 按主题替换 */
 
 QWidget {
     background-color: @bg;

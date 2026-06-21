@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
+#include <QRegularExpression>
 
 ThemeManager& ThemeManager::instance()
 {
@@ -57,6 +58,11 @@ QString ThemeManager::buildStyleSheet(Theme theme) const
     }
     QString sheet = QTextStream(&f).readAll();
     f.close();
+
+    // 移除 QSS 注释(Qt 本就忽略注释),避免注释中的 @ 等字符干扰占位符残留校验
+    static const QRegularExpression commentRe(
+        QStringLiteral("/\\*.*?\\*/"), QRegularExpression::DotMatchesEverythingOption);
+    sheet.remove(commentRe);
 
     const QMap<QString, QString>& colors = palette(theme);
     // 先替换更长的 key,避免 @accentHover 被 @accent 截断式误替换
