@@ -77,6 +77,14 @@ set(GUI_THEME_HEADERS
     Gui/Theme/ThemeManager.h
 )
 
+# Gui\Widgets 模块
+set(GUI_WIDGETS_SOURCES
+    Gui/Widgets/CollapsibleGroupBox.cpp
+)
+set(GUI_WIDGETS_HEADERS
+    Gui/Widgets/CollapsibleGroupBox.h
+)
+
 # Gui\ScriptEditor 模块
 set(GUI_SCRIPTEDITOR_SOURCES
     Gui/ScriptEditor/ScriptEditor.cpp
@@ -136,6 +144,7 @@ set(SOURCES
     ${COMM_PROTOCOL_SOURCES}
     ${GUI_SOURCES}
     ${GUI_THEME_SOURCES}
+    ${GUI_WIDGETS_SOURCES}
     ${GUI_SCRIPTEDITOR_SOURCES}
     ${GUI_SIMULATIONPLATFORM_SOURCES}
     ${MAINFLOW_SOURCES}
@@ -149,6 +158,7 @@ set(HEADERS
     ${COMM_PROTOCOL_HEADERS}
     ${GUI_HEADERS}
     ${GUI_THEME_HEADERS}
+    ${GUI_WIDGETS_HEADERS}
     ${GUI_SCRIPTEDITOR_HEADERS}
     ${GUI_SIMULATIONPLATFORM_HEADERS}
     ${MAINFLOW_HEADERS}
@@ -185,6 +195,7 @@ source_group("Comm\\\\Socket" FILES ${COMM_SOCKET_SOURCES} ${COMM_SOCKET_HEADERS
 source_group("Comm\\\\Protocol" FILES ${COMM_PROTOCOL_SOURCES} ${COMM_PROTOCOL_HEADERS})
 source_group("Gui" FILES ${GUI_SOURCES} ${GUI_HEADERS})
 source_group("Gui\\\\Theme" FILES ${GUI_THEME_SOURCES} ${GUI_THEME_HEADERS})
+source_group("Gui\\\\Widgets" FILES ${GUI_WIDGETS_SOURCES} ${GUI_WIDGETS_HEADERS})
 source_group("Gui\\\\ScriptEditor" FILES ${GUI_SCRIPTEDITOR_SOURCES} ${GUI_SCRIPTEDITOR_HEADERS})
 source_group("Gui\\\\SimulationPlatform" FILES ${GUI_SIMULATIONPLATFORM_SOURCES} ${GUI_SIMULATIONPLATFORM_HEADERS})
 source_group("MainFlow" FILES ${MAINFLOW_SOURCES} ${MAINFLOW_HEADERS})
@@ -252,6 +263,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 	${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Theme
+    ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/ScriptEditor
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/SimulationPlatform
     ${CMAKE_CURRENT_SOURCE_DIR}/Comm
