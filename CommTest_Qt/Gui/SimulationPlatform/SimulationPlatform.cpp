@@ -7,6 +7,7 @@
  */
 
 #include "SimulationPlatform.h"
+#include "ThemeManager.h"
 #include <QFileDialog>
 #include <QDir>
 #include <QCoreApplication>
@@ -19,13 +20,17 @@
 #define VIRTUAL_MARK_STATIC_X 10
 #define VIRTUAL_MARK_STATIC_Y -10
 
-// 绘图颜色定义（选择灰度值较低的颜色，提高白色背景下的对比度）
-#define COLOR_COORDINATE_AXIS     Qt::black        // 坐标轴 (灰度0)
-#define COLOR_BASE_PLATFORM       Qt::blue         // 目标平台 (灰度64)
-#define COLOR_REALTIME_PLATFORM   Qt::darkGreen    // 对象平台 (灰度64)
-#define COLOR_MARK1               Qt::red          // Mark1 (灰度64)
-#define COLOR_MARK2               Qt::darkMagenta  // Mark2 (灰度64)
-#define COLOR_VIRTUAL_MARK        Qt::darkCyan     // 虚拟Mark (灰度96)
+// 绘图语义色:浅色主题沿用原色,深色主题用同色系提亮变体(在深底上仍可读);
+// 坐标轴/刻度/文字跟随主题次级文字色。随主题实时变化(由 themeChanged 触发重绘)。
+namespace {
+inline bool platformDarkTheme() { return ThemeManager::instance().currentTheme() == Theme::Dark; }
+inline QColor colCoordinateAxis()   { return ThemeManager::instance().color("@text2"); }
+inline QColor colBasePlatform()     { return platformDarkTheme() ? QColor(0x5b, 0x9b, 0xd5) : QColor(Qt::blue); }
+inline QColor colRealTimePlatform() { return platformDarkTheme() ? QColor(0x5c, 0xb8, 0x5c) : QColor(Qt::darkGreen); }
+inline QColor colMark1()            { return platformDarkTheme() ? QColor(0xff, 0x6b, 0x6b) : QColor(Qt::red); }
+inline QColor colMark2()            { return platformDarkTheme() ? QColor(0xd0, 0x70, 0xd0) : QColor(Qt::darkMagenta); }
+inline QColor colVirtualMark()      { return platformDarkTheme() ? QColor(0x3c, 0xc7, 0xc7) : QColor(Qt::darkCyan); }
+}
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QWidget(parent)
@@ -43,6 +48,13 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     setupUI();
     setupValidators();
     setupConnections();
+
+    // 主题切换时实时重绘画布与图像区(控件由全局 qss 自动重绘)
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](Theme) {
+        if (canvas) canvas->update();
+        if (imageViewer) imageViewer->update();
+        update();
+    });
 
     setWindowTitle("Simulation Platform");
     resize(800, 600);
@@ -498,13 +510,13 @@ void SimulationPlatform::drawCanvas(QPainter &painter)
     // 绘制基准平台
     if (showBasePlatformCheckBox->isChecked())
     {
-        drawPlatform(painter, basePlatform, COLOR_BASE_PLATFORM);
+        drawPlatform(painter, basePlatform, colBasePlatform());
     }
 
     // 绘制实时平台
     if (showRealTimePlatformCheckBox->isChecked())
     {
-        drawPlatform(painter, realTimePlatform, COLOR_REALTIME_PLATFORM);
+        drawPlatform(painter, realTimePlatform, colRealTimePlatform());
     }
 
     // 绘制Mark1
@@ -553,7 +565,7 @@ void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
 {
     painter.save();
 
-    QPen pen(COLOR_COORDINATE_AXIS, 1, Qt::SolidLine);
+    QPen pen(colCoordinateAxis(), 1, Qt::SolidLine);
     painter.setPen(pen);
 
     // 绘制X轴和Y轴
@@ -679,9 +691,9 @@ void SimulationPlatform::drawMark1(QPainter &painter)
     QPointF pos = transformPoint(QPointF(finalX, finalY));
 
     // 设置画笔
-    QPen pen(COLOR_MARK1, 1);
+    QPen pen(colMark1(), 1);
     painter.setPen(pen);
-    painter.setBrush(COLOR_MARK1);
+    painter.setBrush(colMark1());
 
     // 保存当前变换
     painter.save();
@@ -743,9 +755,9 @@ void SimulationPlatform::drawMark2(QPainter &painter)
     QPointF pos = transformPoint(QPointF(finalX, finalY));
 
     // 设置画笔
-    QPen pen(COLOR_MARK2, 1);
+    QPen pen(colMark2(), 1);
     painter.setPen(pen);
-    painter.setBrush(COLOR_MARK2);
+    painter.setBrush(colMark2());
 
     // 保存当前变换
     painter.save();
@@ -804,7 +816,7 @@ void SimulationPlatform::drawVirtualMark(QPainter &painter)
     QPointF pos = transformPoint(QPointF(mark2FinalX, mark2FinalY));
 
     // 设置画笔
-    QPen pen(COLOR_VIRTUAL_MARK, 2);
+    QPen pen(colVirtualMark(), 2);
     painter.setPen(pen);
 
     // 移动到Mark2中心位置并旋转
@@ -819,7 +831,7 @@ void SimulationPlatform::drawVirtualMark(QPainter &painter)
     double rectWidth = MARK_RECT_WIDTH * m_scale;   // 矩形宽度
     double rectHeight = MARK_RECT_HEIGHT * m_scale; // 矩形高度
 
-    painter.setBrush(COLOR_VIRTUAL_MARK);
+    painter.setBrush(colVirtualMark());
 
     // 绘制左侧十字Mark（相对左侧Mark2向外、向上偏移）
     // 左侧Mark2中心在 (-spacing, 0)，向外偏移即X减小，向上偏移即Y减小（屏幕坐标）

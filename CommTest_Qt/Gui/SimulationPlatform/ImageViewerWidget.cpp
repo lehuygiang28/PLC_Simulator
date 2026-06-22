@@ -7,6 +7,7 @@
  */
 
 #include "ImageViewerWidget.h"
+#include "ThemeManager.h"
 #include <QResizeEvent>
 
 ImageViewerWidget::ImageViewerWidget(QWidget* parent)
@@ -93,7 +94,7 @@ void ImageViewerWidget::paintEvent(QPaintEvent* event)
     drawCheckerboard(painter);
 
     if (m_image.isNull()) {
-        painter.setPen(Qt::darkGray);
+        painter.setPen(ThemeManager::instance().color("@text2"));
         painter.drawText(rect(), Qt::AlignCenter, "No Image Loaded");
         return;
     }
@@ -111,14 +112,16 @@ void ImageViewerWidget::paintEvent(QPaintEvent* event)
 
 void ImageViewerWidget::drawCheckerboard(QPainter& painter)
 {
-    const int gridSize = 10;  // 棋盘格单元大小
-    const QColor lightColor(255, 255, 255);  // 白色
-    const QColor darkColor(204, 204, 204);   // 浅灰色
+    const int gridSize = 16;  // 棋盘格单元大小
+    const bool dark = ThemeManager::instance().currentTheme() == Theme::Dark;
+    // 两档交替色:浅色=白/浅蓝白;深色=两档深灰
+    const QColor cellA = dark ? QColor(0x3a, 0x3d, 0x41) : QColor(0xff, 0xff, 0xff);
+    const QColor cellB = dark ? QColor(0x2b, 0x2d, 0x30) : QColor(0xdb, 0xe9, 0xf7);
 
     for (int y = 0; y < height(); y += gridSize) {
         for (int x = 0; x < width(); x += gridSize) {
-            bool isLight = ((x / gridSize) + (y / gridSize)) % 2 == 0;
-            painter.fillRect(x, y, gridSize, gridSize, isLight ? lightColor : darkColor);
+            bool isCellA = ((x / gridSize) + (y / gridSize)) % 2 == 0;
+            painter.fillRect(x, y, gridSize, gridSize, isCellA ? cellA : cellB);
         }
     }
 }
