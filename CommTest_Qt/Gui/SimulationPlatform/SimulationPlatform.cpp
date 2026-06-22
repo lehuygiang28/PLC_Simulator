@@ -465,6 +465,10 @@ void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& 
 
 void SimulationPlatform::openParamDialog()
 {
+    // 进对话框前记录原始值,供 Cancel 回退
+    const double origSpacing = m_markSpacing;
+    const double origRatio   = m_Ratio;
+
     QDialog dlg(this);
     dlg.setWindowTitle(QStringLiteral("参数设置"));
 
@@ -479,6 +483,27 @@ void SimulationPlatform::openParamDialog()
     sizeEdit->setValidator(v);
     ratioEdit->setValidator(v);
 
+    // 实时预览:只改内存值 + 画面 + 状态栏,不 emit(不落盘);保存只在 OK 时发生一次
+    auto applyPreview = [this](double distance, double ratio) {
+        m_markSpacing = distance;
+        m_Ratio = ratio;
+        m_scale = m_ScreenWidth / m_Ratio;
+        canvas->update();
+        if (stack->currentIndex() == 0)
+            updateStatusBarForPage(0);
+    };
+
+    // 用户输入时实时预览;护栏:数值有效且缩放比 > 0(否则 m_scale 变 inf)
+    auto onEdited = [=]() {
+        bool okD = false, okR = false;
+        const double d = sizeEdit->text().toDouble(&okD);
+        const double r = ratioEdit->text().toDouble(&okR);
+        if (okD && okR && r > 0.0)
+            applyPreview(d, r);
+    };
+    connect(sizeEdit,  &QLineEdit::textEdited, this, [=](const QString&) { onEdited(); });
+    connect(ratioEdit, &QLineEdit::textEdited, this, [=](const QString&) { onEdited(); });
+
     QFormLayout* form = new QFormLayout();
     form->addRow(QStringLiteral("产品尺寸 (mm):"), sizeEdit);
     form->addRow(QStringLiteral("缩放比 (px/mm):"), ratioEdit);
@@ -491,15 +516,16 @@ void SimulationPlatform::openParamDialog()
     lay->addLayout(form);
     lay->addWidget(box);
 
-    if (dlg.exec() != QDialog::Accepted)
-        return;
-
-    m_markSpacing = sizeEdit->text().toDouble();
-    m_Ratio = ratioEdit->text().toDouble();
-    m_scale = m_ScreenWidth / m_Ratio;
-
-    canvas->update();
-    emit parametersChanged(m_markSpacing, m_Ratio);
+    if (dlg.exec() == QDialog::Accepted)
+    {
+        // 值已实时应用,这里 emit 一次完成保存
+        emit parametersChanged(m_markSpacing, m_Ratio);
+    }
+    else
+    {
+        // 取消/关闭:回退到原始值(配置里仍是原值,无需保存)
+        applyPreview(origSpacing, origRatio);
+    }
 }
 
 void SimulationPlatform::setupValidators()
