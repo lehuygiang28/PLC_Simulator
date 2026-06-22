@@ -38,6 +38,8 @@ inline QColor colVirtualMark()      { return platformDarkTheme() ? QColor(0x3c, 
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QMainWindow(parent)
+    , simMenu(nullptr)
+    , imageMenu(nullptr)
 {
     // 初始化默认值
     basePlatform = {0, 0, 0};
@@ -344,9 +346,19 @@ void SimulationPlatform::buildMenuBar()
         connect(a, &QAction::triggered, this, [this, i]() { moveToScreenCorner(i); });
     }
 
-    // TODO(Task4): 移入「模拟平台」菜单。临时入口用于 Task3 验证。
-    QAction* tmpParam = menuBar()->addAction(QStringLiteral("参数设置…"));
-    connect(tmpParam, &QAction::triggered, this, &SimulationPlatform::openParamDialog);
+    // ===== 模拟平台(仅模拟页可用)=====
+    simMenu = mbar->addMenu(QStringLiteral("模拟平台"));
+    QAction* actParam = simMenu->addAction(QStringLiteral("参数设置…"));
+    connect(actParam, &QAction::triggered, this, &SimulationPlatform::openParamDialog);
+    simMenu->addSeparator();
+    bindGroupToggle(0, grpBase,     QStringLiteral("基准平台"));
+    bindGroupToggle(1, grpRealTime, QStringLiteral("实时平台"));
+    bindGroupToggle(2, grpMark1,    QStringLiteral("Mark1"));
+    bindGroupToggle(3, grpMark2,    QStringLiteral("Mark2"));
+    bindGroupToggle(4, grpVirtual,  QStringLiteral("虚拟Mark"));
+
+    // ===== 图像(仅图片页可用;内容见 Task 5)=====
+    imageMenu = mbar->addMenu(QStringLiteral("图像"));
 }
 
 void SimulationPlatform::showPage(int index)
@@ -354,6 +366,10 @@ void SimulationPlatform::showPage(int index)
     stack->setCurrentIndex(index);
     if (index == 0 && actPageSim) actPageSim->setChecked(true);
     if (index == 1 && actPagePic) actPagePic->setChecked(true);
+
+    // 页面专属菜单互斥启用:模拟页→模拟平台菜单可用、图像菜单置灰;反之亦然
+    if (simMenu)   simMenu->menuAction()->setEnabled(index == 0);
+    if (imageMenu) imageMenu->menuAction()->setEnabled(index == 1);
 }
 
 void SimulationPlatform::moveToScreenCorner(int corner)
@@ -370,6 +386,21 @@ void SimulationPlatform::moveToScreenCorner(int corner)
     case 3: this->move(avail.width() - totalWidth, avail.height() - totalHeight); break; // 右下
     default: break;
     }
+}
+
+void SimulationPlatform::bindGroupToggle(int i, CollapsibleGroupBox* g, const QString& title)
+{
+    QAction* a = simMenu->addAction(title);
+    a->setCheckable(true);
+    a->setChecked(true);
+    actGrp[i] = a;
+
+    // 菜单勾选 → 显示/隐藏整组
+    connect(a, &QAction::toggled, this, [g](bool on) { g->setVisible(on); });
+
+    // 组内 × 关闭 → 取消勾选(toggled 再驱动隐藏)
+    g->setClosable(true);
+    connect(g, &CollapsibleGroupBox::closed, this, [a]() { a->setChecked(false); });
 }
 
 void SimulationPlatform::openParamDialog()

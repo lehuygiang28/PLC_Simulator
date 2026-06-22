@@ -134,9 +134,13 @@ private:
     QStackedWidget* stack;
     QAction* actPageSim;
     QAction* actPagePic;
+    QMenu* simMenu;
+    QMenu* imageMenu;
+    QAction* actGrp[5];   // 5 组显隐勾选项,顺序: 基准/实时/Mark1/Mark2/虚拟
     void buildMenuBar();
     void showPage(int index);
     void moveToScreenCorner(int corner);
+    void bindGroupToggle(int i, CollapsibleGroupBox* g, const QString& title);
 
     // 页面切换相关
     QWidget* simulationPage;      // 模拟平台页面
