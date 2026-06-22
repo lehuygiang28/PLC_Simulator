@@ -133,6 +133,7 @@ private:
     QAction* actPagePic;
     QMenu* simMenu;
     QMenu* imageMenu;
+    QSize m_pageSize[2];   // 各页窗口尺寸的会话内记忆(0=模拟页 1=图片页),不落盘
     void buildMenuBar();
     void showPage(int index);
     void moveToScreenCorner(int corner);

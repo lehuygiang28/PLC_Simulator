@@ -375,7 +375,22 @@ void SimulationPlatform::buildMenuBar()
 
 void SimulationPlatform::showPage(int index)
 {
+    // 切页前记住离开页的窗口尺寸(仅本会话,不落盘)
+    const int prev = stack->currentIndex();
+    if (prev != index && prev >= 0 && prev < 2)
+        m_pageSize[prev] = size();
+
     stack->setCurrentIndex(index);
+
+    // 让窗口最小尺寸只受当前页约束:非当前页 sizePolicy 设为 Ignored,
+    // 其 qSmartMinSize 归 0,QStackedLayout 不再用它钳制最小高度。
+    for (int i = 0; i < stack->count(); ++i)
+    {
+        const bool cur = (i == index);
+        stack->widget(i)->setSizePolicy(cur ? QSizePolicy::Preferred : QSizePolicy::Ignored,
+                                        cur ? QSizePolicy::Preferred : QSizePolicy::Ignored);
+    }
+
     if (index == 0 && actPageSim) actPageSim->setChecked(true);
     if (index == 1 && actPagePic) actPagePic->setChecked(true);
 
@@ -384,6 +399,10 @@ void SimulationPlatform::showPage(int index)
     if (imageMenu) imageMenu->menuAction()->setEnabled(index == 1);
 
     updateStatusBarForPage(index);
+
+    // 恢复目标页此前在本会话记住的尺寸(首次则保持当前自然尺寸)
+    if (index >= 0 && index < 2 && m_pageSize[index].isValid())
+        resize(m_pageSize[index]);
 }
 
 void SimulationPlatform::updateStatusBarForPage(int index)

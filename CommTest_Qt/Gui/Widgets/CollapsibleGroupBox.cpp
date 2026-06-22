@@ -13,6 +13,8 @@
 #include <QFontMetrics>
 #include <QToolButton>
 #include <QResizeEvent>
+#include <QStyle>
+#include <QStyleOptionGroupBox>
 
 CollapsibleGroupBox::CollapsibleGroupBox(QWidget* parent)
     : QGroupBox(parent)
@@ -106,6 +108,7 @@ void CollapsibleGroupBox::setClosable(bool closable)
     if (closable && !m_closeButton)
     {
         m_closeButton = new QToolButton(this);
+        m_closeButton->setObjectName(QStringLiteral("groupCloseButton"));
         m_closeButton->setText(QStringLiteral("×"));   // ×
         m_closeButton->setToolTip(QStringLiteral("关闭"));
         m_closeButton->setCursor(Qt::PointingHandCursor);
@@ -126,9 +129,13 @@ void CollapsibleGroupBox::positionCloseButton()
 {
     if (!m_closeButton)
         return;
+    // 用 Qt 样式真实的标题矩形对齐,使 × 与标题文字垂直同高
+    QStyleOptionGroupBox opt;
+    initStyleOption(&opt);
+    const QRect titleRect = style()->subControlRect(QStyle::CC_GroupBox, &opt, QStyle::SC_GroupBoxLabel, this);
     const int margin = 6;
     const int x = width() - m_closeButton->width() - margin;
-    const int y = (headerHeight() - m_closeButton->height()) / 2;
+    const int y = titleRect.center().y() - m_closeButton->height() / 2;
     m_closeButton->move(qMax(0, x), qMax(0, y));
 }
 

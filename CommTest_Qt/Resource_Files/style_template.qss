@@ -36,6 +36,14 @@ QGroupBox::title {
     font-weight: bold;
 }
 
+/* CollapsibleGroupBox 标题栏的关闭按钮:背景透明,× 与标题/箭头同为强调色 */
+QToolButton#groupCloseButton {
+    background: transparent;
+    border: none;
+    color: @accent;
+}
+QToolButton#groupCloseButton:hover { color: @accentHover; }
+
 /* 按钮 */
 QPushButton {
     background-color: @surface2;
