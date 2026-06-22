@@ -322,6 +322,9 @@ void CommTest_Qt::InitializeMember()
 			ui->cmbBox_ProtocolType->addItem(it.value(), QVariant::fromValue(it.key()));
 		}
 
+		ui->edit_IP->setMaximumWidth(120);
+		ui->edit_Port->setMaximumWidth(70);
+
 		if (ui->cmbBox_ProtocolType->currentIndex() < 0)
 		{
 			ui->cmbBox_ProtocolType->setCurrentIndex(0);

@@ -202,7 +202,13 @@ bool ThemeManager::eventFilter(QObject* watched, QEvent* event)
         QWidget* w = qobject_cast<QWidget*>(watched);
         if (w != nullptr && w->isWindow())
         {
-            applyTitleBar(w);
+            // 仅对带原生标题栏的窗口(主窗口/对话框)设置深浅标题栏;
+            // 跳过 Popup/ToolTip 等瞬态弹窗——它们无标题栏,套用 DWM 会触发非客户区重绘导致闪烁。
+            const Qt::WindowType type = w->windowType();
+            if (type == Qt::Window || type == Qt::Dialog)
+            {
+                applyTitleBar(w);
+            }
         }
     }
     return QObject::eventFilter(watched, event);

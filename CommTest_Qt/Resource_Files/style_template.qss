@@ -36,6 +36,14 @@ QGroupBox::title {
     font-weight: bold;
 }
 
+/* CollapsibleGroupBox 标题栏的关闭按钮:背景透明,× 与标题/箭头同为强调色 */
+QToolButton#groupCloseButton {
+    background: transparent;
+    border: none;
+    color: @accent;
+}
+QToolButton#groupCloseButton:hover { color: @accentHover; }
+
 /* 按钮 */
 QPushButton {
     background-color: @surface2;
@@ -44,6 +52,7 @@ QPushButton {
     border-radius: 6px;
     padding: 5px 12px;
     font-size: 10pt;
+    outline: none;
 }
 QPushButton:hover { border: 1px solid @accent; }
 QPushButton:pressed { background-color: @accentDark; color: #ffffff; border: 1px solid @accentDark; }
@@ -152,6 +161,7 @@ QHeaderView::section {
 QMenuBar { background-color: @surface; color: @text; border-bottom: 1px solid @border; }
 QMenuBar::item { padding: 4px 10px; background: transparent; }
 QMenuBar::item:selected { background-color: @surface2; border-radius: 5px; }
+QMenuBar::item:disabled { color: @disabledText; }
 QMenu { background-color: @surface; color: @text; border: 1px solid @border; }
 QMenu::item { padding: 5px 24px; }
 QMenu::item:selected { background-color: @accent; color: #ffffff; }

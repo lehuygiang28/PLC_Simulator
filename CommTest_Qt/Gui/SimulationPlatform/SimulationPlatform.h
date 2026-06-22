@@ -30,7 +30,14 @@
 #include <QPalette>
 #include <QScreen>
 #include <QFont>
-#include <QTabWidget>
+#include <QMainWindow>
+#include <QStackedWidget>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QActionGroup>
+#include <QStatusBar>
+#include <QDialog>
 #include <QPushButton>
 #include <QImage>
 #include <QWheelEvent>
@@ -42,7 +49,7 @@
 #include "ImageViewerWidget.h"
 #include "CollapsibleGroupBox.h"
 
-class SimulationPlatform : public QWidget
+class SimulationPlatform : public QMainWindow
 {
     Q_OBJECT
 signals:
@@ -112,31 +119,42 @@ private:
     QLineEdit *virtualMarkYEdit;
     QCheckBox *showVirtualMarkCheckBox;
     
-    QLineEdit* markCenterDistanceEdit;
-    QLineEdit* ScreenRatio;
-    QRadioButton* ShowPlatformUL;
-    QRadioButton* ShowPlatformUR;
-    QRadioButton* ShowPlatformDL;
-    QRadioButton* ShowPlatformDR;
+    // 5 个控制组(供菜单显隐/关闭引用)
+    CollapsibleGroupBox* grpBase;
+    CollapsibleGroupBox* grpRealTime;
+    CollapsibleGroupBox* grpMark1;
+    CollapsibleGroupBox* grpMark2;
+    CollapsibleGroupBox* grpVirtual;
+    void openParamDialog();
+
+    // 页面/菜单/状态栏
+    QStackedWidget* stack;
+    QAction* actPageSim;
+    QAction* actPagePic;
+    QMenu* simMenu;
+    QMenu* imageMenu;
+    QSize m_pageSize[2];   // 各页窗口尺寸的会话内记忆(0=模拟页 1=图片页),不落盘
+    void buildMenuBar();
+    void showPage(int index);
+    void moveToScreenCorner(int corner);
+    void bindGroupToggle(CollapsibleGroupBox* g, const QString& title, bool visible = true);
 
     // 页面切换相关
-    QTabWidget* tabWidget;
     QWidget* simulationPage;      // 模拟平台页面
     QWidget* pictureShowPage;     // 图片显示页面 (PictureShow)
 
     // 图片显示页面控件
     ImageViewerWidget* imageViewer;
-    QPushButton* setImageBtn;
-    QLineEdit* zoomRatioEdit;  // 缩放倍率输入框
-    QRadioButton* picShowPlatformUL;
-    QRadioButton* picShowPlatformUR;
-    QRadioButton* picShowPlatformDL;
-    QRadioButton* picShowPlatformDR;
 
     void setupPictureShowPage();
     void loadDefaultImage();
     void onSetImageClicked();
-    void onTabChanged(int index);
+
+    // 状态栏
+    QLabel* statusLeft;
+    QLabel* statusRight;
+    QString m_imagePath;
+    void updateStatusBarForPage(int index);
 
     // 数据
     struct Platform {
@@ -163,8 +181,6 @@ private:
     double m_Ratio;   // 屏幕分辨率比例
     double m_scale;  // 缩放比例 (像素/mm)
     double m_markSpacing; // Mark中心间距，单位mm
-    double m_markHeight;
-    double m_markWidth;
     double m_ScreenWidth;
     
     void setupUI();
@@ -176,9 +192,7 @@ private:
     void drawMark1(QPainter &painter);
     void drawMark2(QPainter &painter);
     void drawVirtualMark(QPainter &painter);
-    QPointF rotatePoint(const QPointF &point, double angle);
     QPointF transformPoint(const QPointF &point);
-    QPointF inverseTransformPoint(const QPointF &point);
 };
 
 #endif // SIMULATIONPLATFORM_H

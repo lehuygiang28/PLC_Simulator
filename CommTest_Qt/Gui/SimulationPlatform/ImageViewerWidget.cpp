@@ -9,6 +9,7 @@
 #include "ImageViewerWidget.h"
 #include "ThemeManager.h"
 #include <QResizeEvent>
+#include <QShowEvent>
 
 ImageViewerWidget::ImageViewerWidget(QWidget* parent)
     : QWidget(parent)
@@ -17,6 +18,8 @@ ImageViewerWidget::ImageViewerWidget(QWidget* parent)
     , m_maxScale(10.0)
     , m_offset(0, 0)
     , m_dragging(false)
+    , m_fitMode(true)
+    , m_pendingFit(false)
 {
     setMinimumSize(200, 200);
     setMouseTracking(true);
@@ -32,22 +35,23 @@ void ImageViewerWidget::setImage(const QImage& image)
 
 void ImageViewerWidget::fitToWindow()
 {
-    if (m_image.isNull() || width() <= 0 || height() <= 0) {
-        m_scale = 1.0;
-        emit scaleChanged(m_scale);
-        update();
+    if (m_image.isNull())
+        return;
+
+    // 尺寸尚未就绪(控件未布局/未显示):标记延迟,待首次有效尺寸再 fit
+    if (width() <= 0 || height() <= 0) {
+        m_pendingFit = true;
         return;
     }
 
-    // 计算使图像完整显示所需的缩放比例
+    // 计算使图像完整显示所需的缩放比例(高或宽与画布相当)
     double scaleX = static_cast<double>(width()) / m_image.width();
     double scaleY = static_cast<double>(height()) / m_image.height();
-    m_scale = qMin(scaleX, scaleY);
-
-    // 确保缩放比例在有效范围内
-    m_scale = qBound(m_minScale, m_scale, m_maxScale);
+    m_scale = qBound(m_minScale, qMin(scaleX, scaleY), m_maxScale);
 
     m_offset = QPointF(0, 0);
+    m_fitMode = true;      // fit 即进入适应模式
+    m_pendingFit = false;
     emit scaleChanged(m_scale);
     update();
 }
@@ -72,6 +76,7 @@ void ImageViewerWidget::setScale(double scale)
     double newScale = qBound(m_minScale, scale, m_maxScale);
     if (qFuzzyCompare(newScale, m_scale)) return;
     m_scale = newScale;
+    m_fitMode = false;   // 显式设定缩放 → 自由模式
     update();
     emit scaleChanged(m_scale);
 }
@@ -148,6 +153,7 @@ void ImageViewerWidget::wheelEvent(QWheelEvent* event)
     double scaleRatio = m_scale / oldScale;
     m_offset = mousePos - center - relativePos * scaleRatio;
 
+    m_fitMode = false;   // 用户手动缩放 → 转自由模式,resize 不再强制铺满
     update();
     emit scaleChanged(m_scale);
     event->accept();
@@ -168,6 +174,7 @@ void ImageViewerWidget::mouseMoveEvent(QMouseEvent* event)
         QPointF delta = event->pos() - m_lastMousePos;
         m_offset += delta;
         m_lastMousePos = event->pos();
+        m_fitMode = false;   // 用户拖动平移 → 转自由模式
         update();
     }
 }
@@ -189,108 +196,21 @@ void ImageViewerWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
 void ImageViewerWidget::resizeEvent(QResizeEvent* event)
 {
-    QSize oldSize = event->oldSize();
-    QSize newSize = event->size();
-
-    // 仅当有图像且旧尺寸有效时进行比例调整
-    if (!m_image.isNull() && oldSize.isValid() && oldSize.width() > 0 && oldSize.height() > 0) {
-        // 计算窗口尺寸变化比例
-        double ratioX = static_cast<double>(newSize.width()) / oldSize.width();
-        double ratioY = static_cast<double>(newSize.height()) / oldSize.height();
-        // 取较小的比例以保持显示内容一致
-        double ratio = qMin(ratioX, ratioY);
-
-        // 按比例调整缩放值
-        double newScale = m_scale * ratio;
-        m_scale = qBound(m_minScale, newScale, m_maxScale);
-
-        // 按比例调整偏移量
-        m_offset *= ratio;
-
-        emit scaleChanged(m_scale);
-    }
-
     QWidget::resizeEvent(event);
+
+    if (!m_image.isNull() && width() > 0 && height() > 0) {
+        // 待适应(首次就绪)或适应模式:重新按当前尺寸铺满
+        // 自由模式(用户已缩放/平移):保持绝对缩放与偏移,仅由 paintEvent 按新尺寸重新居中
+        if (m_pendingFit || m_fitMode)
+            fitToWindow();
+    }
     update();
 }
 
-
-
-
-/*************************************
- // 可选的高级方案：添加用户可切换的渲染模式
-// 这个文件仅供参考，不会被编译
-
-// ============= 在 ImageViewerWidget.h 中添加 =============
-
-public:
-    enum InterpolationMode {
-        NearestNeighbor,  // 最近邻（清晰但有锯齿）
-        Smooth,           // 平滑（无锯齿但可能模糊）
-        Auto              // 自动（当前实现的方式）
-    };
-
-    void setInterpolationMode(InterpolationMode mode);
-    InterpolationMode interpolationMode() const;
-
-private:
-    InterpolationMode m_interpolationMode = Auto;
-
-
-// ============= 在 ImageViewerWidget.cpp 中实现 =============
-
-void ImageViewerWidget::setInterpolationMode(InterpolationMode mode)
+void ImageViewerWidget::showEvent(QShowEvent* event)
 {
-    if (m_interpolationMode != mode) {
-        m_interpolationMode = mode;
-        update();
-    }
+    QWidget::showEvent(event);
+    // 加载时尺寸未就绪而延迟的 fit,在控件首次显示(已是真实尺寸)时补做
+    if (m_pendingFit && !m_image.isNull() && width() > 0 && height() > 0)
+        fitToWindow();
 }
-
-ImageViewerWidget::InterpolationMode ImageViewerWidget::interpolationMode() const
-{
-    return m_interpolationMode;
-}
-
-// 修改 paintEvent 中的逻辑
-void ImageViewerWidget::paintEvent(QPaintEvent* event)
-{
-    Q_UNUSED(event);
-    QPainter painter(this);
-
-    // 根据用户选择的模式设置插值算法
-    bool useSmooth = false;
-    switch (m_interpolationMode) {
-        case NearestNeighbor:
-            useSmooth = false;  // 始终使用最近邻
-            break;
-        case Smooth:
-            useSmooth = true;   // 始终使用平滑
-            break;
-        case Auto:
-            useSmooth = (m_scale < 1.0);  // 自动选择
-            break;
-    }
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, useSmooth);
-
-    // 其余代码保持不变...
-}
-
-
-// ============= 在 UI 中添加切换按钮 =============
-
-// 例如在 SimulationPlatform.cpp 中添加：
-QComboBox* interpolationCombo = new QComboBox();
-interpolationCombo->addItem("自动", ImageViewerWidget::Auto);
-interpolationCombo->addItem("清晰（像素化）", ImageViewerWidget::NearestNeighbor);
-interpolationCombo->addItem("平滑（抗锯齿）", ImageViewerWidget::Smooth);
-
-connect(interpolationCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-        [this](int index) {
-    auto mode = static_cast<ImageViewerWidget::InterpolationMode>(
-        interpolationCombo->itemData(index).toInt()
-    );
-    m_imageViewer->setInterpolationMode(mode);
-});
-
- */

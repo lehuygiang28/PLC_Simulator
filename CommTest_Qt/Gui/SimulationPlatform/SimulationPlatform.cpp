@@ -8,10 +8,14 @@
 
 #include "SimulationPlatform.h"
 #include "ThemeManager.h"
+#include <QStackedWidget>
+#include <QMenuBar>
 #include <QFileDialog>
 #include <QDir>
 #include <QCoreApplication>
 #include <QMessageBox>
+#include <QFormLayout>
+#include <QDialogButtonBox>
 
 #define MARK_RECT_WIDTH 3
 #define MARK_RECT_HEIGHT 8
@@ -33,7 +37,11 @@ inline QColor colVirtualMark()      { return platformDarkTheme() ? QColor(0x3c, 
 }
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
-    : QWidget(parent)
+    : QMainWindow(parent)
+    , simMenu(nullptr)
+    , imageMenu(nullptr)
+    , statusLeft(nullptr)
+    , statusRight(nullptr)
 {
     // 初始化默认值
     basePlatform = {0, 0, 0};
@@ -112,24 +120,28 @@ void SimulationPlatform::SetSimulationPlatformParams(double distance, double rat
     m_Ratio = ratio;
     m_scale = m_ScreenWidth / m_Ratio; // 更新缩放比例
 
-    markCenterDistanceEdit->setText(QString::number(m_markSpacing));
-    ScreenRatio->setText(QString::number(m_Ratio));
-
     emit parametersChanged(m_markSpacing, m_Ratio);
     update(); // 触发重绘
 }
 void SimulationPlatform::setupUI()
 {
-    // 创建主布局
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-
-    // 创建 TabWidget 用于页面切换
-    tabWidget = new QTabWidget(this);
-    mainLayout->addWidget(tabWidget, 1);
+    stack = new QStackedWidget(this);
+    setCentralWidget(stack);
 
     // ========== 模拟平台页面 ==========
     simulationPage = new QWidget(this);
-    QHBoxLayout *simLayout = new QHBoxLayout(simulationPage);  // 左:画布  右:控制面板
+    QVBoxLayout *simPageLayout = new QVBoxLayout(simulationPage);  // 上:收起按钮栏  下:画布+控制面板
+    simPageLayout->setContentsMargins(9, 6, 9, 9);  // 四周留白,避免画布贴左、面板贴右
+
+    // 顶栏:收起/展开按钮(右对齐,提到画布与面板的共同上方;折叠后画布全宽时按钮仍在右上角)
+    QPushButton* panelToggleBtn = new QPushButton(QStringLiteral("收起 »"), this);
+    QHBoxLayout* topBar = new QHBoxLayout();
+    topBar->addStretch(1);
+    topBar->addWidget(panelToggleBtn);
+    simPageLayout->addLayout(topBar);
+
+    QHBoxLayout *simLayout = new QHBoxLayout();  // 左:画布  右:控制面板
+    simPageLayout->addLayout(simLayout, 1);
 
     // 画布(占左侧主区)
     canvas = new CanvasWidget(this);
@@ -167,30 +179,17 @@ void SimulationPlatform::setupUI()
     virtualMarkXEdit = new QLineEdit(this);
     virtualMarkYEdit = new QLineEdit(this);
     showVirtualMarkCheckBox = new QCheckBox("显示", this);
-    showVirtualMarkCheckBox->setChecked(true);
-
-    markCenterDistanceEdit = new QLineEdit(this);
-    ScreenRatio = new QLineEdit(this);
-    ShowPlatformUL = new QRadioButton("左上显示", this);
-    ShowPlatformUR = new QRadioButton("右上显示", this);
-    ShowPlatformDL = new QRadioButton("左下显示", this);
-    ShowPlatformDR = new QRadioButton("右下显示", this);
-    QButtonGroup *group1 = new QButtonGroup(this);
-    group1->addButton(ShowPlatformUL);
-    group1->addButton(ShowPlatformUR);
-    group1->addButton(ShowPlatformDL);
-    group1->addButton(ShowPlatformDR);
-    ShowPlatformUL->setChecked(true);
+    showVirtualMarkCheckBox->setChecked(false);  // 虚拟Mark 默认整体关闭(组隐藏 + 不绘制)
 
     // 数值输入框统一限宽,使分组更紧凑(数字无需太宽)
     for (QLineEdit *e : { basePlatformXEdit, basePlatformYEdit, basePlatformAngleEdit,
                           realTimePlatformXEdit, realTimePlatformYEdit, realTimePlatformAngleEdit,
                           mark1XEdit, mark1YEdit, mark1AngleEdit,
                           mark2XEdit, mark2YEdit, mark2AngleEdit,
-                          virtualMarkXEdit, virtualMarkYEdit,
-                          markCenterDistanceEdit, ScreenRatio })
+                          virtualMarkXEdit, virtualMarkYEdit })
     {
         e->setFixedWidth(78);
+        e->setAlignment(Qt::AlignCenter);  // 数值居中,与主界面 IP/端口风格统一
     }
 
     // 右对齐表单标签:使各行冒号对齐成一列,输入框起点整齐
@@ -206,119 +205,108 @@ void SimulationPlatform::setupUI()
         g->setContentsMargins(8, 6, 8, 6);
     };
 
-    // ---- 分组:按目标侧 / 对象侧 配对(平台 + 其跟随的 Mark 同组)----
-    // 单位:位置统一为 mm(写在组标题),角度为 °(标在角度标签)
-
-    // 目标组 = 目标平台 + 目标Mark
-    CollapsibleGroupBox *targetGroup = new CollapsibleGroupBox(this);
-    targetGroup->setTitle("目标 (mm)");
-    QGridLayout *targetLayout = new QGridLayout(targetGroup);
-    tighten(targetLayout);
+    // ---- 5 组独立控制组(竖排)----
+    // 基准平台
+    grpBase = new CollapsibleGroupBox(this);
+    grpBase->setTitle(QStringLiteral("基准平台 (mm)"));
     {
-        int row = 0;
-        targetLayout->addWidget(rlbl("平台 X:"), row, 0);
-        targetLayout->addWidget(basePlatformXEdit, row++, 1);
-        targetLayout->addWidget(rlbl("平台 Y:"), row, 0);
-        targetLayout->addWidget(basePlatformYEdit, row++, 1);
-        targetLayout->addWidget(rlbl("平台 Angle (°):"), row, 0);
-        targetLayout->addWidget(basePlatformAngleEdit, row++, 1);
-        targetLayout->addWidget(showBasePlatformCheckBox, row++, 0, 1, 2);
-        targetLayout->addWidget(rlbl("Mark X:"), row, 0);
-        targetLayout->addWidget(mark1XEdit, row++, 1);
-        targetLayout->addWidget(rlbl("Mark Y:"), row, 0);
-        targetLayout->addWidget(mark1YEdit, row++, 1);
-        targetLayout->addWidget(rlbl("Mark Angle (°):"), row, 0);
-        targetLayout->addWidget(mark1AngleEdit, row++, 1);
-        targetLayout->addWidget(mark1FollowBaseCheckBox, row, 0);
-        targetLayout->addWidget(ShowMark1CheckBox, row++, 1);
+        QGridLayout* g = new QGridLayout(grpBase); tighten(g); int row = 0;
+        g->addWidget(rlbl(QStringLiteral("X:")), row, 0);          g->addWidget(basePlatformXEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Y:")), row, 0);          g->addWidget(basePlatformYEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Angle (°):")), row, 0);  g->addWidget(basePlatformAngleEdit, row++, 1);
+        g->addWidget(showBasePlatformCheckBox, row++, 0, 1, 2);
     }
 
-    // 对象组 = 对象平台 + 对象Mark
-    CollapsibleGroupBox *objectGroup = new CollapsibleGroupBox(this);
-    objectGroup->setTitle("对象 (mm)");
-    QGridLayout *objectLayout = new QGridLayout(objectGroup);
-    tighten(objectLayout);
+    // 实时平台
+    grpRealTime = new CollapsibleGroupBox(this);
+    grpRealTime->setTitle(QStringLiteral("实时平台 (mm)"));
     {
-        int row = 0;
-        objectLayout->addWidget(rlbl("平台 X:"), row, 0);
-        objectLayout->addWidget(realTimePlatformXEdit, row++, 1);
-        objectLayout->addWidget(rlbl("平台 Y:"), row, 0);
-        objectLayout->addWidget(realTimePlatformYEdit, row++, 1);
-        objectLayout->addWidget(rlbl("平台 Angle (°):"), row, 0);
-        objectLayout->addWidget(realTimePlatformAngleEdit, row++, 1);
-        objectLayout->addWidget(showRealTimePlatformCheckBox, row++, 0, 1, 2);
-        objectLayout->addWidget(rlbl("Mark X:"), row, 0);
-        objectLayout->addWidget(mark2XEdit, row++, 1);
-        objectLayout->addWidget(rlbl("Mark Y:"), row, 0);
-        objectLayout->addWidget(mark2YEdit, row++, 1);
-        objectLayout->addWidget(rlbl("Mark Angle (°):"), row, 0);
-        objectLayout->addWidget(mark2AngleEdit, row++, 1);
-        objectLayout->addWidget(mark2FollowRealTimeCheckBox, row, 0);
-        objectLayout->addWidget(ShowMark2CheckBox, row++, 1);
+        QGridLayout* g = new QGridLayout(grpRealTime); tighten(g); int row = 0;
+        g->addWidget(rlbl(QStringLiteral("X:")), row, 0);          g->addWidget(realTimePlatformXEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Y:")), row, 0);          g->addWidget(realTimePlatformYEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Angle (°):")), row, 0);  g->addWidget(realTimePlatformAngleEdit, row++, 1);
+        g->addWidget(showRealTimePlatformCheckBox, row++, 0, 1, 2);
     }
 
-    // 虚拟Mark组
-    CollapsibleGroupBox *virtualMarkGroup = new CollapsibleGroupBox(this);
-    virtualMarkGroup->setTitle("虚拟Mark (mm)");
-    QGridLayout *virtualMarkLayout = new QGridLayout(virtualMarkGroup);
-    tighten(virtualMarkLayout);
-    virtualMarkLayout->addWidget(rlbl("X偏移:"), 0, 0);
-    virtualMarkLayout->addWidget(virtualMarkXEdit, 0, 1);
-    virtualMarkLayout->addWidget(rlbl("Y偏移:"), 1, 0);
-    virtualMarkLayout->addWidget(virtualMarkYEdit, 1, 1);
-    virtualMarkLayout->addWidget(showVirtualMarkCheckBox, 2, 0, 1, 2);
+    // Mark1
+    grpMark1 = new CollapsibleGroupBox(this);
+    grpMark1->setTitle(QStringLiteral("基准Mark (mm)"));
+    {
+        QGridLayout* g = new QGridLayout(grpMark1); tighten(g); int row = 0;
+        g->addWidget(rlbl(QStringLiteral("X:")), row, 0);          g->addWidget(mark1XEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Y:")), row, 0);          g->addWidget(mark1YEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Angle (°):")), row, 0);  g->addWidget(mark1AngleEdit, row++, 1);
+        g->addWidget(mark1FollowBaseCheckBox, row, 0);             g->addWidget(ShowMark1CheckBox, row++, 1);
+    }
 
-    // 设置组
-    CollapsibleGroupBox *settingGroup = new CollapsibleGroupBox(this);
-    settingGroup->setTitle("设置");
-    QGridLayout *settingLayout = new QGridLayout(settingGroup);
-    tighten(settingLayout);
-    settingLayout->addWidget(rlbl("产品尺寸:"), 0, 0);
-    settingLayout->addWidget(markCenterDistanceEdit, 0, 1);
-    settingLayout->addWidget(rlbl("缩放比:"), 1, 0);
-    settingLayout->addWidget(ScreenRatio, 1, 1);
-    settingLayout->addWidget(ShowPlatformUL, 2, 0);
-    settingLayout->addWidget(ShowPlatformUR, 2, 1);
-    settingLayout->addWidget(ShowPlatformDL, 3, 0);
-    settingLayout->addWidget(ShowPlatformDR, 3, 1);
+    // Mark2
+    grpMark2 = new CollapsibleGroupBox(this);
+    grpMark2->setTitle(QStringLiteral("实时Mark (mm)"));
+    {
+        QGridLayout* g = new QGridLayout(grpMark2); tighten(g); int row = 0;
+        g->addWidget(rlbl(QStringLiteral("X:")), row, 0);          g->addWidget(mark2XEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Y:")), row, 0);          g->addWidget(mark2YEdit, row++, 1);
+        g->addWidget(rlbl(QStringLiteral("Angle (°):")), row, 0);  g->addWidget(mark2AngleEdit, row++, 1);
+        g->addWidget(mark2FollowRealTimeCheckBox, row, 0);         g->addWidget(ShowMark2CheckBox, row++, 1);
+    }
 
-    // ---- 右侧控制面板:竖排 4 组 + 整体收起切换 ----
-    QWidget *rightPanel = new QWidget(this);
-    QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
+    // 虚拟Mark
+    grpVirtual = new CollapsibleGroupBox(this);
+    grpVirtual->setTitle(QStringLiteral("虚拟Mark (mm)"));
+    {
+        QGridLayout* g = new QGridLayout(grpVirtual); tighten(g);
+        g->addWidget(rlbl(QStringLiteral("X偏移:")), 0, 0); g->addWidget(virtualMarkXEdit, 0, 1);
+        g->addWidget(rlbl(QStringLiteral("Y偏移:")), 1, 0); g->addWidget(virtualMarkYEdit, 1, 1);
+        g->addWidget(showVirtualMarkCheckBox, 2, 0, 1, 2);
+    }
+
+    // ---- 右侧控制面板:竖排 5 组 ----
+    QWidget* rightPanel = new QWidget(this);
+    QVBoxLayout* rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, 0, 0);
+    for (CollapsibleGroupBox* g : { grpBase, grpRealTime, grpMark1, grpMark2, grpVirtual })
+        rightLayout->addWidget(g, 0, Qt::AlignTop);
+    rightLayout->addStretch(1);
 
-    QPushButton *panelToggleBtn = new QPushButton("收起 »", this);
-    rightLayout->addWidget(panelToggleBtn, 0, Qt::AlignRight);
-
-    QWidget *groupsContainer = new QWidget(this);
-    QGridLayout *groupsLayout = new QGridLayout(groupsContainer);
-    groupsLayout->setContentsMargins(0, 0, 0, 0);
-    // 2×2 两列:目标 | 对象 ;虚拟Mark | 设置(各自顶端对齐,降低整体高度)
-    groupsLayout->addWidget(targetGroup,      0, 0, Qt::AlignTop);
-    groupsLayout->addWidget(objectGroup,      0, 1, Qt::AlignTop);
-    groupsLayout->addWidget(virtualMarkGroup, 1, 0, Qt::AlignTop);
-    groupsLayout->addWidget(settingGroup,     1, 1, Qt::AlignTop);
-    groupsLayout->setRowStretch(2, 1);
-    rightLayout->addWidget(groupsContainer, 1);
-
-    // 整块收起:隐藏分组容器,画布占满;保留切换按钮以便展开
+    // 顶栏按钮收起/展开整个右面板:折叠后画布水平铺满
     connect(panelToggleBtn, &QPushButton::clicked, this, [=]() {
-        const bool show = !groupsContainer->isVisible();
-        groupsContainer->setVisible(show);
-        panelToggleBtn->setText(show ? "收起 »" : "« 展开");
+        const bool show = !rightPanel->isVisible();
+        rightPanel->setVisible(show);
+        panelToggleBtn->setText(show ? QStringLiteral("收起 »") : QStringLiteral("« 展开"));
     });
 
     simLayout->addWidget(rightPanel);
 
-    // 将模拟平台页面添加到 TabWidget
-    tabWidget->addTab(simulationPage, "模拟平台");
+    // 模拟平台页加入栈
+    stack->addWidget(simulationPage);   // index 0
 
-    // ========== 图片显示页面 ==========
+    // 图片显示页
     setupPictureShowPage();
-    tabWidget->addTab(pictureShowPage, "图片显示");
+    stack->addWidget(pictureShowPage);  // index 1
 
-    // 连接 Tab 切换信号
-    connect(tabWidget, &QTabWidget::currentChanged, this, &SimulationPlatform::onTabChanged);
+    // 菜单栏(视图/模拟平台/图像)
+    buildMenuBar();
+
+    // 状态栏:左 = 上下文文本(路径/参数),右 = 缩放百分比
+    statusLeft  = new QLabel(this);
+    statusRight = new QLabel(this);
+    statusBar()->addWidget(statusLeft, 1);
+    statusBar()->addPermanentWidget(statusRight);
+
+    // 图片缩放变化 → 状态栏右侧百分比(仅图片页显示)
+    connect(imageViewer, &ImageViewerWidget::scaleChanged, this, [this](double scale) {
+        if (stack->currentIndex() == 1)
+            statusRight->setText(QStringLiteral("缩放: %1%").arg(QString::number(scale * 100.0, 'f', 0)));
+    });
+
+    // 参数变化 → 模拟页状态栏文本刷新
+    connect(this, &SimulationPlatform::parametersChanged, this, [this](double, double) {
+        if (stack->currentIndex() == 0)
+            updateStatusBarForPage(0);
+    });
+
+    // 默认显示模拟页
+    showPage(0);
 
     // 设置初始值
     basePlatformXEdit->setText(QString::number(basePlatform.x));
@@ -339,9 +327,208 @@ void SimulationPlatform::setupUI()
 
     virtualMarkXEdit->setText(QString::number(virtualMark.x));
     virtualMarkYEdit->setText(QString::number(virtualMark.y));
+}
 
-    markCenterDistanceEdit->setText(QString::number(m_markSpacing));
-    ScreenRatio->setText(QString::number(m_Ratio));
+void SimulationPlatform::buildMenuBar()
+{
+    QMenuBar* mbar = menuBar();
+
+    // ===== 视图 =====
+    QMenu* viewMenu = mbar->addMenu(QStringLiteral("视图"));
+
+    QActionGroup* pageGroup = new QActionGroup(this);
+    pageGroup->setExclusive(true);
+    actPageSim = viewMenu->addAction(QStringLiteral("模拟平台"));
+    actPagePic = viewMenu->addAction(QStringLiteral("图片显示"));
+    for (QAction* a : { actPageSim, actPagePic }) { a->setCheckable(true); pageGroup->addAction(a); }
+    actPageSim->setChecked(true);
+    connect(actPageSim, &QAction::triggered, this, [this]() { showPage(0); });
+    connect(actPagePic, &QAction::triggered, this, [this]() { showPage(1); });
+
+    viewMenu->addSeparator();
+
+    // 窗口位置(四角,单选,两页共用)
+    QMenu* posMenu = viewMenu->addMenu(QStringLiteral("窗口位置"));
+    QActionGroup* posGroup = new QActionGroup(this);
+    posGroup->setExclusive(true);
+    const char* names[5] = { "左上", "右上", "左下", "右下", "居中" };
+    for (int i = 0; i < 5; ++i)
+    {
+        QAction* a = posMenu->addAction(QString::fromUtf8(names[i]));
+        a->setCheckable(true);
+        posGroup->addAction(a);
+        if (i == 0) a->setChecked(true);
+        connect(a, &QAction::triggered, this, [this, i]() { moveToScreenCorner(i); });
+    }
+
+    // ===== 模拟平台(仅模拟页可用)=====
+    simMenu = mbar->addMenu(QStringLiteral("模拟平台"));
+    QAction* actParam = simMenu->addAction(QStringLiteral("参数设置…"));
+    connect(actParam, &QAction::triggered, this, &SimulationPlatform::openParamDialog);
+    simMenu->addSeparator();
+    bindGroupToggle(grpBase,     QStringLiteral("基准平台"));
+    bindGroupToggle(grpRealTime, QStringLiteral("实时平台"));
+    bindGroupToggle(grpMark1,    QStringLiteral("基准Mark"));
+    bindGroupToggle(grpMark2,    QStringLiteral("实时Mark"));
+    bindGroupToggle(grpVirtual,  QStringLiteral("虚拟Mark"), false);  // 虚拟Mark 默认不显示
+
+    // ===== 图像(仅图片页可用)=====
+    imageMenu = mbar->addMenu(QStringLiteral("图像"));
+    QAction* actLoad = imageMenu->addAction(QStringLiteral("加载图片…"));
+    connect(actLoad, &QAction::triggered, this, &SimulationPlatform::onSetImageClicked);
+}
+
+void SimulationPlatform::showPage(int index)
+{
+    // 切页前记住离开页的窗口尺寸(仅本会话,不落盘)
+    const int prev = stack->currentIndex();
+    if (prev != index && prev >= 0 && prev < 2)
+        m_pageSize[prev] = size();
+
+    stack->setCurrentIndex(index);
+
+    // 让窗口最小尺寸只受当前页约束:非当前页 sizePolicy 设为 Ignored,
+    // 其 qSmartMinSize 归 0,QStackedLayout 不再用它钳制最小高度。
+    for (int i = 0; i < stack->count(); ++i)
+    {
+        const bool cur = (i == index);
+        stack->widget(i)->setSizePolicy(cur ? QSizePolicy::Preferred : QSizePolicy::Ignored,
+                                        cur ? QSizePolicy::Preferred : QSizePolicy::Ignored);
+    }
+
+    if (index == 0 && actPageSim) actPageSim->setChecked(true);
+    if (index == 1 && actPagePic) actPagePic->setChecked(true);
+
+    // 页面专属菜单互斥启用:模拟页→模拟平台菜单可用、图像菜单置灰;反之亦然
+    if (simMenu)   simMenu->menuAction()->setEnabled(index == 0);
+    if (imageMenu) imageMenu->menuAction()->setEnabled(index == 1);
+
+    updateStatusBarForPage(index);
+
+    // 恢复目标页此前在本会话记住的尺寸(首次则保持当前自然尺寸)
+    if (index >= 0 && index < 2 && m_pageSize[index].isValid())
+        resize(m_pageSize[index]);
+}
+
+void SimulationPlatform::updateStatusBarForPage(int index)
+{
+    if (!statusLeft || !statusRight)
+        return;
+
+    if (index == 0)
+    {
+        // 模拟页:产品尺寸 + 缩放比
+        statusLeft->setText(QStringLiteral("产品尺寸: %1 mm    缩放比: %2 px/mm")
+                                .arg(QString::number(m_markSpacing))
+                                .arg(QString::number(m_Ratio)));
+        statusRight->clear();
+    }
+    else
+    {
+        // 图片页:路径 + 缩放百分比
+        statusLeft->setText(m_imagePath.isEmpty() ? QStringLiteral("未加载图片") : m_imagePath);
+        if (imageViewer)
+            statusRight->setText(QStringLiteral("缩放: %1%")
+                                     .arg(QString::number(imageViewer->scale() * 100.0, 'f', 0)));
+    }
+}
+
+void SimulationPlatform::moveToScreenCorner(int corner)
+{
+    const QRect fg = this->frameGeometry();
+    const int totalWidth  = fg.width();
+    const int totalHeight = fg.height();
+    const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
+    switch (corner)
+    {
+    case 0: this->move(0, 0); break;                                              // 左上
+    case 1: this->move(avail.width() - totalWidth, 0); break;                     // 右上
+    case 2: this->move(0, avail.height() - totalHeight); break;                   // 左下
+    case 3: this->move(avail.width() - totalWidth, avail.height() - totalHeight); break; // 右下
+    case 4: this->move(avail.x() + (avail.width() - totalWidth) / 2,
+                       avail.y() + (avail.height() - totalHeight) / 2); break;     // 居中
+    default: break;
+    }
+}
+
+void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& title, bool visible)
+{
+    QAction* a = simMenu->addAction(title);
+    a->setCheckable(true);
+    a->setChecked(visible);   // 初始勾选状态(connect 前设置,不触发)
+    g->setVisible(visible);   // 同步初始可见性
+
+    // 菜单勾选 → 显示/隐藏整组
+    connect(a, &QAction::toggled, this, [g](bool on) { g->setVisible(on); });
+
+    // 组内 × 关闭 → 取消勾选(toggled 再驱动隐藏)
+    g->setClosable(true);
+    connect(g, &CollapsibleGroupBox::closed, this, [a]() { a->setChecked(false); });
+}
+
+void SimulationPlatform::openParamDialog()
+{
+    // 进对话框前记录原始值,供 Cancel 回退
+    const double origSpacing = m_markSpacing;
+    const double origRatio   = m_Ratio;
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(QStringLiteral("参数设置"));
+
+    QLineEdit* sizeEdit  = new QLineEdit(&dlg);
+    QLineEdit* ratioEdit = new QLineEdit(&dlg);
+    sizeEdit->setText(QString::number(m_markSpacing));
+    ratioEdit->setText(QString::number(m_Ratio));
+    sizeEdit->setAlignment(Qt::AlignCenter);
+    ratioEdit->setAlignment(Qt::AlignCenter);
+    QDoubleValidator* v = new QDoubleValidator(&dlg);
+    v->setDecimals(2);
+    sizeEdit->setValidator(v);
+    ratioEdit->setValidator(v);
+
+    // 实时预览:只改内存值 + 画面 + 状态栏,不 emit(不落盘);保存只在 OK 时发生一次
+    auto applyPreview = [this](double distance, double ratio) {
+        m_markSpacing = distance;
+        m_Ratio = ratio;
+        m_scale = m_ScreenWidth / m_Ratio;
+        canvas->update();
+        if (stack->currentIndex() == 0)
+            updateStatusBarForPage(0);
+    };
+
+    // 用户输入时实时预览;护栏:数值有效且缩放比 > 0(否则 m_scale 变 inf)
+    auto onEdited = [=]() {
+        bool okD = false, okR = false;
+        const double d = sizeEdit->text().toDouble(&okD);
+        const double r = ratioEdit->text().toDouble(&okR);
+        if (okD && okR && r > 0.0)
+            applyPreview(d, r);
+    };
+    connect(sizeEdit,  &QLineEdit::textEdited, this, [=](const QString&) { onEdited(); });
+    connect(ratioEdit, &QLineEdit::textEdited, this, [=](const QString&) { onEdited(); });
+
+    QFormLayout* form = new QFormLayout();
+    form->addRow(QStringLiteral("产品尺寸 (mm):"), sizeEdit);
+    form->addRow(QStringLiteral("缩放比 (px/mm):"), ratioEdit);
+
+    QDialogButtonBox* box = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    QVBoxLayout* lay = new QVBoxLayout(&dlg);
+    lay->addLayout(form);
+    lay->addWidget(box);
+
+    if (dlg.exec() == QDialog::Accepted)
+    {
+        // 值已实时应用,这里 emit 一次完成保存
+        emit parametersChanged(m_markSpacing, m_Ratio);
+    }
+    else
+    {
+        // 取消/关闭:回退到原始值(配置里仍是原值,无需保存)
+        applyPreview(origSpacing, origRatio);
+    }
 }
 
 void SimulationPlatform::setupValidators()
@@ -403,53 +590,6 @@ void SimulationPlatform::setupConnections()
     connect(virtualMarkYEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateVirtualMark);
     connect(showVirtualMarkCheckBox, &QCheckBox::clicked, this, [this]()
             { canvas->update(); });
-
-    connect(markCenterDistanceEdit, &QLineEdit::editingFinished, this, [this]()
-            {
-        m_markSpacing = markCenterDistanceEdit->text().toDouble();
-        canvas->update();
-        emit parametersChanged(m_markSpacing, m_Ratio); });
-
-    connect(ScreenRatio, &QLineEdit::editingFinished, this, [this]()
-            {
-        m_Ratio = ScreenRatio->text().toDouble();
-        m_scale = m_ScreenWidth / m_Ratio;
-        canvas->update();
-        emit parametersChanged(m_markSpacing, m_Ratio); });
-
-    connect(ShowPlatformUL->group(), &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
-            {
-    if (checked) {
-
-        QRect frameGeometry = this->frameGeometry();
-        int totalHeight = frameGeometry.height();  // 包含标题栏的高度
-        int totalWidth = frameGeometry.width();    // 包含边框的宽度
-
-        int screenWidth = QGuiApplication::primaryScreen()->availableGeometry().width();
-        int screenHeight = QGuiApplication::primaryScreen()->availableGeometry().height();
-        if(button == ShowPlatformUL)
-        {
-            //将当前窗口移动到屏幕左上角显示
-            this->move(0, 0);
-        }
-        else if(button == ShowPlatformUR)
-        {
-            //将当前窗口移动到屏幕右上角显示
-            this->move(screenWidth - totalWidth, 0);
-        }
-        else if(button == ShowPlatformDL)
-        {
-            //将当前窗口移动到屏幕左下角显示
-            this->move(0, screenHeight - totalHeight);
-        }
-        else if(button == ShowPlatformDR)
-        {
-            //将当前窗口移动到屏幕右下角显示
-            this->move(screenWidth - totalWidth, screenHeight - totalHeight);
-        }
-
-        //canvas->update();
-    } });
 }
 
 void SimulationPlatform::updateBasePlatform()
@@ -496,7 +636,7 @@ void SimulationPlatform::updateVirtualMark()
 void SimulationPlatform::paintEvent(QPaintEvent *event)
 {
     // 主窗口不需要绘制，由CanvasWidget负责绘制
-    QWidget::paintEvent(event);
+    QMainWindow::paintEvent(event);
 }
 
 void SimulationPlatform::drawCanvas(QPainter &painter)
@@ -541,7 +681,7 @@ void SimulationPlatform::drawCanvas(QPainter &painter)
 void SimulationPlatform::resizeEvent(QResizeEvent *event)
 {
     updateOriginAndScale();
-    QWidget::resizeEvent(event);
+    QMainWindow::resizeEvent(event);
     canvas->update();
 }
 
@@ -550,15 +690,6 @@ void SimulationPlatform::updateOriginAndScale()
     // 设置坐标原点为中心点
     m_origin.setX(canvas->width() / 2);
     m_origin.setY(canvas->height() / 2);
-
-    // 计算合适的缩放比例，确保至少能看到±100mm的范围
-    // double scaleX = canvas->width() / 2.0 / 10.0;
-    // double scaleY = canvas->height() / 2.0 / 10.0;
-    // scale = qMin(scaleX, scaleY);
-    // scale = qMax(scale, 1.0); // 至少1像素/mm
-
-    // ScreenWidth = canvas->width();
-    // scale = ScreenWidth / 200.0; // 默认缩放比例 2像
 }
 
 void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
@@ -858,16 +989,6 @@ void SimulationPlatform::drawVirtualMark(QPainter &painter)
     painter.restore();
 }
 
-QPointF SimulationPlatform::rotatePoint(const QPointF &point, double angle)
-{
-    double rad = angle * M_PI / 180.0;
-    double cosA = cos(rad);
-    double sinA = sin(rad);
-
-    return QPointF(point.x() * cosA - point.y() * sinA,
-                   point.x() * sinA + point.y() * cosA);
-}
-
 QPointF SimulationPlatform::transformPoint(const QPointF &point)
 {
     // 将世界坐标(mm)转换为屏幕坐标(pixel)
@@ -875,101 +996,14 @@ QPointF SimulationPlatform::transformPoint(const QPointF &point)
                    m_origin.y() - point.y() * m_scale); // 注意Y轴翻转
 }
 
-QPointF SimulationPlatform::inverseTransformPoint(const QPointF &point)
-{
-    // 将屏幕坐标(pixel)转换为世界坐标(mm)
-    return QPointF((point.x() - m_origin.x()) / m_scale,
-                   (m_origin.y() - point.y()) / m_scale); // 注意Y轴翻转
-}
-
 void SimulationPlatform::setupPictureShowPage()
 {
     pictureShowPage = new QWidget(this);
-    QHBoxLayout *picLayout = new QHBoxLayout(pictureShowPage);  // 左:图像  右:功能面板
+    QVBoxLayout* picLayout = new QVBoxLayout(pictureShowPage);
+    picLayout->setContentsMargins(0, 0, 0, 0);
 
-    // 图像显示区域(占左侧主区)
     imageViewer = new ImageViewerWidget(this);
     picLayout->addWidget(imageViewer, 1);
-
-    // 功能区域(右侧可折叠面板)
-    CollapsibleGroupBox *funcGroup = new CollapsibleGroupBox(this);
-    funcGroup->setTitle("功能");
-    QVBoxLayout *funcLayout = new QVBoxLayout(funcGroup);
-
-    // 设置图像按钮
-    setImageBtn = new QPushButton("设置图像", this);
-    connect(setImageBtn, &QPushButton::clicked, this, &SimulationPlatform::onSetImageClicked);
-    funcLayout->addWidget(setImageBtn);
-
-    // 缩放倍率输入框
-    zoomRatioEdit = new QLineEdit(this);
-    zoomRatioEdit->setText("1.00");
-    QDoubleValidator *zoomValidator = new QDoubleValidator(0.1, 10.0, 2, this);
-    zoomValidator->setNotation(QDoubleValidator::StandardNotation);
-    zoomRatioEdit->setValidator(zoomValidator);
-
-    QHBoxLayout *zoomRow = new QHBoxLayout();
-    zoomRow->addWidget(new QLabel("缩放倍率:", this));
-    zoomRow->addWidget(zoomRatioEdit, 1);
-    funcLayout->addLayout(zoomRow);
-
-    // 输入框编辑完成时更新图像缩放
-    connect(zoomRatioEdit, &QLineEdit::editingFinished, this, [this]()
-            {
-        bool ok;
-        double scale = zoomRatioEdit->text().toDouble(&ok);
-        if (ok && imageViewer) {
-            imageViewer->setScale(scale);
-        } });
-
-    // 图像缩放变化时更新输入框
-    connect(imageViewer, &ImageViewerWidget::scaleChanged, this, [this](double scale)
-            { zoomRatioEdit->setText(QString::number(scale, 'f', 2)); });
-
-    // 窗口位置按钮组
-    picShowPlatformUL = new QRadioButton("左上显示", this);
-    picShowPlatformUR = new QRadioButton("右上显示", this);
-    picShowPlatformDL = new QRadioButton("左下显示", this);
-    picShowPlatformDR = new QRadioButton("右下显示", this);
-
-    QButtonGroup *picPosGroup = new QButtonGroup(this);
-    picPosGroup->addButton(picShowPlatformUL);
-    picPosGroup->addButton(picShowPlatformUR);
-    picPosGroup->addButton(picShowPlatformDL);
-    picPosGroup->addButton(picShowPlatformDR);
-    picShowPlatformUL->setChecked(true);
-
-    funcLayout->addWidget(picShowPlatformUL);
-    funcLayout->addWidget(picShowPlatformUR);
-    funcLayout->addWidget(picShowPlatformDL);
-    funcLayout->addWidget(picShowPlatformDR);
-    funcLayout->addStretch(1);
-
-    picLayout->addWidget(funcGroup, 0, Qt::AlignTop);
-
-    // 连接位置按钮信号
-    connect(picPosGroup, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
-            {
-        if (checked) {
-            QRect frameGeometry = this->frameGeometry();
-            int totalHeight = frameGeometry.height();
-            int totalWidth = frameGeometry.width();
-
-            int screenWidth = QGuiApplication::primaryScreen()->availableGeometry().width();
-            int screenHeight = QGuiApplication::primaryScreen()->availableGeometry().height();
-
-            if (button == picShowPlatformUL) {
-                this->move(0, 0);
-            } else if (button == picShowPlatformUR) {
-                this->move(screenWidth - totalWidth, 0);
-            } else if (button == picShowPlatformDL) {
-                this->move(0, screenHeight - totalHeight);
-            } else if (button == picShowPlatformDR) {
-                this->move(screenWidth - totalWidth, screenHeight - totalHeight);
-            }
-        } });
-
-    // 样式由全局主题(qApp 样式表)统一控制,不再设置局部样式
 
     // 加载默认图像
     loadDefaultImage();
@@ -1002,6 +1036,7 @@ void SimulationPlatform::loadDefaultImage()
         if (!image.isNull())
         {
             imageViewer->setImage(image);
+            m_imagePath = imagePath;
         }
     }
 }
@@ -1037,6 +1072,9 @@ void SimulationPlatform::onSetImageClicked()
 
     // 显示图像
     imageViewer->setImage(image);
+    m_imagePath = filePath;
+    if (stack->currentIndex() == 1)
+        updateStatusBarForPage(1);
 
     // 获取原文件的扩展名
     QFileInfo fileInfo(filePath);
@@ -1063,8 +1101,3 @@ void SimulationPlatform::onSetImageClicked()
     }
 }
 
-void SimulationPlatform::onTabChanged(int index)
-{
-    Q_UNUSED(index);
-    // 页面切换时的处理逻辑（如有需要可以在这里添加）
-}
