@@ -1,0 +1,106 @@
+/*
+ * PLC Simulator - Industrial Communication Protocol Testing Tool
+ * Copyright (c) 2025-2026 Wang Mao
+ *
+ * This file is part of PLC Simulator.
+ * Licensed under the MIT License. See LICENSE file in the project root.
+ */
+#include "PlatformScene.h"
+#include <QGuiApplication>
+#include <QScreen>
+
+namespace {
+// 默认 Mark 可见性:虚拟 Mark 默认隐藏(与原行为一致)
+}
+
+PlatformScene::PlatformScene(QObject* parent)
+    : QObject(parent)
+{
+    m_virtualMark.visible = false;  // 原 showVirtualMarkCheckBox 默认 false
+    m_screenWidthPx = QGuiApplication::primaryScreen()->availableGeometry().width();
+    recomputeScale();
+}
+
+void PlatformScene::recomputeScale()
+{
+    if (m_screenRatio > 0.0)
+        m_pixelsPerMm = m_screenWidthPx / m_screenRatio;  // 原 m_scale = m_ScreenWidth / m_Ratio
+}
+
+PlatformItem& PlatformScene::itemRef(Platform which)
+{
+    return which == Platform::Base ? m_base : m_live;
+}
+
+const PlatformItem& PlatformScene::platform(Platform which) const
+{
+    return which == Platform::Base ? m_base : m_live;
+}
+
+void PlatformScene::moveAbsolute(const Pose& target, Platform which)
+{
+    PlatformItem& it = itemRef(which);
+    if (it.pose.x == target.x && it.pose.y == target.y && it.pose.angleDeg == target.angleDeg)
+        return;  // 无变化不发信号(等价原轮询的去重)
+    it.pose = target;
+    emit poseChanged(which, it.pose);
+    emit changed();
+}
+
+void PlatformScene::moveRelative(const Pose& delta, Platform which)
+{
+    if (delta.x == 0.0 && delta.y == 0.0 && delta.angleDeg == 0.0)
+        return;
+    PlatformItem& it = itemRef(which);
+    it.pose.x += delta.x;
+    it.pose.y += delta.y;
+    it.pose.angleDeg += delta.angleDeg;
+    emit poseChanged(which, it.pose);
+    emit changed();
+}
+
+Pose PlatformScene::pose(Platform which) const
+{
+    return platform(which).pose;
+}
+
+void PlatformScene::setPlatformVisible(Platform which, bool visible)
+{
+    itemRef(which).visible = visible;
+    emit changed();
+}
+
+void PlatformScene::setBaseMarkPose(const Pose& pose) { m_baseMark.pose = pose; emit changed(); }
+void PlatformScene::setLiveMarkPose(const Pose& pose) { m_liveMark.pose = pose; emit changed(); }
+void PlatformScene::setVirtualMarkOffset(double x, double y) { m_virtualMark.pose.x = x; m_virtualMark.pose.y = y; emit changed(); }
+void PlatformScene::setBaseMarkFollows(bool follows) { m_baseMark.followsPlatform = follows; emit changed(); }
+void PlatformScene::setLiveMarkFollows(bool follows) { m_liveMark.followsPlatform = follows; emit changed(); }
+void PlatformScene::setBaseMarkVisible(bool visible) { m_baseMark.visible = visible; emit changed(); }
+void PlatformScene::setLiveMarkVisible(bool visible) { m_liveMark.visible = visible; emit changed(); }
+void PlatformScene::setVirtualMarkVisible(bool visible) { m_virtualMark.visible = visible; emit changed(); }
+
+void PlatformScene::setSceneParams(double markCenterDistance, double screenRatio)
+{
+    m_markCenterDistance = markCenterDistance;
+    m_screenRatio = screenRatio;
+    recomputeScale();
+    emit changed();
+}
+
+Pose PlatformScene::baseMarkFinalPose() const
+{
+    if (m_baseMark.followsPlatform)
+        return { m_base.pose.x + m_baseMark.pose.x,
+                 m_base.pose.y + m_baseMark.pose.y,
+                 m_base.pose.angleDeg + m_baseMark.pose.angleDeg };
+    return m_baseMark.pose;
+}
+
+Pose PlatformScene::liveMarkFinalPose() const
+{
+    if (m_liveMark.followsPlatform)
+        return { m_live.pose.x + m_liveMark.pose.x,
+                 m_live.pose.y + m_liveMark.pose.y,
+                 m_live.pose.angleDeg + m_liveMark.pose.angleDeg };
+    return m_liveMark.pose;
+}
