@@ -103,6 +103,7 @@ set(GUI_SIMULATIONPLATFORM_SOURCES
     Gui/SimulationPlatform/SimulationPlatform.cpp
     Gui/SimulationPlatform/PlatformCanvas.cpp
     Gui/SimulationPlatform/ImageViewer.cpp
+    Gui/SimulationPlatform/ImagePage.cpp
     Gui/SimulationPlatform/PlatformScene.cpp
     Gui/SimulationPlatform/PlatformControlPanel.cpp
     Gui/SimulationPlatform/PlatformParamsDialog.cpp
@@ -112,6 +113,7 @@ set(GUI_SIMULATIONPLATFORM_HEADERS
     Gui/SimulationPlatform/SimulationPlatform.h
     Gui/SimulationPlatform/PlatformCanvas.h
     Gui/SimulationPlatform/ImageViewer.h
+    Gui/SimulationPlatform/ImagePage.h
     Gui/SimulationPlatform/PlatformTypes.h
     Gui/SimulationPlatform/PlatformScene.h
     Gui/SimulationPlatform/PlatformControlPanel.h

@@ -39,7 +39,7 @@
 
 // 包含拆分出的控件头文件
 #include "PlatformCanvas.h"
-#include "ImageViewer.h"
+#include "ImagePage.h"
 #include "CollapsibleGroupBox.h"
 #include "PlatformScene.h"
 #include "PlatformControlPanel.h"
@@ -91,19 +91,11 @@ private:
 
     // 页面切换相关
     QWidget* simulationPage;      // 模拟平台页面
-    QWidget* pictureShowPage;     // 图片显示页面 (PictureShow)
-
-    // 图片显示页面控件
-    ImageViewer* imageViewer;
-
-    void setupPictureShowPage();
-    void loadDefaultImage();
-    void onSetImageClicked();
+    ImagePage* m_imagePage = nullptr;  // 图片显示页面
 
     // 状态栏
     QLabel* statusLeft;
     QLabel* statusRight;
-    QString m_imagePath;
     void updateStatusBarForPage(int index);
 
     // 场景数据模型(单一数据源)

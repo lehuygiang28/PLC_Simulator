@@ -7,13 +7,10 @@
  */
 
 #include "SimulationPlatform.h"
+#include "ImagePage.h"
 #include "ThemeManager.h"
 #include <QStackedWidget>
 #include <QMenuBar>
-#include <QFileDialog>
-#include <QDir>
-#include <QCoreApplication>
-#include <QMessageBox>
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QMainWindow(parent)
@@ -29,7 +26,7 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     // 主题切换时实时重绘画布与图像区(控件由全局 qss 自动重绘)
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](Theme) {
         if (canvas) canvas->update();
-        if (imageViewer) imageViewer->update();
+        if (m_imagePage) m_imagePage->update();
         update();
     });
 
@@ -104,8 +101,8 @@ void SimulationPlatform::setupUI()
     stack->addWidget(simulationPage);   // index 0
 
     // 图片显示页
-    setupPictureShowPage();
-    stack->addWidget(pictureShowPage);  // index 1
+    m_imagePage = new ImagePage(this);
+    stack->addWidget(m_imagePage);      // index 1
 
     // 菜单栏(视图/模拟平台/图像)
     buildMenuBar();
@@ -117,9 +114,15 @@ void SimulationPlatform::setupUI()
     statusBar()->addPermanentWidget(statusRight);
 
     // 图片缩放变化 → 状态栏右侧百分比(仅图片页显示)
-    connect(imageViewer, &ImageViewer::scaleChanged, this, [this](double scale) {
+    connect(m_imagePage, &ImagePage::scaleChanged, this, [this](double scale) {
         if (stack->currentIndex() == 1)
             statusRight->setText(QStringLiteral("缩放: %1%").arg(QString::number(scale * 100.0, 'f', 0)));
+    });
+
+    // 图片路径变化 → 状态栏左侧路径更新(仅图片页显示)
+    connect(m_imagePage, &ImagePage::imagePathChanged, this, [this](const QString& path) {
+        if (stack->currentIndex() == 1)
+            statusLeft->setText(path.isEmpty() ? QStringLiteral("未加载图片") : path);
     });
 
     // 参数变化 → 模拟页状态栏文本刷新
@@ -184,7 +187,7 @@ void SimulationPlatform::buildMenuBar()
     // ===== 图像(仅图片页可用)=====
     imageMenu = mbar->addMenu(QStringLiteral("图像"));
     QAction* actLoad = imageMenu->addAction(QStringLiteral("加载图片…"));
-    connect(actLoad, &QAction::triggered, this, &SimulationPlatform::onSetImageClicked);
+    connect(actLoad, &QAction::triggered, m_imagePage, &ImagePage::loadImage);
 }
 
 void SimulationPlatform::showPage(int index)
@@ -235,10 +238,11 @@ void SimulationPlatform::updateStatusBarForPage(int index)
     else
     {
         // 图片页:路径 + 缩放百分比
-        statusLeft->setText(m_imagePath.isEmpty() ? QStringLiteral("未加载图片") : m_imagePath);
-        if (imageViewer)
+        const QString path = m_imagePage ? m_imagePage->imagePath() : QString();
+        statusLeft->setText(path.isEmpty() ? QStringLiteral("未加载图片") : path);
+        if (m_imagePage)
             statusRight->setText(QStringLiteral("缩放: %1%")
-                                     .arg(QString::number(imageViewer->scale() * 100.0, 'f', 0)));
+                                     .arg(QString::number(m_imagePage->scale() * 100.0, 'f', 0)));
     }
 }
 
@@ -289,107 +293,3 @@ void SimulationPlatform::resizeEvent(QResizeEvent *event)
     QMainWindow::resizeEvent(event);
 }
 
-void SimulationPlatform::setupPictureShowPage()
-{
-    pictureShowPage = new QWidget(this);
-    QVBoxLayout* picLayout = new QVBoxLayout(pictureShowPage);
-    picLayout->setContentsMargins(0, 0, 0, 0);
-
-    imageViewer = new ImageViewer(this);
-    picLayout->addWidget(imageViewer, 1);
-
-    // 加载默认图像
-    loadDefaultImage();
-}
-
-void SimulationPlatform::loadDefaultImage()
-{
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString configDir = appDir + "/Config";
-
-    QDir dir(configDir);
-    if (!dir.exists())
-    {
-        dir.mkpath(".");
-        return;
-    }
-
-    // 查找包含 'SimulationImage' 的图像文件
-    QStringList filters;
-    filters << "SimulationImage*.bmp" << "SimulationImage*.png"
-            << "SimulationImage*.jpg" << "SimulationImage*.jpeg"
-            << "SimulationImage*.tiff" << "SimulationImage*.tif";
-
-    QStringList files = dir.entryList(filters, QDir::Files, QDir::Name);
-
-    if (!files.isEmpty())
-    {
-        QString imagePath = configDir + "/" + files.first();
-        QImage image(imagePath);
-        if (!image.isNull())
-        {
-            imageViewer->setImage(image);
-            m_imagePath = imagePath;
-        }
-    }
-}
-
-void SimulationPlatform::onSetImageClicked()
-{
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString configDir = appDir + "/Config";
-
-    // 确保目录存在
-    QDir dir(configDir);
-    if (!dir.exists())
-    {
-        dir.mkpath(".");
-    }
-
-    // 打开文件对话框
-    QString filter = "图像文件 (*.bmp *.png *.jpg *.jpeg *.tiff *.tif)";
-    QString filePath = QFileDialog::getOpenFileName(this, "选择图像", configDir, filter);
-
-    if (filePath.isEmpty())
-    {
-        return;
-    }
-
-    // 加载图像
-    QImage image(filePath);
-    if (image.isNull())
-    {
-        QMessageBox::warning(this, "错误", "无法加载所选图像文件。");
-        return;
-    }
-
-    // 显示图像
-    imageViewer->setImage(image);
-    m_imagePath = filePath;
-    if (stack->currentIndex() == 1)
-        updateStatusBarForPage(1);
-
-    // 获取原文件的扩展名
-    QFileInfo fileInfo(filePath);
-    QString suffix = fileInfo.suffix().toLower();
-
-    // 保存到 Config 目录，命名为 SimulationImage
-    QString destPath = configDir + "/SimulationImage." + suffix;
-
-    // 如果已存在同名文件（包括不同扩展名），先删除旧的
-    QStringList oldFiles = dir.entryList(QStringList() << "SimulationImage.*", QDir::Files);
-    for (const QString &oldFile : oldFiles)
-    {
-        QFile::remove(configDir + "/" + oldFile);
-    }
-
-    // 复制文件到目标位置
-    if (!QFile::copy(filePath, destPath))
-    {
-        // 如果复制失败，尝试直接保存
-        if (!image.save(destPath))
-        {
-            QMessageBox::warning(this, "警告", "图像加载成功，但无法保存到配置目录。");
-        }
-    }
-}
