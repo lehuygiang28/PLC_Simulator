@@ -12,16 +12,9 @@
 #include <QApplication>
 #include <QWidget>
 #include <QPainter>
-#include <QLineEdit>
-#include <QRadioButton>
-#include <QCheckBox>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGridLayout>
-#include <QButtonGroup>
-#include <QGroupBox>
-#include <QDoubleValidator>
 #include <QResizeEvent>
 #include <QPointF>
 #include <QPoint>
@@ -49,6 +42,7 @@
 #include "ImageViewer.h"
 #include "CollapsibleGroupBox.h"
 #include "PlatformScene.h"
+#include "PlatformControlPanel.h"
 
 class SimulationPlatform : public QMainWindow
 {
@@ -74,51 +68,12 @@ public:
 protected:
     void resizeEvent(QResizeEvent *event) override;
 
-private slots:
-    void updateBasePlatform();
-    void updateRealTimePlatform();
-    void updateMark1();
-    void updateMark2();
-    void updateVirtualMark();
-    void syncEditsFromScene();
-
 private:
     // UI控件
     PlatformCanvas* canvas;
 
-    QLineEdit *basePlatformXEdit;
-    QLineEdit *basePlatformYEdit;
-    QLineEdit *basePlatformAngleEdit;
-    QCheckBox* showBasePlatformCheckBox;
-
-    QLineEdit *realTimePlatformXEdit;
-    QLineEdit *realTimePlatformYEdit;
-    QLineEdit *realTimePlatformAngleEdit;
-    QCheckBox* showRealTimePlatformCheckBox;
-
-    QLineEdit *mark1XEdit;
-    QLineEdit *mark1YEdit;
-    QLineEdit *mark1AngleEdit;
-    QCheckBox *mark1FollowBaseCheckBox;
-    QCheckBox *ShowMark1CheckBox;
-
-    QLineEdit *mark2XEdit;
-    QLineEdit *mark2YEdit;
-    QLineEdit *mark2AngleEdit;
-    QCheckBox *mark2FollowRealTimeCheckBox;
-    QCheckBox *ShowMark2CheckBox;
-
-    QLineEdit *virtualMarkXEdit;
-    QLineEdit *virtualMarkYEdit;
-    QCheckBox *showVirtualMarkCheckBox;
-
-    // 5 个控制组(供菜单显隐/关闭引用)
-    CollapsibleGroupBox* grpBase;
-    CollapsibleGroupBox* grpRealTime;
-    CollapsibleGroupBox* grpMark1;
-    CollapsibleGroupBox* grpMark2;
-    CollapsibleGroupBox* grpVirtual;
-    void openParamDialog();
+    // 右侧控制面板
+    PlatformControlPanel* m_controlPanel = nullptr;
 
     // 页面/菜单/状态栏
     QStackedWidget* stack;
@@ -131,6 +86,7 @@ private:
     void showPage(int index);
     void moveToScreenCorner(int corner);
     void bindGroupToggle(CollapsibleGroupBox* g, const QString& title, bool visible = true);
+    void openParamDialog();
 
     // 页面切换相关
     QWidget* simulationPage;      // 模拟平台页面
@@ -153,8 +109,6 @@ private:
     PlatformScene* m_scene = nullptr;
 
     void setupUI();
-    void setupValidators();
-    void setupConnections();
 };
 
 #endif // SIMULATIONPLATFORM_H

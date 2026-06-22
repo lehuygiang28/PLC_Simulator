@@ -104,6 +104,7 @@ set(GUI_SIMULATIONPLATFORM_SOURCES
     Gui/SimulationPlatform/PlatformCanvas.cpp
     Gui/SimulationPlatform/ImageViewer.cpp
     Gui/SimulationPlatform/PlatformScene.cpp
+    Gui/SimulationPlatform/PlatformControlPanel.cpp
 )
 
 set(GUI_SIMULATIONPLATFORM_HEADERS
@@ -112,6 +113,7 @@ set(GUI_SIMULATIONPLATFORM_HEADERS
     Gui/SimulationPlatform/ImageViewer.h
     Gui/SimulationPlatform/PlatformTypes.h
     Gui/SimulationPlatform/PlatformScene.h
+    Gui/SimulationPlatform/PlatformControlPanel.h
 )
 
 # MainFlow 模块
