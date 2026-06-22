@@ -14,10 +14,6 @@
 #include <QDir>
 #include <QCoreApplication>
 #include <QMessageBox>
-#include <QFormLayout>
-#include <QDialogButtonBox>
-#include <QLineEdit>
-#include <QDoubleValidator>
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QMainWindow(parent)
@@ -128,6 +124,12 @@ void SimulationPlatform::setupUI()
 
     // 参数变化 → 模拟页状态栏文本刷新
     connect(this, &SimulationPlatform::parametersChanged, this, [this](double, double) {
+        if (stack->currentIndex() == 0)
+            updateStatusBarForPage(0);
+    });
+
+    // 场景数据变化 → 模拟页状态栏实时刷新（预览期对话框修改场景时同步更新）
+    connect(m_scene, &PlatformScene::changed, this, [this]() {
         if (stack->currentIndex() == 0)
             updateStatusBarForPage(0);
     });
@@ -275,64 +277,11 @@ void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& 
 
 void SimulationPlatform::openParamDialog()
 {
-    // 进对话框前记录原始值,供 Cancel 回退
-    const double origSpacing = m_scene->markCenterDistance();
-    const double origRatio   = m_scene->screenRatio();
-
-    QDialog dlg(this);
-    dlg.setWindowTitle(QStringLiteral("参数设置"));
-
-    QLineEdit* sizeEdit  = new QLineEdit(&dlg);
-    QLineEdit* ratioEdit = new QLineEdit(&dlg);
-    sizeEdit->setText(QString::number(origSpacing));
-    ratioEdit->setText(QString::number(origRatio));
-    sizeEdit->setAlignment(Qt::AlignCenter);
-    ratioEdit->setAlignment(Qt::AlignCenter);
-    QDoubleValidator* v = new QDoubleValidator(&dlg);
-    v->setDecimals(2);
-    sizeEdit->setValidator(v);
-    ratioEdit->setValidator(v);
-
-    // 实时预览:写 scene(scene.changed 驱动画布 + 状态栏刷新)
-    auto applyPreview = [this](double distance, double ratio) {
-        m_scene->setSceneParams(distance, ratio);
-        if (stack->currentIndex() == 0)
-            updateStatusBarForPage(0);
-    };
-
-    // 用户输入时实时预览;护栏:数值有效且缩放比 > 0
-    auto onEdited = [=]() {
-        bool okD = false, okR = false;
-        const double d = sizeEdit->text().toDouble(&okD);
-        const double r = ratioEdit->text().toDouble(&okR);
-        if (okD && okR && r > 0.0)
-            applyPreview(d, r);
-    };
-    connect(sizeEdit,  &QLineEdit::textEdited, this, [=](const QString&) { onEdited(); });
-    connect(ratioEdit, &QLineEdit::textEdited, this, [=](const QString&) { onEdited(); });
-
-    QFormLayout* form = new QFormLayout();
-    form->addRow(QStringLiteral("产品尺寸 (mm):"), sizeEdit);
-    form->addRow(QStringLiteral("缩放比 (px/mm):"), ratioEdit);
-
-    QDialogButtonBox* box = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-    connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-    connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
-    QVBoxLayout* lay = new QVBoxLayout(&dlg);
-    lay->addLayout(form);
-    lay->addWidget(box);
-
+    PlatformParamsDialog dlg(m_scene, this);
     if (dlg.exec() == QDialog::Accepted)
-    {
-        // 值已实时应用,这里 emit 一次完成保存
         emit parametersChanged(m_scene->markCenterDistance(), m_scene->screenRatio());
-    }
-    else
-    {
-        // 取消/关闭:回退到原始值(配置里仍是原值,无需保存)
-        applyPreview(origSpacing, origRatio);
-    }
+    if (stack->currentIndex() == 0)
+        updateStatusBarForPage(0);
 }
 
 void SimulationPlatform::resizeEvent(QResizeEvent *event)

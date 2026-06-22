@@ -43,6 +43,7 @@
 #include "CollapsibleGroupBox.h"
 #include "PlatformScene.h"
 #include "PlatformControlPanel.h"
+#include "PlatformParamsDialog.h"
 
 class SimulationPlatform : public QMainWindow
 {
