@@ -11,6 +11,8 @@
 #include <QMouseEvent>
 #include <QEvent>
 #include <QFontMetrics>
+#include <QToolButton>
+#include <QResizeEvent>
 
 CollapsibleGroupBox::CollapsibleGroupBox(QWidget* parent)
     : QGroupBox(parent)
@@ -58,6 +60,8 @@ void CollapsibleGroupBox::setCollapsed(bool collapsed)
         const QList<QWidget*> kids = findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly);
         for (QWidget* w : kids)
         {
+            if (w == m_closeButton)   // 关闭按钮常驻标题栏,折叠时不隐藏
+                continue;
             if (w->isVisible())
             {
                 w->hide();
@@ -91,4 +95,45 @@ void CollapsibleGroupBox::mousePressEvent(QMouseEvent* event)
         return;
     }
     QGroupBox::mousePressEvent(event);
+}
+
+void CollapsibleGroupBox::setClosable(bool closable)
+{
+    if (m_closable == closable)
+        return;
+    m_closable = closable;
+
+    if (closable && !m_closeButton)
+    {
+        m_closeButton = new QToolButton(this);
+        m_closeButton->setText(QStringLiteral("×"));   // ×
+        m_closeButton->setToolTip(QStringLiteral("关闭"));
+        m_closeButton->setCursor(Qt::PointingHandCursor);
+        m_closeButton->setAutoRaise(true);
+        m_closeButton->setFocusPolicy(Qt::NoFocus);
+        m_closeButton->setFixedSize(18, 18);
+        connect(m_closeButton, &QToolButton::clicked, this, &CollapsibleGroupBox::closed);
+        positionCloseButton();
+        m_closeButton->show();
+    }
+    else if (m_closeButton)
+    {
+        m_closeButton->setVisible(closable);
+    }
+}
+
+void CollapsibleGroupBox::positionCloseButton()
+{
+    if (!m_closeButton)
+        return;
+    const int margin = 6;
+    const int x = width() - m_closeButton->width() - margin;
+    const int y = (headerHeight() - m_closeButton->height()) / 2;
+    m_closeButton->move(qMax(0, x), qMax(0, y));
+}
+
+void CollapsibleGroupBox::resizeEvent(QResizeEvent* event)
+{
+    QGroupBox::resizeEvent(event);
+    positionCloseButton();
 }
