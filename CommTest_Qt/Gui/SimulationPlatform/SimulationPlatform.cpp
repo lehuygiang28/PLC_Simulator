@@ -43,7 +43,6 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     setupUI();
     setupValidators();
     setupConnections();
-    applyStyle();
 
     setWindowTitle("Simulation Platform");
     resize(800, 600);
@@ -434,120 +433,6 @@ void SimulationPlatform::updateVirtualMark()
     virtualMark.x = virtualMarkXEdit->text().toDouble();
     virtualMark.y = virtualMarkYEdit->text().toDouble();
     canvas->update();
-}
-
-void SimulationPlatform::applyStyle()
-{
-    const QString inputStyleSheet =
-        "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {"
-        "    background-color: #FFFFFF;"
-        "    color: #212121;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 4px;"
-        "    padding: 4px 6px;"
-        "    font-size: 10pt;"
-        "}"
-        "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {"
-        "    border: 2px solid #4CA3E0;"
-        "    background-color: #FFFEF5;"
-        "}";
-
-    const QString checkboxStyleSheet =
-        "QCheckBox, QRadioButton {"
-        "    color: #212121;"
-        "    spacing: 6px;"
-        "    font-size: 10pt;"
-        "}"
-        "QCheckBox::indicator, QRadioButton::indicator {"
-        "    width: 16px;"
-        "    height: 16px;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 3px;"
-        "    background-color: #FFFFFF;"
-        "}"
-        "QCheckBox::indicator:checked, QRadioButton::indicator:checked {"
-        "    background-color: #4CA3E0;"
-        "    border: 1px solid #2E7BA8;"
-        "}"
-        "QCheckBox::indicator:hover, QRadioButton::indicator:hover {"
-        "    border: 1px solid #4CA3E0;"
-        "}";
-
-    const QString RadioStyleSheet =
-        "QRadioButton {"
-        "    color: #212121;"
-        "    spacing: 6px;"
-        "    font-size: 10pt;"
-        "}"
-        "QRadioButton::indicator {"
-        "    width: 16px;"
-        "    height: 16px;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 8px;"
-        "    background-color: #FFFFFF;"
-        "}"
-        "QRadioButton::indicator:checked {"
-        "    background-color: #4CA3E0;"
-        "    border: 1px solid #2E7BA8;"
-        "}"
-        "QRadioButton::indicator:hover {"
-        "    border: 1px solid #4CA3E0;"
-        "}";
-
-    const QString groupBoxStyleSheet =
-        "QGroupBox {"
-        "    background-color: #F0F0F0;"
-        "    color: #212121;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 6px;"
-        "    margin-top: 8px;"
-        "}"
-        "QGroupBox::title {"
-        "    subcontrol-origin: margin;"
-        "    subcontrol-position: top left;"
-        "    padding: 0 6px;"
-        "    font-weight: 600;"
-        "}";
-
-    auto applyLineEdit = [&](QLineEdit *e)
-    { if (e) e->setStyleSheet(inputStyleSheet); };
-    applyLineEdit(basePlatformXEdit);
-    applyLineEdit(basePlatformYEdit);
-    applyLineEdit(basePlatformAngleEdit);
-    applyLineEdit(realTimePlatformXEdit);
-    applyLineEdit(realTimePlatformYEdit);
-    applyLineEdit(realTimePlatformAngleEdit);
-    applyLineEdit(mark1XEdit);
-    applyLineEdit(mark1YEdit);
-    applyLineEdit(mark1AngleEdit);
-    applyLineEdit(mark2XEdit);
-    applyLineEdit(mark2YEdit);
-    applyLineEdit(mark2AngleEdit);
-    applyLineEdit(virtualMarkXEdit);
-    applyLineEdit(virtualMarkYEdit);
-    applyLineEdit(markCenterDistanceEdit);
-    applyLineEdit(ScreenRatio);
-
-    auto applyCheck = [&](QWidget *w)
-    { if (w) w->setStyleSheet(checkboxStyleSheet); };
-    applyCheck(showBasePlatformCheckBox);
-    applyCheck(showRealTimePlatformCheckBox);
-    applyCheck(mark1FollowBaseCheckBox);
-    applyCheck(ShowMark1CheckBox);
-    applyCheck(mark2FollowRealTimeCheckBox);
-    applyCheck(ShowMark2CheckBox);
-    applyCheck(showVirtualMarkCheckBox);
-
-    auto applyRadio = [&](QWidget *w)
-    { if (w) w->setStyleSheet(RadioStyleSheet); };
-    applyRadio(ShowPlatformUL);
-    applyRadio(ShowPlatformUR);
-    applyRadio(ShowPlatformDL);
-    applyRadio(ShowPlatformDR);
-
-    auto applyGroup = [&](QGroupBox *g)
-    { if (g) g->setStyleSheet(groupBoxStyleSheet); };
-    applyGroup(controlGroup);
 }
 
 void SimulationPlatform::paintEvent(QPaintEvent *event)
@@ -1026,79 +911,7 @@ void SimulationPlatform::setupPictureShowPage()
             }
         } });
 
-    // 应用样式
-    const QString buttonStyleSheet =
-        "QPushButton {"
-        "    background-color: #4CA3E0;"
-        "    color: white;"
-        "    border: none;"
-        "    border-radius: 4px;"
-        "    padding: 6px 12px;"
-        "    font-size: 10pt;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #3A8BC8;"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: #2E7BA8;"
-        "}";
-    setImageBtn->setStyleSheet(buttonStyleSheet);
-
-    const QString inputStyleSheet =
-        "QLineEdit {"
-        "    background-color: #FFFFFF;"
-        "    color: #212121;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 4px;"
-        "    padding: 4px 6px;"
-        "    font-size: 10pt;"
-        "}"
-        "QLineEdit:focus {"
-        "    border: 2px solid #4CA3E0;"
-        "    background-color: #FFFEF5;"
-        "}";
-    zoomRatioEdit->setStyleSheet(inputStyleSheet);
-
-    const QString checkboxStyleSheet =
-        "QRadioButton {"
-        "    color: #212121;"
-        "    spacing: 6px;"
-        "    font-size: 10pt;"
-        "}"
-        "QRadioButton::indicator {"
-        "    width: 16px;"
-        "    height: 16px;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 8px;"
-        "    background-color: #FFFFFF;"
-        "}"
-        "QRadioButton::indicator:checked {"
-        "    background-color: #4CA3E0;"
-        "    border: 1px solid #2E7BA8;"
-        "}"
-        "QRadioButton::indicator:hover {"
-        "    border: 1px solid #4CA3E0;"
-        "}";
-    picShowPlatformUL->setStyleSheet(checkboxStyleSheet);
-    picShowPlatformUR->setStyleSheet(checkboxStyleSheet);
-    picShowPlatformDL->setStyleSheet(checkboxStyleSheet);
-    picShowPlatformDR->setStyleSheet(checkboxStyleSheet);
-
-    const QString groupBoxStyleSheet =
-        "QGroupBox {"
-        "    background-color: #F0F0F0;"
-        "    color: #212121;"
-        "    border: 1px solid #CCCCCC;"
-        "    border-radius: 6px;"
-        "    margin-top: 8px;"
-        "}"
-        "QGroupBox::title {"
-        "    subcontrol-origin: margin;"
-        "    subcontrol-position: top left;"
-        "    padding: 0 6px;"
-        "    font-weight: 600;"
-        "}";
-    funcGroup->setStyleSheet(groupBoxStyleSheet);
+    // 样式由全局主题(qApp 样式表)统一控制,不再设置局部样式
 
     // 加载默认图像
     loadDefaultImage();
