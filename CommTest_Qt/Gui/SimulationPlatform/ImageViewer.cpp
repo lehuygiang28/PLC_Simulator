@@ -6,12 +6,12 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#include "ImageViewerWidget.h"
+#include "ImageViewer.h"
 #include "ThemeManager.h"
 #include <QResizeEvent>
 #include <QShowEvent>
 
-ImageViewerWidget::ImageViewerWidget(QWidget* parent)
+ImageViewer::ImageViewer(QWidget* parent)
     : QWidget(parent)
     , m_scale(1.0)
     , m_minScale(0.1)
@@ -25,7 +25,7 @@ ImageViewerWidget::ImageViewerWidget(QWidget* parent)
     setMouseTracking(true);
 }
 
-void ImageViewerWidget::setImage(const QImage& image)
+void ImageViewer::setImage(const QImage& image)
 {
     m_image = image;
     m_offset = QPointF(0, 0);
@@ -33,7 +33,7 @@ void ImageViewerWidget::setImage(const QImage& image)
     fitToWindow();
 }
 
-void ImageViewerWidget::fitToWindow()
+void ImageViewer::fitToWindow()
 {
     if (m_image.isNull())
         return;
@@ -56,22 +56,22 @@ void ImageViewerWidget::fitToWindow()
     update();
 }
 
-bool ImageViewerWidget::hasImage() const
+bool ImageViewer::hasImage() const
 {
     return !m_image.isNull();
 }
 
-const QImage& ImageViewerWidget::image() const
+const QImage& ImageViewer::image() const
 {
     return m_image;
 }
 
-double ImageViewerWidget::scale() const
+double ImageViewer::scale() const
 {
     return m_scale;
 }
 
-void ImageViewerWidget::setScale(double scale)
+void ImageViewer::setScale(double scale)
 {
     double newScale = qBound(m_minScale, scale, m_maxScale);
     if (qFuzzyCompare(newScale, m_scale)) return;
@@ -81,7 +81,7 @@ void ImageViewerWidget::setScale(double scale)
     emit scaleChanged(m_scale);
 }
 
-void ImageViewerWidget::paintEvent(QPaintEvent* event)
+void ImageViewer::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
@@ -115,7 +115,7 @@ void ImageViewerWidget::paintEvent(QPaintEvent* event)
     painter.drawImage(QRectF(topLeft, scaledSize), m_image);
 }
 
-void ImageViewerWidget::drawCheckerboard(QPainter& painter)
+void ImageViewer::drawCheckerboard(QPainter& painter)
 {
     const int gridSize = 16;  // 棋盘格单元大小
     const bool dark = ThemeManager::instance().currentTheme() == Theme::Dark;
@@ -131,7 +131,7 @@ void ImageViewerWidget::drawCheckerboard(QPainter& painter)
     }
 }
 
-void ImageViewerWidget::wheelEvent(QWheelEvent* event)
+void ImageViewer::wheelEvent(QWheelEvent* event)
 {
     if (m_image.isNull()) return;
 
@@ -159,7 +159,7 @@ void ImageViewerWidget::wheelEvent(QWheelEvent* event)
     event->accept();
 }
 
-void ImageViewerWidget::mousePressEvent(QMouseEvent* event)
+void ImageViewer::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         m_lastMousePos = event->pos();
@@ -168,7 +168,7 @@ void ImageViewerWidget::mousePressEvent(QMouseEvent* event)
     }
 }
 
-void ImageViewerWidget::mouseMoveEvent(QMouseEvent* event)
+void ImageViewer::mouseMoveEvent(QMouseEvent* event)
 {
     if (m_dragging) {
         QPointF delta = event->pos() - m_lastMousePos;
@@ -179,7 +179,7 @@ void ImageViewerWidget::mouseMoveEvent(QMouseEvent* event)
     }
 }
 
-void ImageViewerWidget::mouseReleaseEvent(QMouseEvent* event)
+void ImageViewer::mouseReleaseEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         m_dragging = false;
@@ -187,14 +187,14 @@ void ImageViewerWidget::mouseReleaseEvent(QMouseEvent* event)
     }
 }
 
-void ImageViewerWidget::mouseDoubleClickEvent(QMouseEvent* event)
+void ImageViewer::mouseDoubleClickEvent(QMouseEvent* event)
 {
     Q_UNUSED(event);
     // 双击恢复图像完整显示
     fitToWindow();
 }
 
-void ImageViewerWidget::resizeEvent(QResizeEvent* event)
+void ImageViewer::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
 
@@ -207,7 +207,7 @@ void ImageViewerWidget::resizeEvent(QResizeEvent* event)
     update();
 }
 
-void ImageViewerWidget::showEvent(QShowEvent* event)
+void ImageViewer::showEvent(QShowEvent* event)
 {
     QWidget::showEvent(event);
     // 加载时尺寸未就绪而延迟的 fit,在控件首次显示(已是真实尺寸)时补做

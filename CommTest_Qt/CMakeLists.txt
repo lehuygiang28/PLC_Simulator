@@ -102,13 +102,13 @@ set(GUI_SCRIPTEDITOR_HEADERS
 set(GUI_SIMULATIONPLATFORM_SOURCES
     Gui/SimulationPlatform/SimulationPlatform.cpp
     Gui/SimulationPlatform/CanvasWidget.cpp
-    Gui/SimulationPlatform/ImageViewerWidget.cpp
+    Gui/SimulationPlatform/ImageViewer.cpp
 )
 
 set(GUI_SIMULATIONPLATFORM_HEADERS
     Gui/SimulationPlatform/SimulationPlatform.h
     Gui/SimulationPlatform/CanvasWidget.h
-    Gui/SimulationPlatform/ImageViewerWidget.h
+    Gui/SimulationPlatform/ImageViewer.h
 )
 
 # MainFlow 模块

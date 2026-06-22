@@ -294,7 +294,7 @@ void SimulationPlatform::setupUI()
     statusBar()->addPermanentWidget(statusRight);
 
     // 图片缩放变化 → 状态栏右侧百分比(仅图片页显示)
-    connect(imageViewer, &ImageViewerWidget::scaleChanged, this, [this](double scale) {
+    connect(imageViewer, &ImageViewer::scaleChanged, this, [this](double scale) {
         if (stack->currentIndex() == 1)
             statusRight->setText(QStringLiteral("缩放: %1%").arg(QString::number(scale * 100.0, 'f', 0)));
     });
@@ -1002,7 +1002,7 @@ void SimulationPlatform::setupPictureShowPage()
     QVBoxLayout* picLayout = new QVBoxLayout(pictureShowPage);
     picLayout->setContentsMargins(0, 0, 0, 0);
 
-    imageViewer = new ImageViewerWidget(this);
+    imageViewer = new ImageViewer(this);
     picLayout->addWidget(imageViewer, 1);
 
     // 加载默认图像

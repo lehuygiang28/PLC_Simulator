@@ -46,7 +46,7 @@
 
 // 包含拆分出的控件头文件
 #include "CanvasWidget.h"
-#include "ImageViewerWidget.h"
+#include "ImageViewer.h"
 #include "CollapsibleGroupBox.h"
 
 class SimulationPlatform : public QMainWindow
@@ -144,7 +144,7 @@ private:
     QWidget* pictureShowPage;     // 图片显示页面 (PictureShow)
 
     // 图片显示页面控件
-    ImageViewerWidget* imageViewer;
+    ImageViewer* imageViewer;
 
     void setupPictureShowPage();
     void loadDefaultImage();
