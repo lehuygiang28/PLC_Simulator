@@ -15,7 +15,7 @@
 #include <QWindow>
 
 CommTest_Qt::CommTest_Qt(QWidget *parent)
-	: QMainWindow(parent), ui(new Ui::CommTest_QtClass()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configManager(nullptr), m_nLogStat(0), m_lastRealTimeX(0.0), m_lastRealTimeY(0.0), m_lastRealTimeAngle(0.0), m_lastBaseX(0.0), m_lastBaseY(0.0), m_lastBaseAngle(0.0), m_positionCheckTimer(nullptr)
+	: QMainWindow(parent), ui(new Ui::CommTest_QtClass()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configManager(nullptr), m_nLogStat(0)
 {
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(APP_NAME).arg(APP_VERSION));
@@ -92,18 +92,18 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 	{
 		CommTest_Qt *m_pParent;
 		explicit SimulationPlatformController(CommTest_Qt *parent) : m_pParent(parent) {}
-		void MovePlatformAbsFloat(double dX, double dY, double dAngle) override
+		void MovePlatformAbsFloat(double x, double y, double angleDeg) override
 		{
 			if (m_pParent && m_pParent->m_simulationPlatform)
 			{
-				m_pParent->m_simulationPlatform->SetRealTimePlatformAbs(dX, dY, dAngle);
+				m_pParent->m_simulationPlatform->moveAbsolute({x, y, angleDeg});
 			}
 		}
-		void MovePlatformRelativeFloat(double dX, double dY, double dAngle) override
+		void MovePlatformRelativeFloat(double x, double y, double angleDeg) override
 		{
 			if (m_pParent && m_pParent->m_simulationPlatform)
 			{
-				m_pParent->m_simulationPlatform->SetRealTimePlatformRelative(dX, dY, dAngle);
+				m_pParent->m_simulationPlatform->moveRelative({x, y, angleDeg});
 			}
 		}
 		void MovePlatformRelativeInt32(int32_t nX, int32_t nY, int32_t nAngle) override
@@ -115,12 +115,12 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 				double divisorD = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_D);
 
 				// 转换坐标值：除以10的幂次方
-				double convertedX = static_cast<double>(nX) / divisorXY;
-				double convertedY = static_cast<double>(nY) / divisorXY;
-				double convertedAngle = static_cast<double>(nAngle) / divisorD;
+				double x = static_cast<double>(nX) / divisorXY;
+				double y = static_cast<double>(nY) / divisorXY;
+				double angleDeg = static_cast<double>(nAngle) / divisorD;
 
 				// 控制平台移动
-				m_pParent->m_simulationPlatform->SetRealTimePlatformRelative(convertedX, convertedY, convertedAngle);
+				m_pParent->m_simulationPlatform->moveRelative({x, y, angleDeg});
 			}
 		}
 		void MovePlatformAbsInt32(int32_t nX, int32_t nY, int32_t nAngle) override
@@ -132,12 +132,12 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 				double divisorD = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_D);
 
 				// 转换坐标值：除以10的幂次方
-				double convertedX = static_cast<double>(nX) / divisorXY;
-				double convertedY = static_cast<double>(nY) / divisorXY;
-				double convertedAngle = static_cast<double>(nAngle) / divisorD;
+				double x = static_cast<double>(nX) / divisorXY;
+				double y = static_cast<double>(nY) / divisorXY;
+				double angleDeg = static_cast<double>(nAngle) / divisorD;
 
 				// 控制平台移动
-				m_pParent->m_simulationPlatform->SetRealTimePlatformAbs(convertedX, convertedY, convertedAngle);
+				m_pParent->m_simulationPlatform->moveAbsolute({x, y, angleDeg});
 			}
 		}
 
@@ -145,24 +145,24 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 		{
 			if (m_pParent && m_pParent->m_simulationPlatform)
 			{
-				double x = 0.0, y = 0.0, angle = 0.0;
-				m_pParent->m_simulationPlatform->GetRealTimePlatformData(x, y, angle);
+				const Pose p = m_pParent->m_simulationPlatform->pose(Platform::Live);
 
 				// 获取幂次值并计算乘数（注意：这里是乘以幂次，与平台控制时除以幂次相反）
 				double multiplierXY = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_XY); // 10^powerXY
 				double multiplierD = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_D);   // 10^powerD
 
 				// 将坐标值乘以10的幂次方并转换为int32
-				nX = static_cast<int32_t>(x * multiplierXY);
-				nY = static_cast<int32_t>(y * multiplierXY);
-				nAngle = static_cast<int32_t>(angle * multiplierD);
+				nX = static_cast<int32_t>(p.x * multiplierXY);
+				nY = static_cast<int32_t>(p.y * multiplierXY);
+				nAngle = static_cast<int32_t>(p.angleDeg * multiplierD);
 			}
 		}
-		void GetCurrentPosFloat(double &dX, double &dY, double &dAngle) override
+		void GetCurrentPosFloat(double &x, double &y, double &angleDeg) override
 		{
 			if (m_pParent && m_pParent->m_simulationPlatform)
 			{
-				m_pParent->m_simulationPlatform->GetRealTimePlatformData(dX, dY, dAngle);
+				const Pose p = m_pParent->m_simulationPlatform->pose(Platform::Live);
+				x = p.x; y = p.y; angleDeg = p.angleDeg;
 			}
 		}
 	};
@@ -172,10 +172,9 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 		return;
 	m_pWorkFlow->SetBaseController(m_PlatformController.get());
 
-	// 初始化位置监测定时器
-	m_positionCheckTimer = new QTimer(this);
-	connect(m_positionCheckTimer, &QTimer::timeout, this, &CommTest_Qt::OnPlatformPositionChanged);
-	m_positionCheckTimer->start(100); // 每100ms检查一次平台位置
+	// 平台位姿变化信号 → 自动写入寄存器
+	connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
+		[this](Platform which, const Pose& p) { OnPlatformPoseChanged(which, p); });
 
 	// 初始化自动写入相关控件的启用/禁用状态
 	// 根据ChkBox_WritePosAutoEnable的初始状态设置其他控件
@@ -266,7 +265,7 @@ void CommTest_Qt::InitialAllConfigs()
 		if (m_configManager->LoadSimulationPlatformParams(markCenterDistance, screenRatio))
 		{
 			if (m_simulationPlatform != nullptr)
-				m_simulationPlatform->SetSimulationPlatformParams(markCenterDistance, screenRatio);
+				m_simulationPlatform->setSceneParams(markCenterDistance, screenRatio);
 		}
 	}
 }
@@ -743,7 +742,7 @@ void CommTest_Qt::InitialSignalConnect()
 	}
 
 	// 初始化SimulationPlatform自动保存参数
-	connect(m_simulationPlatform, &SimulationPlatform::parametersChanged, this, [=](double markCenterDistance, double screenRatio)
+	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [=](double markCenterDistance, double screenRatio)
 			{
 		if (m_configManager)
 		{
@@ -816,8 +815,8 @@ void CommTest_Qt::OnWriteAxisDoubleWord()
 	}
 
 	// 获取平台实时位置
-	double x = 0.0, y = 0.0, angle = 0.0;
-	m_simulationPlatform->GetRealTimePlatformData(x, y, angle);
+	const Pose p = m_simulationPlatform->pose(Platform::Live);
+	const double x = p.x, y = p.y, angle = p.angleDeg;
 
 	// 获取幂次值并计算乘数（注意：这里是乘以幂次，与平台控制时除以幂次相反）
 	double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY); // 10^powerXY
@@ -876,13 +875,12 @@ void CommTest_Qt::OnWriteAxisFloat()
 	}
 
 	// 获取平台实时位置
-	double x = 0.0, y = 0.0, angle = 0.0;
-	m_simulationPlatform->GetRealTimePlatformData(x, y, angle);
+	const Pose p = m_simulationPlatform->pose(Platform::Live);
 
 	// 转换为float（直接使用，不需要乘幂次）
-	float xFloat = static_cast<float>(x);
-	float yFloat = static_cast<float>(y);
-	float angleFloat = static_cast<float>(angle);
+	float xFloat = static_cast<float>(p.x);
+	float yFloat = static_cast<float>(p.y);
+	float angleFloat = static_cast<float>(p.angleDeg);
 
 	// 获取对应的寄存器地址
 	bool ok = false;
@@ -933,7 +931,7 @@ void CommTest_Qt::OnWritePosAutoEnableChanged(int state)
 	ui->Btn_WriteAxisFloat->setEnabled(!isAutoEnabled);
 }
 
-void CommTest_Qt::OnPlatformPositionChanged()
+void CommTest_Qt::OnPlatformPoseChanged(Platform which, const Pose& pose)
 {
 	// 检查是否启用自动写入
 	if (!ui->ChkBox_WritePosAutoEnable->isChecked())
@@ -946,137 +944,61 @@ void CommTest_Qt::OnPlatformPositionChanged()
 		return;
 	}
 
-	// 获取当前平台位置
-	double realTimeX = 0.0, realTimeY = 0.0, realTimeAngle = 0.0;
-	double baseX = 0.0, baseY = 0.0, baseAngle = 0.0;
-	m_simulationPlatform->GetRealTimePlatformData(realTimeX, realTimeY, realTimeAngle);
-	m_simulationPlatform->GetBasePlatformData(baseX, baseY, baseAngle);
+	// 根据平台类型选择目标寄存器地址
+	QLineEdit* addrEdit = (which == Platform::Live)
+		? ui->edit_AxisPosRegisterAddr
+		: ui->edit_AxisPosRegisterAddr_2;
 
-	// 检查realTimePlatform位置是否变化
-	bool realTimeChanged = (realTimeX != m_lastRealTimeX) ||
-						   (realTimeY != m_lastRealTimeY) ||
-						   (realTimeAngle != m_lastRealTimeAngle);
-
-	// 检查basePlatform位置是否变化
-	bool baseChanged = (baseX != m_lastBaseX) ||
-					   (baseY != m_lastBaseY) ||
-					   (baseAngle != m_lastBaseAngle);
-
-	// 如果realTimePlatform位置变化，写入到edit_AxisPosRegisterAddr指定的地址
-	if (realTimeChanged)
+	bool ok = false;
+	int startAddr = addrEdit->text().toInt(&ok);
+	if (!ok || startAddr >= REGISTER_VAL_NUM - 6)
 	{
-		bool ok = false;
-		int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
-		if (ok && startAddr < REGISTER_VAL_NUM - 6)
-		{
-			// 根据Radio选择写入方式
-			if (ui->Radio_AxisPos_Float->isChecked())
-			{
-				// 使用Float方式写入
-				float xFloat = static_cast<float>(realTimeX);
-				float yFloat = static_cast<float>(realTimeY);
-				float angleFloat = static_cast<float>(realTimeAngle);
-
-				DataTypeConvert data;
-				data.u_float[0] = xFloat;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_float[0] = yFloat;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_float[0] = angleFloat;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-			}
-			else if (ui->Radio_AxisPos_Int32->isChecked())
-			{
-				// 使用Int32方式写入
-				double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY);
-				double multiplierD = GetDivisorFromPowerEdit(ui->edit_Unit_D);
-
-				int32_t xInt32 = static_cast<int32_t>(realTimeX * multiplierXY);
-				int32_t yInt32 = static_cast<int32_t>(realTimeY * multiplierXY);
-				int32_t angleInt32 = static_cast<int32_t>(realTimeAngle * multiplierD);
-
-				DataTypeConvert data;
-				data.u_Int32[0] = xInt32;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_Int32[0] = yInt32;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_Int32[0] = angleInt32;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-			}
-		}
-
-		// 更新上次记录的realTime位置
-		m_lastRealTimeX = realTimeX;
-		m_lastRealTimeY = realTimeY;
-		m_lastRealTimeAngle = realTimeAngle;
+		return;
 	}
 
-	// 如果basePlatform位置变化，写入到edit_AxisPosRegisterAddr_2指定的地址
-	if (baseChanged)
+	// 根据Radio选择写入方式
+	if (ui->Radio_AxisPos_Float->isChecked())
 	{
-		bool ok = false;
-		int startAddr = ui->edit_AxisPosRegisterAddr_2->text().toInt(&ok);
-		if (ok && startAddr < REGISTER_VAL_NUM - 6)
-		{
-			// 根据Radio选择写入方式
-			if (ui->Radio_AxisPos_Float->isChecked())
-			{
-				// 使用Float方式写入
-				float xFloat = static_cast<float>(baseX);
-				float yFloat = static_cast<float>(baseY);
-				float angleFloat = static_cast<float>(baseAngle);
+		// 使用Float方式写入
+		float xFloat    = static_cast<float>(pose.x);
+		float yFloat    = static_cast<float>(pose.y);
+		float angleFloat = static_cast<float>(pose.angleDeg);
 
-				DataTypeConvert data;
-				data.u_float[0] = xFloat;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_float[0] = yFloat;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_float[0] = angleFloat;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-			}
-			else if (ui->Radio_AxisPos_Int32->isChecked())
-			{
-				// 使用Int32方式写入
-				double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY);
-				double multiplierD = GetDivisorFromPowerEdit(ui->edit_Unit_D);
+		DataTypeConvert data;
+		data.u_float[0] = xFloat;
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+		data.u_float[0] = yFloat;
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+		data.u_float[0] = angleFloat;
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+	}
+	else if (ui->Radio_AxisPos_Int32->isChecked())
+	{
+		// 使用Int32方式写入
+		double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY);
+		double multiplierD  = GetDivisorFromPowerEdit(ui->edit_Unit_D);
 
-				int32_t xInt32 = static_cast<int32_t>(baseX * multiplierXY);
-				int32_t yInt32 = static_cast<int32_t>(baseY * multiplierXY);
-				int32_t angleInt32 = static_cast<int32_t>(baseAngle * multiplierD);
+		int32_t xInt32    = static_cast<int32_t>(pose.x        * multiplierXY);
+		int32_t yInt32    = static_cast<int32_t>(pose.y        * multiplierXY);
+		int32_t angleInt32 = static_cast<int32_t>(pose.angleDeg * multiplierD);
 
-				DataTypeConvert data;
-				data.u_Int32[0] = xInt32;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_Int32[0] = yInt32;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-				data.u_Int32[0] = angleInt32;
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-				m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-			}
-		}
-
-		// 更新上次记录的base位置
-		m_lastBaseX = baseX;
-		m_lastBaseY = baseY;
-		m_lastBaseAngle = baseAngle;
+		DataTypeConvert data;
+		data.u_Int32[0] = xInt32;
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+		data.u_Int32[0] = yInt32;
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+		data.u_Int32[0] = angleInt32;
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
+		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
 	}
 
-	// 如果有位置变化，更新寄存器表格显示
-	if (realTimeChanged || baseChanged)
-	{
-		m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
-	}
+	// 更新寄存器表格显示
+	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
 }
 
 // ====================菜单栏相关槽函数实现====================

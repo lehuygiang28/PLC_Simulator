@@ -49,22 +49,20 @@ class SimulationPlatform : public QMainWindow
 {
     Q_OBJECT
 signals:
-    void parametersChanged(double markCenterDistance, double screenRatio);
+    void sceneParamsChanged(double markCenterDistance, double screenRatio);
+    void poseChanged(Platform which, const Pose& pose);
 
 public:
     explicit SimulationPlatform(QWidget *parent = nullptr);
 
     // 平台控制公共接口
-    void SetRealTimePlatformAbs(double x, double y, double angle);  // 绝对位置移动
-    void SetRealTimePlatformRelative(double x, double y, double angle);  // 相对位置移动
+    void moveAbsolute(const Pose& target, Platform which = Platform::Live);
+    void moveRelative(const Pose& delta, Platform which = Platform::Live);
 
-    // 获取实时平台数据
-    void GetRealTimePlatformData(double& x, double& y, double& angle) const;
+    // 获取平台位姿（Live 或 Base）
+    Pose pose(Platform which = Platform::Live) const;
 
-    // 获取基准平台数据
-    void GetBasePlatformData(double& x, double& y, double& angle) const;
-
-    void SetSimulationPlatformParams(double distance,double ratio);
+    void setSceneParams(double markCenterDistance, double screenRatio);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

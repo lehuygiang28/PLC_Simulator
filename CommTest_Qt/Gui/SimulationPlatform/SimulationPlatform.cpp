@@ -21,6 +21,9 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
 {
     m_scene = new PlatformScene(this);
 
+    // 转发场景的 poseChanged 信号到外部
+    connect(m_scene, &PlatformScene::poseChanged, this, &SimulationPlatform::poseChanged);
+
     setupUI();
 
     // 主题切换时实时重绘画布与图像区(控件由全局 qss 自动重绘)
@@ -35,30 +38,25 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
 }
 
 // 平台控制公共接口实现
-void SimulationPlatform::SetRealTimePlatformAbs(double x, double y, double angle)
+void SimulationPlatform::moveAbsolute(const Pose& target, Platform which)
 {
-    m_scene->moveAbsolute({ x, y, angle }, Platform::Live);
+    m_scene->moveAbsolute(target, which);
 }
 
-void SimulationPlatform::SetRealTimePlatformRelative(double x, double y, double angle)
+void SimulationPlatform::moveRelative(const Pose& delta, Platform which)
 {
-    m_scene->moveRelative({ x, y, angle }, Platform::Live);
+    m_scene->moveRelative(delta, which);
 }
 
-void SimulationPlatform::GetRealTimePlatformData(double &x, double &y, double &angle) const
+Pose SimulationPlatform::pose(Platform which) const
 {
-    const Pose p = m_scene->pose(Platform::Live); x = p.x; y = p.y; angle = p.angleDeg;
+    return m_scene->pose(which);
 }
 
-void SimulationPlatform::GetBasePlatformData(double &x, double &y, double &angle) const
+void SimulationPlatform::setSceneParams(double markCenterDistance, double screenRatio)
 {
-    const Pose p = m_scene->pose(Platform::Base); x = p.x; y = p.y; angle = p.angleDeg;
-}
-
-void SimulationPlatform::SetSimulationPlatformParams(double distance, double ratio)
-{
-    m_scene->setSceneParams(distance, ratio);
-    emit parametersChanged(distance, ratio);   // 名称暂不变,Task 8 改
+    m_scene->setSceneParams(markCenterDistance, screenRatio);
+    emit sceneParamsChanged(markCenterDistance, screenRatio);
     update();
 }
 
@@ -126,7 +124,7 @@ void SimulationPlatform::setupUI()
     });
 
     // 参数变化 → 模拟页状态栏文本刷新
-    connect(this, &SimulationPlatform::parametersChanged, this, [this](double, double) {
+    connect(this, &SimulationPlatform::sceneParamsChanged, this, [this](double, double) {
         if (stack->currentIndex() == 0)
             updateStatusBarForPage(0);
     });
@@ -283,7 +281,7 @@ void SimulationPlatform::openParamDialog()
 {
     PlatformParamsDialog dlg(m_scene, this);
     if (dlg.exec() == QDialog::Accepted)
-        emit parametersChanged(m_scene->markCenterDistance(), m_scene->screenRatio());
+        emit sceneParamsChanged(m_scene->markCenterDistance(), m_scene->screenRatio());
     if (stack->currentIndex() == 0)
         updateStatusBarForPage(0);
 }
