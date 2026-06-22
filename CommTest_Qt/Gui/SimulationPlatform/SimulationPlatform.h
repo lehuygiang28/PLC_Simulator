@@ -148,12 +148,16 @@ private:
 
     // 图片显示页面控件
     ImageViewerWidget* imageViewer;
-    QPushButton* setImageBtn;
-    QLineEdit* zoomRatioEdit;  // 缩放倍率输入框
 
     void setupPictureShowPage();
     void loadDefaultImage();
     void onSetImageClicked();
+
+    // 状态栏
+    QLabel* statusLeft;
+    QLabel* statusRight;
+    QString m_imagePath;
+    void updateStatusBarForPage(int index);
 
     // 数据
     struct Platform {

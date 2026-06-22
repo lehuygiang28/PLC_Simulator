@@ -40,6 +40,8 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QMainWindow(parent)
     , simMenu(nullptr)
     , imageMenu(nullptr)
+    , statusLeft(nullptr)
+    , statusRight(nullptr)
 {
     // 初始化默认值
     basePlatform = {0, 0, 0};
@@ -287,6 +289,24 @@ void SimulationPlatform::setupUI()
     // 菜单栏(视图/模拟平台/图像)
     buildMenuBar();
 
+    // 状态栏:左 = 上下文文本(路径/参数),右 = 缩放百分比
+    statusLeft  = new QLabel(this);
+    statusRight = new QLabel(this);
+    statusBar()->addWidget(statusLeft, 1);
+    statusBar()->addPermanentWidget(statusRight);
+
+    // 图片缩放变化 → 状态栏右侧百分比(仅图片页显示)
+    connect(imageViewer, &ImageViewerWidget::scaleChanged, this, [this](double scale) {
+        if (stack->currentIndex() == 1)
+            statusRight->setText(QStringLiteral("缩放: %1%").arg(QString::number(scale * 100.0, 'f', 0)));
+    });
+
+    // 参数变化 → 模拟页状态栏文本刷新
+    connect(this, &SimulationPlatform::parametersChanged, this, [this](double, double) {
+        if (stack->currentIndex() == 0)
+            updateStatusBarForPage(0);
+    });
+
     // 默认显示模拟页
     showPage(0);
 
@@ -357,8 +377,10 @@ void SimulationPlatform::buildMenuBar()
     bindGroupToggle(3, grpMark2,    QStringLiteral("Mark2"));
     bindGroupToggle(4, grpVirtual,  QStringLiteral("虚拟Mark"));
 
-    // ===== 图像(仅图片页可用;内容见 Task 5)=====
+    // ===== 图像(仅图片页可用)=====
     imageMenu = mbar->addMenu(QStringLiteral("图像"));
+    QAction* actLoad = imageMenu->addAction(QStringLiteral("加载图片…"));
+    connect(actLoad, &QAction::triggered, this, &SimulationPlatform::onSetImageClicked);
 }
 
 void SimulationPlatform::showPage(int index)
@@ -370,6 +392,31 @@ void SimulationPlatform::showPage(int index)
     // 页面专属菜单互斥启用:模拟页→模拟平台菜单可用、图像菜单置灰;反之亦然
     if (simMenu)   simMenu->menuAction()->setEnabled(index == 0);
     if (imageMenu) imageMenu->menuAction()->setEnabled(index == 1);
+
+    updateStatusBarForPage(index);
+}
+
+void SimulationPlatform::updateStatusBarForPage(int index)
+{
+    if (!statusLeft || !statusRight)
+        return;
+
+    if (index == 0)
+    {
+        // 模拟页:产品尺寸 + 缩放比
+        statusLeft->setText(QStringLiteral("产品尺寸: %1 mm    缩放比: %2 px/mm")
+                                .arg(QString::number(m_markSpacing))
+                                .arg(QString::number(m_Ratio)));
+        statusRight->clear();
+    }
+    else
+    {
+        // 图片页:路径 + 缩放百分比
+        statusLeft->setText(m_imagePath.isEmpty() ? QStringLiteral("未加载图片") : m_imagePath);
+        if (imageViewer)
+            statusRight->setText(QStringLiteral("缩放: %1%")
+                                     .arg(QString::number(imageViewer->scale() * 100.0, 'f', 0)));
+    }
 }
 
 void SimulationPlatform::moveToScreenCorner(int corner)
@@ -952,52 +999,11 @@ QPointF SimulationPlatform::inverseTransformPoint(const QPointF &point)
 void SimulationPlatform::setupPictureShowPage()
 {
     pictureShowPage = new QWidget(this);
-    QHBoxLayout *picLayout = new QHBoxLayout(pictureShowPage);  // 左:图像  右:功能面板
+    QVBoxLayout* picLayout = new QVBoxLayout(pictureShowPage);
+    picLayout->setContentsMargins(0, 0, 0, 0);
 
-    // 图像显示区域(占左侧主区)
     imageViewer = new ImageViewerWidget(this);
     picLayout->addWidget(imageViewer, 1);
-
-    // 功能区域(右侧可折叠面板)
-    CollapsibleGroupBox *funcGroup = new CollapsibleGroupBox(this);
-    funcGroup->setTitle("功能");
-    QVBoxLayout *funcLayout = new QVBoxLayout(funcGroup);
-
-    // 设置图像按钮
-    setImageBtn = new QPushButton("设置图像", this);
-    connect(setImageBtn, &QPushButton::clicked, this, &SimulationPlatform::onSetImageClicked);
-    funcLayout->addWidget(setImageBtn);
-
-    // 缩放倍率输入框
-    zoomRatioEdit = new QLineEdit(this);
-    zoomRatioEdit->setText("1.00");
-    QDoubleValidator *zoomValidator = new QDoubleValidator(0.1, 10.0, 2, this);
-    zoomValidator->setNotation(QDoubleValidator::StandardNotation);
-    zoomRatioEdit->setValidator(zoomValidator);
-
-    QHBoxLayout *zoomRow = new QHBoxLayout();
-    zoomRow->addWidget(new QLabel("缩放倍率:", this));
-    zoomRow->addWidget(zoomRatioEdit, 1);
-    funcLayout->addLayout(zoomRow);
-
-    // 输入框编辑完成时更新图像缩放
-    connect(zoomRatioEdit, &QLineEdit::editingFinished, this, [this]()
-            {
-        bool ok;
-        double scale = zoomRatioEdit->text().toDouble(&ok);
-        if (ok && imageViewer) {
-            imageViewer->setScale(scale);
-        } });
-
-    // 图像缩放变化时更新输入框
-    connect(imageViewer, &ImageViewerWidget::scaleChanged, this, [this](double scale)
-            { zoomRatioEdit->setText(QString::number(scale, 'f', 2)); });
-
-    funcLayout->addStretch(1);
-
-    picLayout->addWidget(funcGroup, 0, Qt::AlignTop);
-
-    // 样式由全局主题(qApp 样式表)统一控制,不再设置局部样式
 
     // 加载默认图像
     loadDefaultImage();
@@ -1030,6 +1036,7 @@ void SimulationPlatform::loadDefaultImage()
         if (!image.isNull())
         {
             imageViewer->setImage(image);
+            m_imagePath = imagePath;
         }
     }
 }
@@ -1065,6 +1072,9 @@ void SimulationPlatform::onSetImageClicked()
 
     // 显示图像
     imageViewer->setImage(image);
+    m_imagePath = filePath;
+    if (stack->currentIndex() == 1)
+        updateStatusBarForPage(1);
 
     // 获取原文件的扩展名
     QFileInfo fileInfo(filePath);
