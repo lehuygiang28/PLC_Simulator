@@ -245,8 +245,39 @@ bool ConfigManager::LoadProtocolType(int& protocolType)
     
     protocolType = root["protocol_type"].toInt(-1);
     m_cachedConfig.protocolType = protocolType;
-    
+
     return protocolType != -1;
+}
+
+bool ConfigManager::SaveThemePref(int themeId)
+{
+    if (!ReadConfigFile())
+    {
+        return false;
+    }
+
+    QJsonObject root = m_configDoc.object();
+    root["theme"] = themeId;
+    m_configDoc.setObject(root);
+
+    return WriteConfigFile();
+}
+
+bool ConfigManager::LoadThemePref(int& themeId)
+{
+    if (!ReadConfigFile())
+    {
+        return false;
+    }
+
+    QJsonObject root = m_configDoc.object();
+    if (!root.contains("theme"))
+    {
+        return false;
+    }
+
+    themeId = root["theme"].toInt(themeId);
+    return true;
 }
 
 bool ConfigManager::SaveScriptNames(const QStringList& scriptNames)

@@ -16,6 +16,7 @@
 #include "ScriptManager.h"
 #include "Config/ConfigManager.h"
 #include "MainWorkFlow.h"
+#include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>
 #include <QColor>
@@ -27,6 +28,7 @@
 #include <QMessageBox>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
 #include <QDialog>
 #include <QFrame>
 
@@ -51,7 +53,6 @@ private:
     void InitialSignalConnect();
     void InitialLineEditValidator();
     void InitialAllConfigs();
-    void InitialGuiStyle();
 
     // 协议相关
     void CreateCurrentProtocol();
@@ -68,12 +69,15 @@ private:
     // 菜单栏相关
     void OnShowAboutDialog();
     void OnShowChangeLog();
+    void OnThemeSelected(Theme theme);
 
     // 日志显示
     void UpdateLogDisplay(QString strNewLog);
 
 private:
     Ui::CommTest_QtClass* ui;
+    QAction* m_actLightTheme = nullptr;
+    QAction* m_actDarkTheme = nullptr;
 
     // 子窗口
     std::unique_ptr<SubMainWindow> m_subWindow;

@@ -63,6 +63,19 @@ public:
      */
     bool LoadProtocolType(int& protocolType);
 
+    /**
+     * @brief 保存主题偏好
+     * @param themeId 0=浅色, 1=深色
+     */
+    bool SaveThemePref(int themeId);
+
+    /**
+     * @brief 读取主题偏好
+     * @param themeId 输出:0=浅色, 1=深色;无配置时保持入参不变
+     * @return 是否成功读取到配置
+     */
+    bool LoadThemePref(int& themeId);
+
     // ==================== 脚本名称相关接口 ====================
     
     /**

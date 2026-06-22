@@ -10,220 +10,24 @@
     <height>971</height>
    </rect>
   </property>
-  <property name="maximumSize">
-   <size>
-    <width>1350</width>
-    <height>1100</height>
-   </size>
-  </property>
   <property name="windowTitle">
    <string>CommTest_Qt</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <property name="font">
-    <font>
-     <pointsize>9</pointsize>
-    </font>
-   </property>
    <layout class="QHBoxLayout" name="horizontalLayout_2">
     <item>
-     <widget class="QGroupBox" name="grpbox_Comm">
+     <widget class="QWidget" name="grpbox_Comm">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
-      <property name="title">
-       <string>通信</string>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_3">
-       <item row="1" column="1">
-        <widget class="QGroupBox" name="grpbox_RegisterSetting">
-         <property name="enabled">
-          <bool>true</bool>
-         </property>
+      <layout class="QVBoxLayout" name="gridLayout_3">
+       <item>
+        <widget class="CollapsibleGroupBox" name="grpbox_Server">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="title">
-          <string>寄存器设置</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_2">
-          <item row="5" column="2" colspan="2">
-           <widget class="QPushButton" name="Btn_HideMainWindow">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>30</height>
-             </size>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>9</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>小窗显示</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QLabel" name="label_11">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="text">
-             <string>数据显示格式:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="1">
-           <widget class="QPushButton" name="Btn_ClearCommLog">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>30</height>
-             </size>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>9</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>清空日志</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="1">
-           <widget class="QRadioButton" name="Radio_Data_DEC">
-            <property name="text">
-             <string>十进制显示</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="3">
-           <widget class="QComboBox" name="cmbBox_DataType"/>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_6">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="text">
-             <string>显示地址:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="2">
-           <widget class="QRadioButton" name="Radio_Data_HEX">
-            <property name="text">
-             <string>十六进制显示</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="label_7">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="text">
-             <string>数据类型:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QLineEdit" name="edit_RegisterAddr">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>30</height>
-             </size>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>0</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignmentFlag::AlignCenter</set>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0">
-           <widget class="QPushButton" name="Btn_ClearRegister">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>30</height>
-             </size>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>9</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>清空寄存器</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QLabel" name="label_12">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="text">
-             <string>日志显示格式:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="1">
-           <widget class="QRadioButton" name="Radio_Log_Ascii">
-            <property name="text">
-             <string>ASCII码显示</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="2">
-           <widget class="QRadioButton" name="Radio_Log_HEX">
-            <property name="text">
-             <string>十六进制显示</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QGroupBox" name="grpbox_Server">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
@@ -245,11 +49,6 @@
               <width>0</width>
               <height>30</height>
              </size>
-            </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
             </property>
             <property name="text">
              <string>20007</string>
@@ -341,11 +140,6 @@
               <height>30</height>
              </size>
             </property>
-            <property name="font">
-             <font>
-              <pointsize>10</pointsize>
-             </font>
-            </property>
             <property name="text">
              <string>127.0.0.1</string>
             </property>
@@ -368,11 +162,6 @@
               <height>30</height>
              </size>
             </property>
-            <property name="font">
-             <font>
-              <pointsize>9</pointsize>
-             </font>
-            </property>
             <property name="text">
              <string>打开链接</string>
             </property>
@@ -381,8 +170,209 @@
          </layout>
         </widget>
        </item>
-       <item row="2" column="1">
-        <widget class="QTextEdit" name="text_CommLog"/>
+       <item>
+        <widget class="CollapsibleGroupBox" name="grpbox_RegisterSetting">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="title">
+          <string>寄存器设置</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="1" column="0" colspan="4">
+           <layout class="QHBoxLayout" name="addrRowLayout">
+            <item>
+             <widget class="QLabel" name="label_6">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>显示地址:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="edit_RegisterAddr">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>0</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignmentFlag::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_7">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>数据类型:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbBox_DataType"/>
+            </item>
+           </layout>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_11">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>数据显示格式:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QRadioButton" name="Radio_Data_DEC">
+            <property name="text">
+             <string>十进制显示</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <widget class="QRadioButton" name="Radio_Data_HEX">
+            <property name="text">
+             <string>十六进制显示</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_12">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>日志显示格式:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QRadioButton" name="Radio_Log_Ascii">
+            <property name="text">
+             <string>ASCII码显示</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="2">
+           <widget class="QRadioButton" name="Radio_Log_HEX">
+            <property name="text">
+             <string>十六进制显示</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0" colspan="4">
+           <layout class="QHBoxLayout" name="regBtnRowLayout">
+            <item>
+             <widget class="QPushButton" name="Btn_ClearRegister">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>清空寄存器</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Btn_ClearCommLog">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>清空日志</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="Btn_HideMainWindow">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>小窗显示</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="CollapsibleGroupBox" name="grpbox_CommLog">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>1</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="title">
+          <string>通信日志</string>
+         </property>
+         <layout class="QVBoxLayout" name="commLogLayout">
+          <item>
+           <widget class="QTextEdit" name="text_CommLog"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="leftColumnSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Policy::Expanding</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
@@ -391,6 +381,12 @@
      <layout class="QVBoxLayout" name="OperationLayout">
       <item>
        <widget class="QTableWidget" name="table_RegisterData">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
         <property name="rowCount">
          <number>20</number>
         </property>
@@ -436,13 +432,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="groupBox">
-        <property name="title">
-         <string>操作</string>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QGroupBox" name="grpbox_LuaScript">
+       <layout class="QHBoxLayout" name="operationRowLayout">
+        <item>
+         <widget class="CollapsibleGroupBox" name="grpbox_LuaScript">
            <property name="minimumSize">
             <size>
              <width>370</width>
@@ -456,7 +448,7 @@
             <item row="5" column="3">
              <widget class="QCheckBox" name="ChkBox_LoopEnable_6">
               <property name="text">
-               <string>Lua Loop6 启用</string>
+               <string>循环执行</string>
               </property>
              </widget>
             </item>
@@ -468,13 +460,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>编辑脚本1</string>
+               <string>编辑</string>
               </property>
              </widget>
             </item>
@@ -486,13 +473,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>执行脚本5</string>
+               <string>执行</string>
               </property>
              </widget>
             </item>
@@ -504,13 +486,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>执行脚本1</string>
+               <string>执行</string>
               </property>
              </widget>
             </item>
@@ -522,20 +499,15 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>执行脚本4</string>
+               <string>执行</string>
               </property>
              </widget>
             </item>
             <item row="0" column="3">
              <widget class="QCheckBox" name="ChkBox_LoopEnable_1">
               <property name="text">
-               <string>Lua Loop1 启用</string>
+               <string>循环执行</string>
               </property>
              </widget>
             </item>
@@ -547,13 +519,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>执行脚本3</string>
+               <string>执行</string>
               </property>
              </widget>
             </item>
@@ -565,13 +532,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>执行脚本6</string>
+               <string>执行</string>
               </property>
              </widget>
             </item>
@@ -582,11 +544,6 @@
                 <width>0</width>
                 <height>30</height>
                </size>
-              </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
               </property>
               <property name="text">
                <string>脚本2</string>
@@ -604,11 +561,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>脚本4</string>
               </property>
@@ -625,13 +577,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>编辑脚本2</string>
+               <string>编辑</string>
               </property>
              </widget>
             </item>
@@ -642,11 +589,6 @@
                 <width>0</width>
                 <height>30</height>
                </size>
-              </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
               </property>
               <property name="text">
                <string>脚本5</string>
@@ -664,11 +606,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>脚本6</string>
               </property>
@@ -685,13 +622,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>编辑脚本3</string>
+               <string>编辑</string>
               </property>
              </widget>
             </item>
@@ -702,11 +634,6 @@
                 <width>0</width>
                 <height>30</height>
                </size>
-              </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
               </property>
               <property name="text">
                <string>脚本3</string>
@@ -724,11 +651,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>脚本1</string>
               </property>
@@ -740,21 +662,21 @@
             <item row="3" column="3">
              <widget class="QCheckBox" name="ChkBox_LoopEnable_4">
               <property name="text">
-               <string>Lua Loop4 启用</string>
+               <string>循环执行</string>
               </property>
              </widget>
             </item>
             <item row="2" column="3">
              <widget class="QCheckBox" name="ChkBox_LoopEnable_3">
               <property name="text">
-               <string>Lua Loop3 启用</string>
+               <string>循环执行</string>
               </property>
              </widget>
             </item>
             <item row="4" column="3">
              <widget class="QCheckBox" name="ChkBox_LoopEnable_5">
               <property name="text">
-               <string>Lua Loop5 启用</string>
+               <string>循环执行</string>
               </property>
              </widget>
             </item>
@@ -766,13 +688,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>编辑脚本5</string>
+               <string>编辑</string>
               </property>
              </widget>
             </item>
@@ -784,13 +701,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>编辑脚本6</string>
+               <string>编辑</string>
               </property>
              </widget>
             </item>
@@ -802,20 +714,15 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>编辑脚本4</string>
+               <string>编辑</string>
               </property>
              </widget>
             </item>
             <item row="1" column="3">
              <widget class="QCheckBox" name="ChkBox_LoopEnable_2">
               <property name="text">
-               <string>Lua Loop2 启用</string>
+               <string>循环执行</string>
               </property>
              </widget>
             </item>
@@ -827,13 +734,8 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
-               <string>执行脚本2</string>
+               <string>执行</string>
               </property>
              </widget>
             </item>
@@ -841,7 +743,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QGroupBox" name="grpbox_PlatformSimulation">
+          <widget class="CollapsibleGroupBox" name="grpbox_PlatformSimulation">
            <property name="minimumSize">
             <size>
              <width>210</width>
@@ -866,11 +768,6 @@
                 <width>0</width>
                 <height>30</height>
                </size>
-              </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
               </property>
               <property name="text">
                <string>120</string>
@@ -914,11 +811,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>3</string>
               </property>
@@ -948,11 +840,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>显示平台</string>
               </property>
@@ -979,11 +866,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>3</string>
               </property>
@@ -1006,11 +888,6 @@
                 <width>0</width>
                 <height>30</height>
                </size>
-              </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
               </property>
               <property name="text">
                <string>114</string>
@@ -1035,11 +912,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>双字写入</string>
               </property>
@@ -1053,11 +925,6 @@
                 <height>30</height>
                </size>
               </property>
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
               <property name="text">
                <string>浮点写入</string>
               </property>
@@ -1067,7 +934,6 @@
           </widget>
          </item>
         </layout>
-       </widget>
       </item>
      </layout>
     </item>
@@ -1086,6 +952,14 @@
   <widget class="QStatusBar" name="statusBar"/>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <customwidgets>
+  <customwidget>
+   <class>CollapsibleGroupBox</class>
+   <extends>QGroupBox</extends>
+   <header>CollapsibleGroupBox.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../Resource_Files/CommTest_Qt.qrc"/>
  </resources>

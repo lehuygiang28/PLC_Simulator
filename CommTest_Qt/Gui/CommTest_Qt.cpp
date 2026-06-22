@@ -7,6 +7,7 @@
  */
 
 #include "CommTest_Qt.h"
+#include "Theme/ThemeManager.h"
 #include "../version.h"
 #include <QDir>
 #include <QFile>
@@ -28,8 +29,13 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 	// 初始化信号槽连接
 	InitialSignalConnect();
 
-	// 初始化界面样式
-	InitialGuiStyle();
+	// 初始化界面主题(读取持久化偏好,默认深色)
+	{
+		int themeId = static_cast<int>(Theme::Dark);
+		m_configManager->LoadThemePref(themeId);
+		ThemeManager::instance().applyTheme(static_cast<Theme>(themeId));
+	}
+	ui->text_CommLog->setReadOnly(true);
 
 	// 初始化寄存器表格管理器
 	m_registerTableManager = std::make_unique<RegisterTableManager>(
@@ -278,8 +284,8 @@ void CommTest_Qt::InitializeMember()
 	m_subWindow = std::make_unique<SubMainWindow>();
 	// 将当前窗口的名称设置为小窗名称
 	m_subWindow->setWindowTitle(this->windowTitle() + " - 子窗口");
-	m_subWindow->setWindowFlags(Qt::Window); // 设置为独立窗口
-	m_subWindow->createWinId();
+	// 独立窗口,标题栏保留标题与最小化按钮(支持任务栏最小化/还原),不显示最大化/关闭按钮
+	m_subWindow->setWindowFlags(Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
 	// 初始化模拟平台窗口
 	m_simulationPlatform = new SimulationPlatform(this);
 	// 将当前窗口的名称设置为模拟平台窗口名称
@@ -301,19 +307,9 @@ void CommTest_Qt::InitializeMember()
             m_simulationPlatform->setWindowState(state);
         } });
 
-	// 监听子窗口状态变化
-	auto subHandle = m_subWindow->windowHandle();
-	if (subHandle)
-	{
-		connect(subHandle, &QWindow::windowStateChanged, this, [this](Qt::WindowState state)
-				{
-            // 子窗口状态变化
-            if (m_subWindow->isVisible()) {
-                // 只有子窗口显示时才同步
-                m_simulationPlatform->setWindowState(state);
-            }
-			m_subWindow->activateWindow(); });
-	}
+	// 监听子窗口状态变化:用事件过滤器捕获 QEvent::WindowStateChange
+	// (QWidget 级事件,不依赖原生句柄,无需提前 createWinId;状态联动逻辑见 eventFilter)
+	m_subWindow->installEventFilter(this);
 
 	// 协议设置相关
 	{
@@ -415,6 +411,28 @@ void CommTest_Qt::InitialSignalConnect()
 	QAction *changelogAction = helpMenu->addAction("更新日志(&U)");
 	connect(aboutAction, &QAction::triggered, this, &CommTest_Qt::OnShowAboutDialog);
 	connect(changelogAction, &QAction::triggered, this, &CommTest_Qt::OnShowChangeLog);
+
+	// 视图菜单:主题切换
+	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
+	ui->menuBar->insertMenu(helpMenu->menuAction(), viewMenu);
+	QMenu* themeMenu = viewMenu->addMenu("主题");
+	m_actLightTheme = themeMenu->addAction("浅色");
+	m_actDarkTheme = themeMenu->addAction("深色");
+	m_actLightTheme->setCheckable(true);
+	m_actDarkTheme->setCheckable(true);
+	QActionGroup* themeGroup = new QActionGroup(this);
+	themeGroup->setExclusive(true);
+	themeGroup->addAction(m_actLightTheme);
+	themeGroup->addAction(m_actDarkTheme);
+
+	// 同步当前主题的勾选状态
+	Theme cur = ThemeManager::instance().currentTheme();
+	m_actLightTheme->setChecked(cur == Theme::Light);
+	m_actDarkTheme->setChecked(cur == Theme::Dark);
+
+	connect(m_actLightTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Light); });
+	connect(m_actDarkTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
+
 	// 连接小窗口的显示主窗口信号到主窗口的show()槽
 	connect(m_subWindow.get(), &SubMainWindow::showMainWindow, this, &CommTest_Qt::show);
 
@@ -1081,7 +1099,7 @@ void CommTest_Qt::OnShowAboutDialog()
 	// 应用名称（居中）
 	QLabel *nameLabel = new QLabel(APP_NAME, &aboutDialog);
 	nameLabel->setAlignment(Qt::AlignCenter);
-	nameLabel->setStyleSheet("font-size: 18pt; font-weight: bold; color: #333333;");
+	nameLabel->setStyleSheet("font-size: 18pt; font-weight: bold;");
 	mainLayout->addWidget(nameLabel);
 
 	// 版本信息（居中）
@@ -1095,46 +1113,26 @@ void CommTest_Qt::OnShowAboutDialog()
 							  
 	QLabel *versionLabel = new QLabel(versionInfo, &aboutDialog);
 	versionLabel->setAlignment(Qt::AlignCenter);
-	versionLabel->setStyleSheet("font-size: 10pt; color: #666666;");
+	versionLabel->setObjectName("secondaryText");
 	mainLayout->addWidget(versionLabel);
 
-	// 分隔线
+	// 分隔线(复用主题细分隔线)
 	QFrame *line = new QFrame(&aboutDialog);
-	line->setFrameShape(QFrame::HLine);
-	line->setFrameShadow(QFrame::Sunken);
-	line->setStyleSheet("background-color: #CCCCCC;");
+	line->setObjectName("hSeparator");
 	mainLayout->addWidget(line);
 
 	// 应用描述（靠左）
 	QLabel *descLabel = new QLabel(APP_DESCRIPTION, &aboutDialog);
 	descLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 	descLabel->setWordWrap(true);
-	descLabel->setStyleSheet("font-size: 10pt; color: #333333;");
 	mainLayout->addWidget(descLabel);
 
 	mainLayout->addStretch();
 
-	// 按钮样式
-	QString buttonStyle =
-		"QPushButton {"
-		"    background-color: #4CA3E0;"
-		"    color: white;"
-		"    border: none;"
-		"    border-radius: 4px;"
-		"    font-size: 10pt;"
-		"}"
-		"QPushButton:hover {"
-		"    background-color: #3A8BC8;"
-		"}"
-		"QPushButton:pressed {"
-		"    background-color: #2E7BA8;"
-		"}";
-
-	// 第三方许可按钮
+	// 第三方许可按钮(样式跟随全局主题)
 	QPushButton *licenseButton = new QPushButton("第三方许可", &aboutDialog);
 	licenseButton->setFixedSize(100, 30);
-	licenseButton->setStyleSheet(buttonStyle);
-	connect(licenseButton, &QPushButton::clicked, [this, buttonStyle]() {
+	connect(licenseButton, &QPushButton::clicked, [this]() {
 		// 读取第三方许可证文件（与可执行文件在同一目录）
 		QString licensePath = QCoreApplication::applicationDirPath() + "/THIRD_PARTY_LICENSES.txt";
 		QFile licenseFile(licensePath);
@@ -1164,12 +1162,10 @@ void CommTest_Qt::OnShowAboutDialog()
 		QTextEdit *textEdit = new QTextEdit(licenseDialog);
 		textEdit->setReadOnly(true);
 		textEdit->setPlainText(licenseContent);
-		textEdit->setStyleSheet("font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt;");
 		layout->addWidget(textEdit);
 
 		QPushButton *closeBtn = new QPushButton("关闭", licenseDialog);
 		closeBtn->setFixedSize(80, 30);
-		closeBtn->setStyleSheet(buttonStyle);
 		connect(closeBtn, &QPushButton::clicked, licenseDialog, &QDialog::accept);
 
 		QHBoxLayout *btnLayout = new QHBoxLayout();
@@ -1198,9 +1194,9 @@ void CommTest_Qt::OnShowAboutDialog()
 	QLabel *copyrightLabel = new QLabel(APP_COPYRIGHT_RC, &aboutDialog);
 	QLabel *linkLabel = new QLabel(APP_DOMAIN, &aboutDialog);
 	copyrightLabel->setAlignment(Qt::AlignCenter);
-	copyrightLabel->setStyleSheet("font-size: 8pt; color: #808080;");
+	copyrightLabel->setObjectName("captionText");
 	linkLabel->setAlignment(Qt::AlignCenter);
-	linkLabel->setStyleSheet("font-size: 8pt; color: #808080;");
+	linkLabel->setObjectName("captionText");
 	mainLayout->addWidget(copyrightLabel);
 	mainLayout->addWidget(linkLabel);
 
@@ -1222,23 +1218,7 @@ void CommTest_Qt::OnShowChangeLog()
 			LogContent = "There is no changeog.";
 		}
 
-		// 按钮样式
-	QString buttonStyle =
-		"QPushButton {"
-		"    background-color: #4CA3E0;"
-		"    color: white;"
-		"    border: none;"
-		"    border-radius: 4px;"
-		"    font-size: 10pt;"
-		"}"
-		"QPushButton:hover {"
-		"    background-color: #3A8BC8;"
-		"}"
-		"QPushButton:pressed {"
-		"    background-color: #2E7BA8;"
-		"}";
-
-	// 显示许可证对话框
+	// 显示更新日志对话框(样式跟随全局主题)
 	QDialog *licenseDialog = new QDialog(this);
 	licenseDialog->setWindowTitle("更新日志");
 	licenseDialog->setFixedSize(520, 500);
@@ -1249,12 +1229,10 @@ void CommTest_Qt::OnShowChangeLog()
 	QTextEdit *textEdit = new QTextEdit(licenseDialog);
 	textEdit->setReadOnly(true);
 	textEdit->setPlainText(LogContent);
-	textEdit->setStyleSheet("font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt;");
 	layout->addWidget(textEdit);
 
 	QPushButton *closeBtn = new QPushButton("关闭", licenseDialog);
 	closeBtn->setFixedSize(80, 30);
-	closeBtn->setStyleSheet(buttonStyle);
 	connect(closeBtn, &QPushButton::clicked, licenseDialog, &QDialog::accept);
 
 	QHBoxLayout *btnLayout = new QHBoxLayout();
@@ -1266,368 +1244,25 @@ void CommTest_Qt::OnShowChangeLog()
 	licenseDialog->exec();
 }
 
-void CommTest_Qt::InitialGuiStyle()
+void CommTest_Qt::OnThemeSelected(Theme theme)
 {
-	// 设置应用程序浅色系主题
-	QPalette darkPalette;
-
-	// 设置窗口和面板背景色为浅色
-	darkPalette.setColor(QPalette::Window, QColor(245, 245, 245));						   // 浅灰白色背景
-	darkPalette.setColor(QPalette::WindowText, QColor(33, 33, 33));						   // 深灰色文字
-	darkPalette.setColor(QPalette::Base, QColor(255, 255, 255));						   // 白色输入框背景
-	darkPalette.setColor(QPalette::AlternateBase, QColor(245, 245, 245));				   // 交替背景色
-	darkPalette.setColor(QPalette::ToolTipBase, QColor(255, 255, 255));					   // 提示框背景
-	darkPalette.setColor(QPalette::ToolTipText, QColor(33, 33, 33));					   // 提示框文字
-	darkPalette.setColor(QPalette::Text, QColor(33, 33, 33));							   // 文本颜色
-	darkPalette.setColor(QPalette::Button, QColor(240, 240, 240));						   // 按钮背景色
-	darkPalette.setColor(QPalette::ButtonText, QColor(33, 33, 33));						   // 按钮文字
-	darkPalette.setColor(QPalette::BrightText, QColor(255, 255, 255));					   // 亮色文字
-	darkPalette.setColor(QPalette::Highlight, QColor(76, 163, 224));					   // 高亮色（蓝色）
-	darkPalette.setColor(QPalette::HighlightedText, QColor(255, 255, 255));				   // 高亮文字
-	darkPalette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(128, 128, 128)); // 禁用文字
-	darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(128, 128, 128)); // 禁用按钮文字
-
-	// 应用调色板
-	QApplication::setPalette(darkPalette);
-
-	// 定义通用的按钮样式表 - 带圆角、阴影和悬停效果
-	const QString buttonStyleSheet =
-		"QPushButton {"
-		"    background-color: #F0F0F0;"
-		"    color: #212121;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 6px;"
-		"    padding: 6px 12px;"
-		"    font-weight: 500;"
-		"    font-size: 11pt;"
-		"    outline: none;"
-		"}"
-		"QPushButton:hover {"
-		"    background-color: #E8E8E8;"
-		"    border: 1px solid #4CA3E0;"
-		"}"
-		"QPushButton:pressed {"
-		"    background-color: #D0D0D0;"
-		"    border: 1px solid #2E7BA8;"
-		"}"
-		"QPushButton:disabled {"
-		"    background-color: #E0E0E0;"
-		"    color: #808080;"
-		"    border: 1px solid #DDDDDD;"
-		"}"
-		"";
-
-	// 应用按钮样式到所有主要按钮
-	if (ui->Btn_Create != nullptr)
-		ui->Btn_Create->setStyleSheet(buttonStyleSheet);
-	if (ui->Btn_HideMainWindow != nullptr)
-		ui->Btn_HideMainWindow->setStyleSheet(buttonStyleSheet);
-	if (ui->Btn_ShowPlatform != nullptr)
-		ui->Btn_ShowPlatform->setStyleSheet(buttonStyleSheet);
-	if (ui->Btn_ClearRegister != nullptr)
-		ui->Btn_ClearRegister->setStyleSheet(buttonStyleSheet);
-	if (ui->Btn_ClearCommLog != nullptr)
-		ui->Btn_ClearCommLog->setStyleSheet(buttonStyleSheet);
-	if (ui->Btn_WriteAxisDoubleWord != nullptr)
-		ui->Btn_WriteAxisDoubleWord->setStyleSheet(buttonStyleSheet);
-	if (ui->Btn_WriteAxisFloat != nullptr)
-		ui->Btn_WriteAxisFloat->setStyleSheet(buttonStyleSheet);
-
-	// 应用样式到Lua脚本相关的按钮
-	for (int i = 1; i <= 6; ++i)
+	ThemeManager::instance().applyTheme(theme);
+	if (m_configManager != nullptr)
 	{
-		QPushButton *executeBtn = this->findChild<QPushButton *>(QString("Btn_Execute_%1").arg(i));
-		QPushButton *editBtn = this->findChild<QPushButton *>(QString("Btn_Edit_%1").arg(i));
-
-		if (executeBtn != nullptr)
-		{
-			executeBtn->setStyleSheet(buttonStyleSheet);
-		}
-		if (editBtn != nullptr)
-		{
-			editBtn->setStyleSheet(buttonStyleSheet);
-		}
+		m_configManager->SaveThemePref(static_cast<int>(theme));
 	}
-
-	// 定义输入框样式表（LineEdit、SpinBox等）
-	const QString inputStyleSheet =
-		"QLineEdit, QSpinBox, QDoubleSpinBox {"
-		"    background-color: #FFFFFF;"
-		"    color: #212121;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 4px;"
-		"    padding: 4px 6px;"
-		"    font-size: 10pt;"
-		"}"
-		"QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {"
-		"    border: 2px solid #4CA3E0;"
-		"    background-color: #FFFEF5;"
-		"}"
-		"";
-
-	// 定义组合框样式表（ComboBox，与LineEdit明显区分）
-	const QString comboBoxStyleSheet =
-		"QComboBox {"
-		"    background-color: #F8F8F8;" // 浅灰背景，与LineEdit白色区分
-		"    color: #212121;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 5px;"
-		"    padding: 5px 8px;"
-		"    padding-right: 25px;" // 为下拉箭头留出空间
-		"    font-size: 10pt;"
-		"    min-height: 20px;"
-		"}"
-		"QComboBox:hover {"
-		"    border: 1px solid #4CA3E0;"
-		"    background-color: #FAFAFA;"
-		"}"
-		"QComboBox:focus {"
-		"    border: 2px solid #4CA3E0;"
-		"    background-color: #FFFFFF;"
-		"}"
-		"QComboBox::drop-down {"
-		"    subcontrol-origin: padding;"
-		"    subcontrol-position: top right;"
-		"    width: 20px;"
-		"    border-left: 1px solid #CCCCCC;"
-		"    border-top-right-radius: 5px;"
-		"    border-bottom-right-radius: 5px;"
-		"    background-color: #E8E8E8;"
-		"}"
-		"QComboBox::drop-down:hover {"
-		"    background-color: #4CA3E0;"
-		"}"
-		"QComboBox::down-arrow {"
-		"image: none;"
-		"    width: 0px;"
-		"    height: 0px;"
-		"    border-left: 5px solid transparent;"
-		"    border-right: 5px solid transparent;"
-		"    border-top: 6px solid #666666;"
-		"}"
-		"QComboBox::down-arrow:hover {"
-		"    border-top-color: #FFFFFF;"
-		"}"
-		"QComboBox QAbstractItemView {"
-		"    background-color: #FFFFFF;"
-		"    border: 1px solid #4CA3E0;"
-		"    selection-background-color: #4CA3E0;"
-		"    selection-color: #FFFFFF;"
-		"    outline: none;"
-		"}"
-		"";
-
-	// 应用输入框样式
-	if (ui->edit_IP != nullptr)
-		ui->edit_IP->setStyleSheet(inputStyleSheet);
-	if (ui->edit_Port != nullptr)
-		ui->edit_Port->setStyleSheet(inputStyleSheet);
-	if (ui->edit_RegisterAddr != nullptr)
-		ui->edit_RegisterAddr->setStyleSheet(inputStyleSheet);
-	if (ui->edit_Unit_XY != nullptr)
-		ui->edit_Unit_XY->setStyleSheet(inputStyleSheet);
-	if (ui->edit_Unit_D != nullptr)
-		ui->edit_Unit_D->setStyleSheet(inputStyleSheet);
-	if (ui->edit_AxisPosRegisterAddr != nullptr)
-		ui->edit_AxisPosRegisterAddr->setStyleSheet(inputStyleSheet);
-	if (ui->edit_AxisPosRegisterAddr_2 != nullptr)
-		ui->edit_AxisPosRegisterAddr_2->setStyleSheet(inputStyleSheet);
-
-	for (int i = 1; i <= 6; ++i)
-	{
-		QLineEdit *scriptNameEdit = this->findChild<QLineEdit *>(QString("edit_ScriptName_%1").arg(i));
-		if (scriptNameEdit != nullptr)
-		{
-			scriptNameEdit->setStyleSheet(inputStyleSheet);
-		}
-	}
-
-	// 应用组合框样式（统一所有ComboBox控件）
-	if (ui->cmbBox_ProtocolType != nullptr)
-		ui->cmbBox_ProtocolType->setStyleSheet(comboBoxStyleSheet);
-	if (ui->cmbBox_DataType != nullptr)
-		ui->cmbBox_DataType->setStyleSheet(comboBoxStyleSheet);
-	if (ui->cmbBox_ComStop != nullptr)
-		ui->cmbBox_ComStop->setStyleSheet(comboBoxStyleSheet);
-	if (ui->cmbBox_CmdStop != nullptr)
-		ui->cmbBox_CmdStop->setStyleSheet(comboBoxStyleSheet);
-
-	// 定义文本编辑框和表格的样式表
-	const QString textEditStyleSheet =
-		"QTextEdit, QPlainTextEdit {"
-		"    background-color: #FFFFFF;"
-		"    color: #212121;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 4px;"
-		"    padding: 4px;"
-		"    font-family: 'Courier New', monospace;"
-		"    font-size: 10pt;"
-		"}"
-		"";
-
-	if (ui->text_CommLog != nullptr)
-		ui->text_CommLog->setStyleSheet(textEditStyleSheet);
-	// 日志控件只读
-	ui->text_CommLog->setReadOnly(true);
-
-	// 定义表格样式
-	const QString tableStyleSheet =
-		"QTableWidget {"
-		"    background-color: #FFFFFF;"
-		"    alternate-background-color: #F5F5F5;"
-		"    gridline-color: #DDDDDD;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 4px;"
-		"}"
-		"QTableWidget::item {"
-		"    padding: 2px;"
-		"    color: #212121;"
-		"}"
-		"QTableWidget::item:selected {"
-		"    background-color: #4CA3E0;"
-		"    color: #FFFFFF;"
-		"}"
-		"QHeaderView::section {"
-		"    background-color: #F0F0F0;"
-		"    color: #212121;"
-		"    padding: 4px;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 0px;"
-		"}"
-		"";
-
-	if (ui->table_RegisterData != nullptr)
-		ui->table_RegisterData->setStyleSheet(tableStyleSheet);
-
-	// 定义复选框样式表（方形）
-	const QString checkboxStyleSheet =
-		"QCheckBox {"
-		"    color: #212121;"
-		"    spacing: 6px;"
-		"    font-size: 10pt;"
-		"}"
-		"QCheckBox::indicator {"
-		"    width: 16px;"
-		"    height: 16px;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 3px;"
-		"    background-color: #FFFFFF;"
-		"}"
-		"QCheckBox::indicator:checked {"
-		"    background-color: #4CA3E0;"
-		"    border: 1px solid #2E7BA8;"
-		"}"
-		"QCheckBox::indicator:hover {"
-		"    border: 1px solid #4CA3E0;"
-		"}"
-		"";
-
-	// 定义单选按钮样式表（圆形，与复选框明显区分）
-	const QString radioButtonStyleSheet =
-		"QRadioButton {"
-		"    color: #212121;"
-		"    spacing: 6px;"
-		"    font-size: 10pt;"
-		"}"
-		"QRadioButton::indicator {"
-		"    width: 16px;"
-		"    height: 16px;"
-		"    border: 1px solid #CCCCCC;"
-		"    border-radius: 8px;"
-		"    background-color: #FFFFFF;"
-		"}"
-		"QRadioButton::indicator:checked {"
-		"    background-color: #4CA3E0;"
-		"    border: 1px solid #2E7BA8;"
-		"}"
-		"QRadioButton::indicator:hover {"
-		"    border: 1px solid #4CA3E0;"
-		"}";
-	// "QRadioButton {"
-	// "    color: #212121;"
-	// "    spacing: 8px;"
-	// "    font-size: 10pt;"
-	// "}"
-	// "QRadioButton::indicator {"
-	// "    width: 18px;"
-	// "    height: 18px;"
-	// "    border: 2px solid #CCCCCC;"
-	// "    border-radius: 10px;"  // 完全圆形
-	// "    background-color: #FFFFFF;"
-	// "}"
-	// "QRadioButton::indicator:checked {"
-	// "    border: 2px solid #4CA3E0;"
-	// "    background-color: #FFFFFF;"
-	// "    background: qradialgradient(cx:0.5, cy:0.5, radius:0.4, fx:0.5, fy:0.5, "
-	// "                                stop:0 #4CA3E0, stop:0.5 #4CA3E0, stop:0.51 #FFFFFF, stop:1 #FFFFFF);"
-	// "}"
-	// "QRadioButton::indicator:hover {"
-	// "    border: 2px solid #4CA3E0;"
-	// "    background-color: #F0F8FF;"
-	// "}"
-	// "QRadioButton::indicator:checked:hover {"
-	// "    border: 2px solid #2E7BA8;"
-	// "}"
-	// "";
-
-	// 应用复选框样式到所有复选框
-	for (int i = 1; i <= 6; ++i)
-	{
-		QCheckBox *loopCheckBox = this->findChild<QCheckBox *>(QString("ChkBox_LoopEnable_%1").arg(i));
-		if (loopCheckBox != nullptr)
-		{
-			loopCheckBox->setStyleSheet(checkboxStyleSheet);
-		}
-	}
-
-	// 应用单选按钮样式（圆形）
-	if (ui->Radio_Data_DEC != nullptr)
-		ui->Radio_Data_DEC->setStyleSheet(radioButtonStyleSheet);
-	if (ui->Radio_Data_HEX != nullptr)
-		ui->Radio_Data_HEX->setStyleSheet(radioButtonStyleSheet);
-	if (ui->Radio_Log_Ascii != nullptr)
-		ui->Radio_Log_Ascii->setStyleSheet(radioButtonStyleSheet);
-	if (ui->Radio_Log_HEX != nullptr)
-		ui->Radio_Log_HEX->setStyleSheet(radioButtonStyleSheet);
-	if (ui->Radio_AxisPos_Float != nullptr)
-		ui->Radio_AxisPos_Float->setStyleSheet(radioButtonStyleSheet);
-	if (ui->Radio_AxisPos_Int32 != nullptr)
-		ui->Radio_AxisPos_Int32->setStyleSheet(radioButtonStyleSheet);
-
-	// 应用复选框样式（方形）
-	if (ui->ChkBox_WritePosAutoEnable != nullptr)
-		ui->ChkBox_WritePosAutoEnable->setStyleSheet(checkboxStyleSheet);
-
-	// 设置菜单栏样式
-	const QString menuBarStyleSheet =
-		"QMenuBar {"
-		"    background-color: #F0F0F0;"
-		"    color: #212121;"
-		"    border-bottom: 1px solid #CCCCCC;"
-		"}"
-		"QMenuBar::item:selected {"
-		"    background-color: #E8E8E8;"
-		"}"
-		"QMenu {"
-		"    background-color: #FFFFFF;"
-		"    color: #212121;"
-		"    border: 1px solid #CCCCCC;"
-		"}"
-		"QMenu::item:selected {"
-		"    background-color: #4CA3E0;"
-		"    color: #FFFFFF;"
-		"}"
-		"";
-
-	if (ui->menuBar != nullptr)
-		ui->menuBar->setStyleSheet(menuBarStyleSheet);
 }
 
 bool CommTest_Qt::eventFilter(QObject *watched, QEvent *event)
 {
-	if (watched == ui->table_RegisterData)
+	// 小窗最小化/还原时,模拟平台跟随其窗口状态(主窗口隐藏、仅小窗显示的场景)
+	if (watched == m_subWindow.get() && event->type() == QEvent::WindowStateChange)
 	{
-		return QMainWindow::eventFilter(watched, event);
+		if (m_subWindow->isVisible())
+		{
+			m_simulationPlatform->setWindowState(m_subWindow->windowState());
+		}
+		m_subWindow->activateWindow();
 	}
 	return QMainWindow::eventFilter(watched, event);
 }

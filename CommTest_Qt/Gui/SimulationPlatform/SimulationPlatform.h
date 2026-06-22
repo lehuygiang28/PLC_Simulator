@@ -40,6 +40,7 @@
 // 包含拆分出的控件头文件
 #include "CanvasWidget.h"
 #include "ImageViewerWidget.h"
+#include "CollapsibleGroupBox.h"
 
 class SimulationPlatform : public QWidget
 {
@@ -84,8 +85,7 @@ private slots:
 private:
     // UI控件
     CanvasWidget* canvas;
-    QGroupBox* controlGroup;
-    
+
     QLineEdit *basePlatformXEdit;
     QLineEdit *basePlatformYEdit;
     QLineEdit *basePlatformAngleEdit;
@@ -170,7 +170,6 @@ private:
     void setupUI();
     void setupValidators();
     void setupConnections();
-    void applyStyle();
     void updateOriginAndScale();
     void drawCoordinateSystem(QPainter &painter);
     void drawPlatform(QPainter &painter, const Platform &platform, QColor color);

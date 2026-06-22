@@ -11,7 +11,7 @@
 
 #include <QDialog>
 #include <QPushButton>
-#include <QGridLayout>
+#include <QVBoxLayout>
 #include <QCloseEvent>
 
 class SubMainWindow :
@@ -39,7 +39,6 @@ protected:
 private:
     QPushButton* btn[6]; // 6个按钮
     QPushButton* btnExit; // 退出小窗按钮
-    void applyStyle();
 private slots:
     void onButton1Clicked();
     void onButton2Clicked();

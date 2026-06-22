@@ -33,12 +33,13 @@ ScriptEditor::ScriptEditor(QWidget *parent, IScriptRunner* pScriptRunner)
     setCentralWidget(editor);
     setWindowTitle(tr("Lua Script Editor"));
 
-    // 设置字体
+    // 设置代码字体:优先现代等宽字体,逐级回退,确保代码对齐
     QFont font;
-    font.setFamily("Courier");
+    font.setFamilies({"Cascadia Mono", "Consolas", "Courier New", "monospace"});
+    font.setStyleHint(QFont::Monospace);
     font.setFixedPitch(true);
     font.setPointSize(10);
-    editor->setFont(font);
+    editor->setFont(font);  // CodeEditor 会在字体变化时按 IndentWidth 自动同步 Tab 视觉列宽
 
     createMenus();
     setupHighlighter();
@@ -422,16 +423,19 @@ void ScriptEditor::onTextChanged()
 
 void ScriptEditor::updateWindowTitle()
 {
-    QString title = tr("Lua Script Editor");
+    const QString appName = tr("Lua Script Editor");
+    QString title;
 
     if (!scriptFileName.isEmpty()) {
-        title += tr(" - %1").arg(scriptFileName);
+        // 文件名在前、应用名在后(任务栏/Alt-Tab 截断时文件名优先可见);
+        // 标题仅显示文件名,完整路径仍保存在 scriptFileName 中供文件读写。
+        // [*] 紧跟文件名,由 Qt 据 windowModified 自动显示/隐藏修改标记(星号)。
+        title = tr("%1[*] - %2").arg(QFileInfo(scriptFileName).fileName(), appName);
+    } else {
+        title = appName + "[*]";
     }
 
-    if (m_isModified) {
-        title += " *";
-    }
-
+    setWindowModified(m_isModified);
     setWindowTitle(title);
 }
 
