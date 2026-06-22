@@ -45,7 +45,7 @@
 #include <cmath>
 
 // 包含拆分出的控件头文件
-#include "CanvasWidget.h"
+#include "PlatformCanvas.h"
 #include "ImageViewer.h"
 #include "CollapsibleGroupBox.h"
 #include "PlatformScene.h"
@@ -71,14 +71,7 @@ public:
 
     void SetSimulationPlatformParams(double distance,double ratio);
 
-    /**
-     * @brief 供 CanvasWidget 调用的画布绘制方法
-     * @param painter 绘图对象
-     */
-    void drawCanvas(QPainter& painter);
-
 protected:
-    void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private slots:
@@ -91,7 +84,7 @@ private slots:
 
 private:
     // UI控件
-    CanvasWidget* canvas;
+    PlatformCanvas* canvas;
 
     QLineEdit *basePlatformXEdit;
     QLineEdit *basePlatformYEdit;
@@ -159,19 +152,9 @@ private:
     // 场景数据模型(单一数据源)
     PlatformScene* m_scene = nullptr;
 
-    // 绘图相关
-    QPoint m_origin; // 坐标原点(像素)
-
     void setupUI();
     void setupValidators();
     void setupConnections();
-    void updateOriginAndScale();
-    void drawCoordinateSystem(QPainter &painter);
-    void drawPlatform(QPainter &painter, const PlatformItem &item, QColor color, double radiusMm);
-    void drawMark1(QPainter &painter);
-    void drawMark2(QPainter &painter);
-    void drawVirtualMark(QPainter &painter);
-    QPointF transformPoint(const QPointF &point);
 };
 
 #endif // SIMULATIONPLATFORM_H
