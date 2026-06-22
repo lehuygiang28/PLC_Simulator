@@ -130,7 +130,18 @@ void SimulationPlatform::setupUI()
 
     // ========== 模拟平台页面 ==========
     simulationPage = new QWidget(this);
-    QHBoxLayout *simLayout = new QHBoxLayout(simulationPage);  // 左:画布  右:控制面板
+    QVBoxLayout *simPageLayout = new QVBoxLayout(simulationPage);  // 上:收起按钮栏  下:画布+控制面板
+    simPageLayout->setContentsMargins(9, 6, 9, 9);  // 四周留白,避免画布贴左、面板贴右
+
+    // 顶栏:收起/展开按钮(右对齐,提到画布与面板的共同上方;折叠后画布全宽时按钮仍在右上角)
+    QPushButton* panelToggleBtn = new QPushButton(QStringLiteral("收起 »"), this);
+    QHBoxLayout* topBar = new QHBoxLayout();
+    topBar->addStretch(1);
+    topBar->addWidget(panelToggleBtn);
+    simPageLayout->addLayout(topBar);
+
+    QHBoxLayout *simLayout = new QHBoxLayout();  // 左:画布  右:控制面板
+    simPageLayout->addLayout(simLayout, 1);
 
     // 画布(占左侧主区)
     canvas = new CanvasWidget(this);
@@ -178,6 +189,7 @@ void SimulationPlatform::setupUI()
                           virtualMarkXEdit, virtualMarkYEdit })
     {
         e->setFixedWidth(78);
+        e->setAlignment(Qt::AlignCenter);  // 数值居中,与主界面 IP/端口风格统一
     }
 
     // 右对齐表单标签:使各行冒号对齐成一列,输入框起点整齐
@@ -218,7 +230,7 @@ void SimulationPlatform::setupUI()
 
     // Mark1
     grpMark1 = new CollapsibleGroupBox(this);
-    grpMark1->setTitle(QStringLiteral("Mark1 (mm)"));
+    grpMark1->setTitle(QStringLiteral("基准Mark (mm)"));
     {
         QGridLayout* g = new QGridLayout(grpMark1); tighten(g); int row = 0;
         g->addWidget(rlbl(QStringLiteral("X:")), row, 0);          g->addWidget(mark1XEdit, row++, 1);
@@ -229,7 +241,7 @@ void SimulationPlatform::setupUI()
 
     // Mark2
     grpMark2 = new CollapsibleGroupBox(this);
-    grpMark2->setTitle(QStringLiteral("Mark2 (mm)"));
+    grpMark2->setTitle(QStringLiteral("实时Mark (mm)"));
     {
         QGridLayout* g = new QGridLayout(grpMark2); tighten(g); int row = 0;
         g->addWidget(rlbl(QStringLiteral("X:")), row, 0);          g->addWidget(mark2XEdit, row++, 1);
@@ -248,25 +260,18 @@ void SimulationPlatform::setupUI()
         g->addWidget(showVirtualMarkCheckBox, 2, 0, 1, 2);
     }
 
-    // ---- 右侧控制面板:竖排 5 组 + 整体收起切换 ----
+    // ---- 右侧控制面板:竖排 5 组 ----
     QWidget* rightPanel = new QWidget(this);
     QVBoxLayout* rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, 0, 0);
-
-    QPushButton* panelToggleBtn = new QPushButton(QStringLiteral("收起 »"), this);
-    rightLayout->addWidget(panelToggleBtn, 0, Qt::AlignRight);
-
-    QWidget* groupsContainer = new QWidget(this);
-    QVBoxLayout* groupsLayout = new QVBoxLayout(groupsContainer);
-    groupsLayout->setContentsMargins(0, 0, 0, 0);
     for (CollapsibleGroupBox* g : { grpBase, grpRealTime, grpMark1, grpMark2, grpVirtual })
-        groupsLayout->addWidget(g, 0, Qt::AlignTop);
-    groupsLayout->addStretch(1);
-    rightLayout->addWidget(groupsContainer, 1);
+        rightLayout->addWidget(g, 0, Qt::AlignTop);
+    rightLayout->addStretch(1);
 
+    // 顶栏按钮收起/展开整个右面板:折叠后画布水平铺满
     connect(panelToggleBtn, &QPushButton::clicked, this, [=]() {
-        const bool show = !groupsContainer->isVisible();
-        groupsContainer->setVisible(show);
+        const bool show = !rightPanel->isVisible();
+        rightPanel->setVisible(show);
         panelToggleBtn->setText(show ? QStringLiteral("收起 »") : QStringLiteral("« 展开"));
     });
 
@@ -363,8 +368,8 @@ void SimulationPlatform::buildMenuBar()
     simMenu->addSeparator();
     bindGroupToggle(grpBase,     QStringLiteral("基准平台"));
     bindGroupToggle(grpRealTime, QStringLiteral("实时平台"));
-    bindGroupToggle(grpMark1,    QStringLiteral("Mark1"));
-    bindGroupToggle(grpMark2,    QStringLiteral("Mark2"));
+    bindGroupToggle(grpMark1,    QStringLiteral("基准Mark"));
+    bindGroupToggle(grpMark2,    QStringLiteral("实时Mark"));
     bindGroupToggle(grpVirtual,  QStringLiteral("虚拟Mark"));
 
     // ===== 图像(仅图片页可用)=====
@@ -467,6 +472,8 @@ void SimulationPlatform::openParamDialog()
     QLineEdit* ratioEdit = new QLineEdit(&dlg);
     sizeEdit->setText(QString::number(m_markSpacing));
     ratioEdit->setText(QString::number(m_Ratio));
+    sizeEdit->setAlignment(Qt::AlignCenter);
+    ratioEdit->setAlignment(Qt::AlignCenter);
     QDoubleValidator* v = new QDoubleValidator(&dlg);
     v->setDecimals(2);
     sizeEdit->setValidator(v);
