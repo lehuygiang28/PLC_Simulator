@@ -48,6 +48,7 @@
 #include "CanvasWidget.h"
 #include "ImageViewer.h"
 #include "CollapsibleGroupBox.h"
+#include "PlatformScene.h"
 
 class SimulationPlatform : public QMainWindow
 {
@@ -62,8 +63,6 @@ public:
     void SetRealTimePlatformAbs(double x, double y, double angle);  // 绝对位置移动
     void SetRealTimePlatformRelative(double x, double y, double angle);  // 相对位置移动
 
-    //void SetSimulationPlatformParams(double distance,double ratio);
-    
     // 获取实时平台数据
     void GetRealTimePlatformData(double& x, double& y, double& angle) const;
 
@@ -88,6 +87,7 @@ private slots:
     void updateMark1();
     void updateMark2();
     void updateVirtualMark();
+    void syncEditsFromScene();
 
 private:
     // UI控件
@@ -97,18 +97,18 @@ private:
     QLineEdit *basePlatformYEdit;
     QLineEdit *basePlatformAngleEdit;
     QCheckBox* showBasePlatformCheckBox;
-    
+
     QLineEdit *realTimePlatformXEdit;
     QLineEdit *realTimePlatformYEdit;
     QLineEdit *realTimePlatformAngleEdit;
     QCheckBox* showRealTimePlatformCheckBox;
-    
+
     QLineEdit *mark1XEdit;
     QLineEdit *mark1YEdit;
     QLineEdit *mark1AngleEdit;
     QCheckBox *mark1FollowBaseCheckBox;
     QCheckBox *ShowMark1CheckBox;
-    
+
     QLineEdit *mark2XEdit;
     QLineEdit *mark2YEdit;
     QLineEdit *mark2AngleEdit;
@@ -118,7 +118,7 @@ private:
     QLineEdit *virtualMarkXEdit;
     QLineEdit *virtualMarkYEdit;
     QCheckBox *showVirtualMarkCheckBox;
-    
+
     // 5 个控制组(供菜单显隐/关闭引用)
     CollapsibleGroupBox* grpBase;
     CollapsibleGroupBox* grpRealTime;
@@ -156,39 +156,18 @@ private:
     QString m_imagePath;
     void updateStatusBarForPage(int index);
 
-    // 数据
-    struct Platform {
-        double x;
-        double y;
-        double angle; // 角度（度）
-    };
-    
-    struct Mark {
-        double x;
-        double y;
-        double angle; // 角度（度）
-        bool followPlatform;
-    };
-    
-    Platform basePlatform;
-    Platform realTimePlatform;
-    Mark mark1;
-    Mark mark2;
-    Mark virtualMark;
-    
+    // 场景数据模型(单一数据源)
+    PlatformScene* m_scene = nullptr;
+
     // 绘图相关
-    QPoint m_origin; // 坐标原点
-    double m_Ratio;   // 屏幕分辨率比例
-    double m_scale;  // 缩放比例 (像素/mm)
-    double m_markSpacing; // Mark中心间距，单位mm
-    double m_ScreenWidth;
-    
+    QPoint m_origin; // 坐标原点(像素)
+
     void setupUI();
     void setupValidators();
     void setupConnections();
     void updateOriginAndScale();
     void drawCoordinateSystem(QPainter &painter);
-    void drawPlatform(QPainter &painter, const Platform &platform, QColor color);
+    void drawPlatform(QPainter &painter, const PlatformItem &item, QColor color, double radiusMm);
     void drawMark1(QPainter &painter);
     void drawMark2(QPainter &painter);
     void drawVirtualMark(QPainter &painter);

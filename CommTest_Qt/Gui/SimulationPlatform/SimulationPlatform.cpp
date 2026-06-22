@@ -17,13 +17,6 @@
 #include <QFormLayout>
 #include <QDialogButtonBox>
 
-#define MARK_RECT_WIDTH 3
-#define MARK_RECT_HEIGHT 8
-
-// 虚拟Mark默认偏移量（mm）
-#define VIRTUAL_MARK_STATIC_X 10
-#define VIRTUAL_MARK_STATIC_Y -10
-
 // 绘图语义色:浅色主题沿用原色,深色主题用同色系提亮变体(在深底上仍可读);
 // 坐标轴/刻度/文字跟随主题次级文字色。随主题实时变化(由 themeChanged 触发重绘)。
 namespace {
@@ -43,19 +36,16 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     , statusLeft(nullptr)
     , statusRight(nullptr)
 {
-    // 初始化默认值
-    basePlatform = {0, 0, 0};
-    realTimePlatform = {0, 0, 0};
-    mark1 = {0, 0, 0, true};
-    mark2 = {0, 0, 0, true};
-    virtualMark = {0, 0, 0, true};
-
-    m_Ratio = 200.0;
-    m_markSpacing = 20.0;
+    m_scene = new PlatformScene(this);
 
     setupUI();
     setupValidators();
     setupConnections();
+
+    // scene 变化 → 画布重绘
+    connect(m_scene, &PlatformScene::changed, this, [this]{ if (canvas) canvas->update(); });
+    // scene 变化 → 输入框回填
+    connect(m_scene, &PlatformScene::changed, this, &SimulationPlatform::syncEditsFromScene);
 
     // 主题切换时实时重绘画布与图像区(控件由全局 qss 自动重绘)
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](Theme) {
@@ -66,63 +56,36 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
 
     setWindowTitle("Simulation Platform");
     resize(800, 600);
-
-    m_ScreenWidth = QGuiApplication::primaryScreen()->availableGeometry().width();
-    ;
-
-    m_scale = m_ScreenWidth / m_Ratio; // 默认缩放比例 2像素/mm
 }
 
 // 平台控制公共接口实现
 void SimulationPlatform::SetRealTimePlatformAbs(double x, double y, double angle)
 {
-    // 设置绝对位置
-    realTimePlatformXEdit->setText(QString::number(x, 'f', 2));
-    realTimePlatformYEdit->setText(QString::number(y, 'f', 2));
-    realTimePlatformAngleEdit->setText(QString::number(angle, 'f', 2));
-
-    // 手动触发更新
-    updateRealTimePlatform();
+    m_scene->moveAbsolute({ x, y, angle }, Platform::Live);
 }
 
 void SimulationPlatform::SetRealTimePlatformRelative(double x, double y, double angle)
 {
-    // 在当前位置基础上增加偏移
-    double newX = realTimePlatform.x + x;
-    double newY = realTimePlatform.y + y;
-    double newAngle = realTimePlatform.angle + angle;
-
-    realTimePlatformXEdit->setText(QString::number(newX, 'f', 2));
-    realTimePlatformYEdit->setText(QString::number(newY, 'f', 2));
-    realTimePlatformAngleEdit->setText(QString::number(newAngle, 'f', 2));
-
-    // 手动触发更新
-    updateRealTimePlatform();
+    m_scene->moveRelative({ x, y, angle }, Platform::Live);
 }
 
 void SimulationPlatform::GetRealTimePlatformData(double &x, double &y, double &angle) const
 {
-    x = realTimePlatform.x;
-    y = realTimePlatform.y;
-    angle = realTimePlatform.angle;
+    const Pose p = m_scene->pose(Platform::Live); x = p.x; y = p.y; angle = p.angleDeg;
 }
 
 void SimulationPlatform::GetBasePlatformData(double &x, double &y, double &angle) const
 {
-    x = basePlatform.x;
-    y = basePlatform.y;
-    angle = basePlatform.angle;
+    const Pose p = m_scene->pose(Platform::Base); x = p.x; y = p.y; angle = p.angleDeg;
 }
 
 void SimulationPlatform::SetSimulationPlatformParams(double distance, double ratio)
 {
-    m_markSpacing = distance;
-    m_Ratio = ratio;
-    m_scale = m_ScreenWidth / m_Ratio; // 更新缩放比例
-
-    emit parametersChanged(m_markSpacing, m_Ratio);
-    update(); // 触发重绘
+    m_scene->setSceneParams(distance, ratio);
+    emit parametersChanged(distance, ratio);   // 名称暂不变,Task 8 改
+    update();
 }
+
 void SimulationPlatform::setupUI()
 {
     stack = new QStackedWidget(this);
@@ -308,25 +271,25 @@ void SimulationPlatform::setupUI()
     // 默认显示模拟页
     showPage(0);
 
-    // 设置初始值
-    basePlatformXEdit->setText(QString::number(basePlatform.x));
-    basePlatformYEdit->setText(QString::number(basePlatform.y));
-    basePlatformAngleEdit->setText(QString::number(basePlatform.angle));
+    // 同步初始值:用 scene 当前值填输入框
+    syncEditsFromScene();
+    mark1XEdit->setText("0");
+    mark1YEdit->setText("0");
+    mark1AngleEdit->setText("0");
+    mark2XEdit->setText("0");
+    mark2YEdit->setText("0");
+    mark2AngleEdit->setText("0");
+    virtualMarkXEdit->setText("0");
+    virtualMarkYEdit->setText("0");
 
-    realTimePlatformXEdit->setText(QString::number(realTimePlatform.x));
-    realTimePlatformYEdit->setText(QString::number(realTimePlatform.y));
-    realTimePlatformAngleEdit->setText(QString::number(realTimePlatform.angle));
-
-    mark1XEdit->setText(QString::number(mark1.x));
-    mark1YEdit->setText(QString::number(mark1.y));
-    mark1AngleEdit->setText(QString::number(mark1.angle));
-
-    mark2XEdit->setText(QString::number(mark2.x));
-    mark2YEdit->setText(QString::number(mark2.y));
-    mark2AngleEdit->setText(QString::number(mark2.angle));
-
-    virtualMarkXEdit->setText(QString::number(virtualMark.x));
-    virtualMarkYEdit->setText(QString::number(virtualMark.y));
+    // 把复选框初始状态写入 scene
+    m_scene->setPlatformVisible(Platform::Base, showBasePlatformCheckBox->isChecked());
+    m_scene->setPlatformVisible(Platform::Live, showRealTimePlatformCheckBox->isChecked());
+    m_scene->setBaseMarkVisible(ShowMark1CheckBox->isChecked());
+    m_scene->setLiveMarkVisible(ShowMark2CheckBox->isChecked());
+    m_scene->setVirtualMarkVisible(showVirtualMarkCheckBox->isChecked());
+    m_scene->setBaseMarkFollows(mark1FollowBaseCheckBox->isChecked());
+    m_scene->setLiveMarkFollows(mark2FollowRealTimeCheckBox->isChecked());
 }
 
 void SimulationPlatform::buildMenuBar()
@@ -419,8 +382,8 @@ void SimulationPlatform::updateStatusBarForPage(int index)
     {
         // 模拟页:产品尺寸 + 缩放比
         statusLeft->setText(QStringLiteral("产品尺寸: %1 mm    缩放比: %2 px/mm")
-                                .arg(QString::number(m_markSpacing))
-                                .arg(QString::number(m_Ratio)));
+                                .arg(QString::number(m_scene->markCenterDistance()))
+                                .arg(QString::number(m_scene->screenRatio())));
         statusRight->clear();
     }
     else
@@ -469,16 +432,16 @@ void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& 
 void SimulationPlatform::openParamDialog()
 {
     // 进对话框前记录原始值,供 Cancel 回退
-    const double origSpacing = m_markSpacing;
-    const double origRatio   = m_Ratio;
+    const double origSpacing = m_scene->markCenterDistance();
+    const double origRatio   = m_scene->screenRatio();
 
     QDialog dlg(this);
     dlg.setWindowTitle(QStringLiteral("参数设置"));
 
     QLineEdit* sizeEdit  = new QLineEdit(&dlg);
     QLineEdit* ratioEdit = new QLineEdit(&dlg);
-    sizeEdit->setText(QString::number(m_markSpacing));
-    ratioEdit->setText(QString::number(m_Ratio));
+    sizeEdit->setText(QString::number(origSpacing));
+    ratioEdit->setText(QString::number(origRatio));
     sizeEdit->setAlignment(Qt::AlignCenter);
     ratioEdit->setAlignment(Qt::AlignCenter);
     QDoubleValidator* v = new QDoubleValidator(&dlg);
@@ -486,17 +449,14 @@ void SimulationPlatform::openParamDialog()
     sizeEdit->setValidator(v);
     ratioEdit->setValidator(v);
 
-    // 实时预览:只改内存值 + 画面 + 状态栏,不 emit(不落盘);保存只在 OK 时发生一次
+    // 实时预览:写 scene(scene.changed 驱动画布 + 状态栏刷新)
     auto applyPreview = [this](double distance, double ratio) {
-        m_markSpacing = distance;
-        m_Ratio = ratio;
-        m_scale = m_ScreenWidth / m_Ratio;
-        canvas->update();
+        m_scene->setSceneParams(distance, ratio);
         if (stack->currentIndex() == 0)
             updateStatusBarForPage(0);
     };
 
-    // 用户输入时实时预览;护栏:数值有效且缩放比 > 0(否则 m_scale 变 inf)
+    // 用户输入时实时预览;护栏:数值有效且缩放比 > 0
     auto onEdited = [=]() {
         bool okD = false, okR = false;
         const double d = sizeEdit->text().toDouble(&okD);
@@ -522,7 +482,7 @@ void SimulationPlatform::openParamDialog()
     if (dlg.exec() == QDialog::Accepted)
     {
         // 值已实时应用,这里 emit 一次完成保存
-        emit parametersChanged(m_markSpacing, m_Ratio);
+        emit parametersChanged(m_scene->markCenterDistance(), m_scene->screenRatio());
     }
     else
     {
@@ -561,76 +521,81 @@ void SimulationPlatform::setupConnections()
     connect(basePlatformXEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateBasePlatform);
     connect(basePlatformYEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateBasePlatform);
     connect(basePlatformAngleEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateBasePlatform);
-    connect(showBasePlatformCheckBox, &QRadioButton::clicked, this, [this]()
-            { update(); });
+    connect(showBasePlatformCheckBox, &QCheckBox::clicked, this, [this](bool on){
+        m_scene->setPlatformVisible(Platform::Base, on);
+    });
 
     connect(realTimePlatformXEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateRealTimePlatform);
     connect(realTimePlatformYEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateRealTimePlatform);
     connect(realTimePlatformAngleEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateRealTimePlatform);
-    connect(showRealTimePlatformCheckBox, &QRadioButton::clicked, this, [this]()
-            { update(); });
+    connect(showRealTimePlatformCheckBox, &QCheckBox::clicked, this, [this](bool on){
+        m_scene->setPlatformVisible(Platform::Live, on);
+    });
 
     connect(mark1XEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateMark1);
     connect(mark1YEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateMark1);
     connect(mark1AngleEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateMark1);
-    connect(mark1FollowBaseCheckBox, &QRadioButton::clicked, this, [this]()
-            { update(); });
-    connect(ShowMark1CheckBox, &QRadioButton::clicked, this, [this]()
-            { update(); });
+    connect(mark1FollowBaseCheckBox, &QCheckBox::clicked, this, &SimulationPlatform::updateMark1);
+    connect(ShowMark1CheckBox, &QCheckBox::clicked, this, [this](bool on){
+        m_scene->setBaseMarkVisible(on);
+    });
 
     connect(mark2XEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateMark2);
     connect(mark2YEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateMark2);
     connect(mark2AngleEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateMark2);
-    connect(mark2FollowRealTimeCheckBox, &QRadioButton::toggled, this, [this]()
-            { update(); });
-    connect(ShowMark2CheckBox, &QRadioButton::clicked, this, [this]()
-            { update(); });
+    connect(mark2FollowRealTimeCheckBox, &QCheckBox::clicked, this, &SimulationPlatform::updateMark2);
+    connect(ShowMark2CheckBox, &QCheckBox::clicked, this, [this](bool on){
+        m_scene->setLiveMarkVisible(on);
+    });
 
     connect(virtualMarkXEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateVirtualMark);
     connect(virtualMarkYEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateVirtualMark);
-    connect(showVirtualMarkCheckBox, &QCheckBox::clicked, this, [this]()
-            { canvas->update(); });
+    connect(showVirtualMarkCheckBox, &QCheckBox::clicked, this, [this](bool on){
+        m_scene->setVirtualMarkVisible(on);
+    });
 }
 
 void SimulationPlatform::updateBasePlatform()
 {
-    basePlatform.x = basePlatformXEdit->text().toDouble();
-    basePlatform.y = basePlatformYEdit->text().toDouble();
-    basePlatform.angle = basePlatformAngleEdit->text().toDouble();
-    canvas->update();
+    m_scene->moveAbsolute({ basePlatformXEdit->text().toDouble(),
+                            basePlatformYEdit->text().toDouble(),
+                            basePlatformAngleEdit->text().toDouble() }, Platform::Base);
 }
 
 void SimulationPlatform::updateRealTimePlatform()
 {
-    realTimePlatform.x = realTimePlatformXEdit->text().toDouble();
-    realTimePlatform.y = realTimePlatformYEdit->text().toDouble();
-    realTimePlatform.angle = realTimePlatformAngleEdit->text().toDouble();
-    canvas->update();
+    m_scene->moveAbsolute({ realTimePlatformXEdit->text().toDouble(),
+                            realTimePlatformYEdit->text().toDouble(),
+                            realTimePlatformAngleEdit->text().toDouble() }, Platform::Live);
 }
 
 void SimulationPlatform::updateMark1()
 {
-    mark1.x = mark1XEdit->text().toDouble();
-    mark1.y = mark1YEdit->text().toDouble();
-    mark1.angle = mark1AngleEdit->text().toDouble();
-    mark1.followPlatform = mark1FollowBaseCheckBox->isChecked();
-    canvas->update();
+    m_scene->setBaseMarkPose({ mark1XEdit->text().toDouble(), mark1YEdit->text().toDouble(),
+                               mark1AngleEdit->text().toDouble() });
+    m_scene->setBaseMarkFollows(mark1FollowBaseCheckBox->isChecked());
 }
 
 void SimulationPlatform::updateMark2()
 {
-    mark2.x = mark2XEdit->text().toDouble();
-    mark2.y = mark2YEdit->text().toDouble();
-    mark2.angle = mark2AngleEdit->text().toDouble();
-    mark2.followPlatform = mark2FollowRealTimeCheckBox->isChecked();
-    canvas->update();
+    m_scene->setLiveMarkPose({ mark2XEdit->text().toDouble(), mark2YEdit->text().toDouble(),
+                               mark2AngleEdit->text().toDouble() });
+    m_scene->setLiveMarkFollows(mark2FollowRealTimeCheckBox->isChecked());
 }
 
 void SimulationPlatform::updateVirtualMark()
 {
-    virtualMark.x = virtualMarkXEdit->text().toDouble();
-    virtualMark.y = virtualMarkYEdit->text().toDouble();
-    canvas->update();
+    m_scene->setVirtualMarkOffset(virtualMarkXEdit->text().toDouble(),
+                                  virtualMarkYEdit->text().toDouble());
+}
+
+void SimulationPlatform::syncEditsFromScene()
+{
+    const Pose b = m_scene->pose(Platform::Base);
+    const Pose l = m_scene->pose(Platform::Live);
+    auto setTxt = [](QLineEdit* e, double v){ QSignalBlocker blk(e); e->setText(QString::number(v, 'f', 2)); };
+    setTxt(basePlatformXEdit, b.x); setTxt(basePlatformYEdit, b.y); setTxt(basePlatformAngleEdit, b.angleDeg);
+    setTxt(realTimePlatformXEdit, l.x); setTxt(realTimePlatformYEdit, l.y); setTxt(realTimePlatformAngleEdit, l.angleDeg);
 }
 
 void SimulationPlatform::paintEvent(QPaintEvent *event)
@@ -648,31 +613,31 @@ void SimulationPlatform::drawCanvas(QPainter &painter)
     drawCoordinateSystem(painter);
 
     // 绘制基准平台
-    if (showBasePlatformCheckBox->isChecked())
+    if (m_scene->platform(Platform::Base).visible)
     {
-        drawPlatform(painter, basePlatform, colBasePlatform());
+        drawPlatform(painter, m_scene->platform(Platform::Base), colBasePlatform(), 20.0);
     }
 
     // 绘制实时平台
-    if (showRealTimePlatformCheckBox->isChecked())
+    if (m_scene->platform(Platform::Live).visible)
     {
-        drawPlatform(painter, realTimePlatform, colRealTimePlatform());
+        drawPlatform(painter, m_scene->platform(Platform::Live), colRealTimePlatform(), 15.0);
     }
 
     // 绘制Mark1
-    if (ShowMark1CheckBox->isChecked())
+    if (m_scene->baseMark().visible)
     {
         drawMark1(painter);
     }
 
     // 绘制Mark2
-    if (ShowMark2CheckBox->isChecked())
+    if (m_scene->liveMark().visible)
     {
         drawMark2(painter);
     }
 
     // 绘制VirtualMark
-    if (showVirtualMarkCheckBox->isChecked())
+    if (m_scene->virtualMark().visible)
     {
         drawVirtualMark(painter);
     }
@@ -708,10 +673,12 @@ void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
     font.setPointSize(8);
     painter.setFont(font);
 
+    const double scale = m_scene->pixelsPerMm();
+
     // X轴正方向刻度
-    for (int i = 0; i * m_scale < canvas->width() - m_origin.x(); i += 10)
+    for (int i = 0; i * scale < canvas->width() - m_origin.x(); i += 10)
     {
-        int x = m_origin.x() + i * m_scale;
+        int x = m_origin.x() + i * scale;
         painter.drawLine(x, m_origin.y() - 3, x, m_origin.y() + 3);
         // 间隔一个循环显示标签
         if ((i / 10) % 2 == 0 || i == 0)
@@ -719,27 +686,27 @@ void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
     }
 
     // X轴负方向刻度
-    for (int i = 0; m_origin.x() - i * m_scale > 0; i += 10)
+    for (int i = 0; m_origin.x() - i * scale > 0; i += 10)
     {
-        int x = m_origin.x() - i * m_scale;
+        int x = m_origin.x() - i * scale;
         painter.drawLine(x, m_origin.y() - 3, x, m_origin.y() + 3);
         if ((i / 10) % 2 == 0 && i != 0)
             painter.drawText(x - 10, m_origin.y() + 15, QString::number(-i));
     }
 
     // Y轴正方向刻度
-    for (int i = 0; i * m_scale < m_origin.y(); i += 10)
+    for (int i = 0; i * scale < m_origin.y(); i += 10)
     {
-        int y = m_origin.y() - i * m_scale;
+        int y = m_origin.y() - i * scale;
         painter.drawLine(m_origin.x() - 3, y, m_origin.x() + 3, y);
         if ((i / 10) % 2 == 0 && i != 0)
             painter.drawText(m_origin.x() + 5, y + 5, QString::number(i));
     }
 
     // Y轴负方向刻度
-    for (int i = 0; m_origin.y() + i * m_scale < canvas->height(); i += 10)
+    for (int i = 0; m_origin.y() + i * scale < canvas->height(); i += 10)
     {
-        int y = m_origin.y() + i * m_scale;
+        int y = m_origin.y() + i * scale;
         painter.drawLine(m_origin.x() - 3, y, m_origin.x() + 3, y);
         if ((i / 10) % 2 == 0 && i != 0)
             painter.drawText(m_origin.x() + 5, y + 5, QString::number(-i));
@@ -748,24 +715,22 @@ void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
     painter.restore();
 }
 
-void SimulationPlatform::drawPlatform(QPainter &painter, const Platform &platform, QColor color)
+void SimulationPlatform::drawPlatform(QPainter &painter, const PlatformItem &item, QColor color, double radiusMm)
 {
     painter.save();
 
+    const double scale = m_scene->pixelsPerMm();
+
     // 计算平台在屏幕上的位置
-    QPointF center = transformPoint(QPointF(platform.x, platform.y));
+    QPointF center = transformPoint(QPointF(item.pose.x, item.pose.y));
 
     // 设置画笔和画刷
     QPen pen(color, 2);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
 
-    // 绘制圆形平台 (直径40mm)
-    double radius = 15 * m_scale;
-    if (&platform == &basePlatform)
-    {
-        radius = 20 * m_scale;
-    }
+    // 绘制圆形平台
+    double radius = radiusMm * scale;
 
     painter.drawEllipse(center, radius, radius);
 
@@ -774,52 +739,25 @@ void SimulationPlatform::drawPlatform(QPainter &painter, const Platform &platfor
 
     // 移动到平台中心并旋转
     painter.translate(center.x(), center.y());
-    painter.rotate(platform.angle);
+    painter.rotate(item.pose.angleDeg);
 
     // 绘制表示方向的十字线 (长度30mm)
-    double lineLength = 30 * m_scale;
+    double lineLength = 30 * scale;
     painter.drawLine(-lineLength, 0, lineLength, 0); // X轴方向线
     painter.drawLine(0, -lineLength, 0, lineLength); // Y轴方向线
 
     // 恢复变换矩阵
     painter.restore();
-
-    // 绘制平台标签
-    // QFont font = painter.font();
-    // font.setBold(true);
-    // painter.setFont(font);
-    // if (&platform == &basePlatform) {
-    //     painter.setPen(Qt::blue);
-    //     painter.drawText(center.x() + radius + 5, center.y(), "Base");
-    // } else {
-    //     painter.setPen(Qt::green);
-    //     painter.drawText(center.x() + radius + 5, center.y(), "Real-time");
-    // }
-
-    // painter.restore();
 }
 
 void SimulationPlatform::drawMark1(QPainter &painter)
 {
     painter.save();
 
-    // 计算最终位置和角度
-    double finalX, finalY, finalAngle;
-    if (mark1.followPlatform)
-    {
-        // 跟随基准平台
-        finalX = basePlatform.x + mark1.x;
-        finalY = basePlatform.y + mark1.y;
-        finalAngle = basePlatform.angle + mark1.angle;
-    }
-    else
-    {
-        finalX = mark1.x;
-        finalY = mark1.y;
-        finalAngle = mark1.angle;
-    }
+    const double scale = m_scene->pixelsPerMm();
+    const Pose finalPose = m_scene->baseMarkFinalPose();
 
-    QPointF pos = transformPoint(QPointF(finalX, finalY));
+    QPointF pos = transformPoint(QPointF(finalPose.x, finalPose.y));
 
     // 设置画笔
     QPen pen(colMark1(), 1);
@@ -831,12 +769,12 @@ void SimulationPlatform::drawMark1(QPainter &painter)
 
     // 移动到Mark位置并旋转
     painter.translate(pos.x(), pos.y());
-    painter.rotate(finalAngle);
+    painter.rotate(finalPose.angleDeg);
 
     // 绘制L型
-    double spacing = m_markSpacing / 2 * m_scale;   // 中心间距
-    double rectWidth = MARK_RECT_WIDTH * m_scale;   // 矩形宽度
-    double rectHeight = MARK_RECT_HEIGHT * m_scale; // 矩形高度
+    double spacing = m_scene->markCenterDistance() / 2 * scale;   // 中心间距
+    double rectWidth = MARK_RECT_WIDTH * scale;   // 矩形宽度
+    double rectHeight = MARK_RECT_HEIGHT * scale; // 矩形高度
 
     // 绘制左边的L型mark
     // 水平部分（横杠）- 左边
@@ -853,37 +791,17 @@ void SimulationPlatform::drawMark1(QPainter &painter)
     // 恢复变换
     painter.restore();
 
-    // // 绘制标签
-    // painter.setPen(Qt::red);
-    // QFont font = painter.font();
-    // font.setBold(true);
-    // painter.setFont(font);
-    // painter.drawText(pos.x() + 10, pos.y() - 10, "Mark1");
-
-    // painter.restore();
+    // painter.restore();  // 原注释掉的标签绘制区域
 }
 
 void SimulationPlatform::drawMark2(QPainter &painter)
 {
     painter.save();
 
-    // 计算最终位置和角度
-    double finalX, finalY, finalAngle;
-    if (mark2.followPlatform)
-    {
-        // 跟随实时平台
-        finalX = realTimePlatform.x + mark2.x;
-        finalY = realTimePlatform.y + mark2.y;
-        finalAngle = realTimePlatform.angle + mark2.angle;
-    }
-    else
-    {
-        finalX = mark2.x;
-        finalY = mark2.y;
-        finalAngle = mark2.angle;
-    }
+    const double scale = m_scene->pixelsPerMm();
+    const Pose finalPose = m_scene->liveMarkFinalPose();
 
-    QPointF pos = transformPoint(QPointF(finalX, finalY));
+    QPointF pos = transformPoint(QPointF(finalPose.x, finalPose.y));
 
     // 设置画笔
     QPen pen(colMark2(), 1);
@@ -895,12 +813,12 @@ void SimulationPlatform::drawMark2(QPainter &painter)
 
     // 移动到Mark位置并旋转
     painter.translate(pos.x(), pos.y());
-    painter.rotate(finalAngle);
+    painter.rotate(finalPose.angleDeg);
 
     // 绘制L型
-    double spacing = m_markSpacing / 2 * m_scale;   // 中心间距
-    double rectWidth = MARK_RECT_WIDTH * m_scale;   // 矩形宽度
-    double rectHeight = MARK_RECT_HEIGHT * m_scale; // 矩形高度
+    double spacing = m_scene->markCenterDistance() / 2 * scale;   // 中心间距
+    double rectWidth = MARK_RECT_WIDTH * scale;   // 矩形宽度
+    double rectHeight = MARK_RECT_HEIGHT * scale; // 矩形高度
 
     // 绘制水平部分
     painter.drawRect(-spacing, 0, rectHeight, rectWidth);
@@ -915,36 +833,19 @@ void SimulationPlatform::drawMark2(QPainter &painter)
     // 恢复变换
     painter.restore();
 
-    // // 绘制标签
-    // painter.setPen(Qt::magenta);
-    // QFont font = painter.font();
-    // font.setBold(true);
-    // painter.setFont(font);
-    // painter.drawText(pos.x() + 10, pos.y() + 20, "Mark2");
-
-    // painter.restore();
+    // painter.restore();  // 原注释掉的标签绘制区域
 }
 
 void SimulationPlatform::drawVirtualMark(QPainter &painter)
 {
     painter.save();
 
-    // 1. 计算Mark2的最终位置和角度
-    double mark2FinalX, mark2FinalY, mark2FinalAngle;
-    if (mark2.followPlatform)
-    {
-        mark2FinalX = realTimePlatform.x + mark2.x;
-        mark2FinalY = realTimePlatform.y + mark2.y;
-        mark2FinalAngle = realTimePlatform.angle + mark2.angle;
-    }
-    else
-    {
-        mark2FinalX = mark2.x;
-        mark2FinalY = mark2.y;
-        mark2FinalAngle = mark2.angle;
-    }
+    const double scale = m_scene->pixelsPerMm();
 
-    QPointF pos = transformPoint(QPointF(mark2FinalX, mark2FinalY));
+    // 1. 计算Mark2的最终位置和角度(用 scene 的 liveMarkFinalPose)
+    const Pose liveMarkFinal = m_scene->liveMarkFinalPose();
+
+    QPointF pos = transformPoint(QPointF(liveMarkFinal.x, liveMarkFinal.y));
 
     // 设置画笔
     QPen pen(colVirtualMark(), 2);
@@ -952,15 +853,15 @@ void SimulationPlatform::drawVirtualMark(QPainter &painter)
 
     // 移动到Mark2中心位置并旋转
     painter.translate(pos.x(), pos.y());
-    painter.rotate(mark2FinalAngle);
+    painter.rotate(liveMarkFinal.angleDeg);
 
     // 计算参数
-    double spacing = m_markSpacing / 2 * m_scale;   // Mark2左右侧的中心间距
+    double spacing = m_scene->markCenterDistance() / 2 * scale;   // Mark2左右侧的中心间距
     // 最终偏移量 = 默认偏移量 + 用户设定值
-    double offsetX = (VIRTUAL_MARK_STATIC_X + virtualMark.x) * m_scale;  // X偏移（向外为正）
-    double offsetY = (VIRTUAL_MARK_STATIC_Y + virtualMark.y) * m_scale;  // Y偏移（向上为正）
-    double rectWidth = MARK_RECT_WIDTH * m_scale;   // 矩形宽度
-    double rectHeight = MARK_RECT_HEIGHT * m_scale; // 矩形高度
+    double offsetX = (VIRTUAL_MARK_STATIC_X + m_scene->virtualMark().pose.x) * scale;  // X偏移（向外为正）
+    double offsetY = (VIRTUAL_MARK_STATIC_Y + m_scene->virtualMark().pose.y) * scale;  // Y偏移（向上为正）
+    double rectWidth = MARK_RECT_WIDTH * scale;   // 矩形宽度
+    double rectHeight = MARK_RECT_HEIGHT * scale; // 矩形高度
 
     painter.setBrush(colVirtualMark());
 
@@ -992,8 +893,8 @@ void SimulationPlatform::drawVirtualMark(QPainter &painter)
 QPointF SimulationPlatform::transformPoint(const QPointF &point)
 {
     // 将世界坐标(mm)转换为屏幕坐标(pixel)
-    return QPointF(m_origin.x() + point.x() * m_scale,
-                   m_origin.y() - point.y() * m_scale); // 注意Y轴翻转
+    return QPointF(m_origin.x() + point.x() * m_scene->pixelsPerMm(),
+                   m_origin.y() - point.y() * m_scene->pixelsPerMm()); // 注意Y轴翻转
 }
 
 void SimulationPlatform::setupPictureShowPage()
@@ -1100,4 +1001,3 @@ void SimulationPlatform::onSetImageClicked()
         }
     }
 }
-
