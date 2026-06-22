@@ -119,9 +119,6 @@ private:
     QLineEdit *virtualMarkYEdit;
     QCheckBox *showVirtualMarkCheckBox;
     
-    QLineEdit* markCenterDistanceEdit;
-    QLineEdit* ScreenRatio;
-
     // 5 个控制组(供菜单显隐/关闭引用)
     CollapsibleGroupBox* grpBase;
     CollapsibleGroupBox* grpRealTime;
@@ -136,11 +133,10 @@ private:
     QAction* actPagePic;
     QMenu* simMenu;
     QMenu* imageMenu;
-    QAction* actGrp[5];   // 5 组显隐勾选项,顺序: 基准/实时/Mark1/Mark2/虚拟
     void buildMenuBar();
     void showPage(int index);
     void moveToScreenCorner(int corner);
-    void bindGroupToggle(int i, CollapsibleGroupBox* g, const QString& title);
+    void bindGroupToggle(CollapsibleGroupBox* g, const QString& title);
 
     // 页面切换相关
     QWidget* simulationPage;      // 模拟平台页面
@@ -184,8 +180,6 @@ private:
     double m_Ratio;   // 屏幕分辨率比例
     double m_scale;  // 缩放比例 (像素/mm)
     double m_markSpacing; // Mark中心间距，单位mm
-    double m_markHeight;
-    double m_markWidth;
     double m_ScreenWidth;
     
     void setupUI();
@@ -197,9 +191,7 @@ private:
     void drawMark1(QPainter &painter);
     void drawMark2(QPainter &painter);
     void drawVirtualMark(QPainter &painter);
-    QPointF rotatePoint(const QPointF &point, double angle);
     QPointF transformPoint(const QPointF &point);
-    QPointF inverseTransformPoint(const QPointF &point);
 };
 
 #endif // SIMULATIONPLATFORM_H

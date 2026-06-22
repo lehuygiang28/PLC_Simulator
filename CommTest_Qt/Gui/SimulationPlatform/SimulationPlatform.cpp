@@ -120,9 +120,6 @@ void SimulationPlatform::SetSimulationPlatformParams(double distance, double rat
     m_Ratio = ratio;
     m_scale = m_ScreenWidth / m_Ratio; // 更新缩放比例
 
-    markCenterDistanceEdit->setText(QString::number(m_markSpacing));
-    ScreenRatio->setText(QString::number(m_Ratio));
-
     emit parametersChanged(m_markSpacing, m_Ratio);
     update(); // 触发重绘
 }
@@ -173,16 +170,12 @@ void SimulationPlatform::setupUI()
     showVirtualMarkCheckBox = new QCheckBox("显示", this);
     showVirtualMarkCheckBox->setChecked(true);
 
-    markCenterDistanceEdit = new QLineEdit(this);
-    ScreenRatio = new QLineEdit(this);
-
     // 数值输入框统一限宽,使分组更紧凑(数字无需太宽)
     for (QLineEdit *e : { basePlatformXEdit, basePlatformYEdit, basePlatformAngleEdit,
                           realTimePlatformXEdit, realTimePlatformYEdit, realTimePlatformAngleEdit,
                           mark1XEdit, mark1YEdit, mark1AngleEdit,
                           mark2XEdit, mark2YEdit, mark2AngleEdit,
-                          virtualMarkXEdit, virtualMarkYEdit,
-                          markCenterDistanceEdit, ScreenRatio })
+                          virtualMarkXEdit, virtualMarkYEdit })
     {
         e->setFixedWidth(78);
     }
@@ -329,9 +322,6 @@ void SimulationPlatform::setupUI()
 
     virtualMarkXEdit->setText(QString::number(virtualMark.x));
     virtualMarkYEdit->setText(QString::number(virtualMark.y));
-
-    markCenterDistanceEdit->setText(QString::number(m_markSpacing));
-    ScreenRatio->setText(QString::number(m_Ratio));
 }
 
 void SimulationPlatform::buildMenuBar()
@@ -371,11 +361,11 @@ void SimulationPlatform::buildMenuBar()
     QAction* actParam = simMenu->addAction(QStringLiteral("参数设置…"));
     connect(actParam, &QAction::triggered, this, &SimulationPlatform::openParamDialog);
     simMenu->addSeparator();
-    bindGroupToggle(0, grpBase,     QStringLiteral("基准平台"));
-    bindGroupToggle(1, grpRealTime, QStringLiteral("实时平台"));
-    bindGroupToggle(2, grpMark1,    QStringLiteral("Mark1"));
-    bindGroupToggle(3, grpMark2,    QStringLiteral("Mark2"));
-    bindGroupToggle(4, grpVirtual,  QStringLiteral("虚拟Mark"));
+    bindGroupToggle(grpBase,     QStringLiteral("基准平台"));
+    bindGroupToggle(grpRealTime, QStringLiteral("实时平台"));
+    bindGroupToggle(grpMark1,    QStringLiteral("Mark1"));
+    bindGroupToggle(grpMark2,    QStringLiteral("Mark2"));
+    bindGroupToggle(grpVirtual,  QStringLiteral("虚拟Mark"));
 
     // ===== 图像(仅图片页可用)=====
     imageMenu = mbar->addMenu(QStringLiteral("图像"));
@@ -435,12 +425,11 @@ void SimulationPlatform::moveToScreenCorner(int corner)
     }
 }
 
-void SimulationPlatform::bindGroupToggle(int i, CollapsibleGroupBox* g, const QString& title)
+void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& title)
 {
     QAction* a = simMenu->addAction(title);
     a->setCheckable(true);
     a->setChecked(true);
-    actGrp[i] = a;
 
     // 菜单勾选 → 显示/隐藏整组
     connect(a, &QAction::toggled, this, [g](bool on) { g->setVisible(on); });
@@ -482,10 +471,6 @@ void SimulationPlatform::openParamDialog()
     m_markSpacing = sizeEdit->text().toDouble();
     m_Ratio = ratioEdit->text().toDouble();
     m_scale = m_ScreenWidth / m_Ratio;
-
-    // 同步隐藏的输入框(它们是 m_markSpacing/m_Ratio 的持久载体)
-    markCenterDistanceEdit->setText(QString::number(m_markSpacing));
-    ScreenRatio->setText(QString::number(m_Ratio));
 
     canvas->update();
     emit parametersChanged(m_markSpacing, m_Ratio);
@@ -550,20 +535,6 @@ void SimulationPlatform::setupConnections()
     connect(virtualMarkYEdit, &QLineEdit::editingFinished, this, &SimulationPlatform::updateVirtualMark);
     connect(showVirtualMarkCheckBox, &QCheckBox::clicked, this, [this]()
             { canvas->update(); });
-
-    connect(markCenterDistanceEdit, &QLineEdit::editingFinished, this, [this]()
-            {
-        m_markSpacing = markCenterDistanceEdit->text().toDouble();
-        canvas->update();
-        emit parametersChanged(m_markSpacing, m_Ratio); });
-
-    connect(ScreenRatio, &QLineEdit::editingFinished, this, [this]()
-            {
-        m_Ratio = ScreenRatio->text().toDouble();
-        m_scale = m_ScreenWidth / m_Ratio;
-        canvas->update();
-        emit parametersChanged(m_markSpacing, m_Ratio); });
-
 }
 
 void SimulationPlatform::updateBasePlatform()
@@ -664,15 +635,6 @@ void SimulationPlatform::updateOriginAndScale()
     // 设置坐标原点为中心点
     m_origin.setX(canvas->width() / 2);
     m_origin.setY(canvas->height() / 2);
-
-    // 计算合适的缩放比例，确保至少能看到±100mm的范围
-    // double scaleX = canvas->width() / 2.0 / 10.0;
-    // double scaleY = canvas->height() / 2.0 / 10.0;
-    // scale = qMin(scaleX, scaleY);
-    // scale = qMax(scale, 1.0); // 至少1像素/mm
-
-    // ScreenWidth = canvas->width();
-    // scale = ScreenWidth / 200.0; // 默认缩放比例 2像
 }
 
 void SimulationPlatform::drawCoordinateSystem(QPainter &painter)
@@ -972,28 +934,11 @@ void SimulationPlatform::drawVirtualMark(QPainter &painter)
     painter.restore();
 }
 
-QPointF SimulationPlatform::rotatePoint(const QPointF &point, double angle)
-{
-    double rad = angle * M_PI / 180.0;
-    double cosA = cos(rad);
-    double sinA = sin(rad);
-
-    return QPointF(point.x() * cosA - point.y() * sinA,
-                   point.x() * sinA + point.y() * cosA);
-}
-
 QPointF SimulationPlatform::transformPoint(const QPointF &point)
 {
     // 将世界坐标(mm)转换为屏幕坐标(pixel)
     return QPointF(m_origin.x() + point.x() * m_scale,
                    m_origin.y() - point.y() * m_scale); // 注意Y轴翻转
-}
-
-QPointF SimulationPlatform::inverseTransformPoint(const QPointF &point)
-{
-    // 将屏幕坐标(pixel)转换为世界坐标(mm)
-    return QPointF((point.x() - m_origin.x()) / m_scale,
-                   (m_origin.y() - point.y()) / m_scale); // 注意Y轴翻转
 }
 
 void SimulationPlatform::setupPictureShowPage()
