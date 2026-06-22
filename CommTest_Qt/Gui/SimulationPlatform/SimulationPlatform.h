@@ -122,6 +122,14 @@ private:
     QLineEdit* markCenterDistanceEdit;
     QLineEdit* ScreenRatio;
 
+    // 5 个控制组(供菜单显隐/关闭引用)
+    CollapsibleGroupBox* grpBase;
+    CollapsibleGroupBox* grpRealTime;
+    CollapsibleGroupBox* grpMark1;
+    CollapsibleGroupBox* grpMark2;
+    CollapsibleGroupBox* grpVirtual;
+    void openParamDialog();
+
     // 页面/菜单/状态栏
     QStackedWidget* stack;
     QAction* actPageSim;
