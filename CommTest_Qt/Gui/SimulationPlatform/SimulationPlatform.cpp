@@ -8,6 +8,8 @@
 
 #include "SimulationPlatform.h"
 #include "ThemeManager.h"
+#include <QStackedWidget>
+#include <QMenuBar>
 #include <QFileDialog>
 #include <QDir>
 #include <QCoreApplication>
@@ -33,7 +35,7 @@ inline QColor colVirtualMark()      { return platformDarkTheme() ? QColor(0x3c, 
 }
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
-    : QWidget(parent)
+    : QMainWindow(parent)
 {
     // 初始化默认值
     basePlatform = {0, 0, 0};
@@ -120,12 +122,8 @@ void SimulationPlatform::SetSimulationPlatformParams(double distance, double rat
 }
 void SimulationPlatform::setupUI()
 {
-    // 创建主布局
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-
-    // 创建 TabWidget 用于页面切换
-    tabWidget = new QTabWidget(this);
-    mainLayout->addWidget(tabWidget, 1);
+    stack = new QStackedWidget(this);
+    setCentralWidget(stack);
 
     // ========== 模拟平台页面 ==========
     simulationPage = new QWidget(this);
@@ -171,16 +169,6 @@ void SimulationPlatform::setupUI()
 
     markCenterDistanceEdit = new QLineEdit(this);
     ScreenRatio = new QLineEdit(this);
-    ShowPlatformUL = new QRadioButton("左上显示", this);
-    ShowPlatformUR = new QRadioButton("右上显示", this);
-    ShowPlatformDL = new QRadioButton("左下显示", this);
-    ShowPlatformDR = new QRadioButton("右下显示", this);
-    QButtonGroup *group1 = new QButtonGroup(this);
-    group1->addButton(ShowPlatformUL);
-    group1->addButton(ShowPlatformUR);
-    group1->addButton(ShowPlatformDL);
-    group1->addButton(ShowPlatformDR);
-    ShowPlatformUL->setChecked(true);
 
     // 数值输入框统一限宽,使分组更紧凑(数字无需太宽)
     for (QLineEdit *e : { basePlatformXEdit, basePlatformYEdit, basePlatformAngleEdit,
@@ -277,10 +265,6 @@ void SimulationPlatform::setupUI()
     settingLayout->addWidget(markCenterDistanceEdit, 0, 1);
     settingLayout->addWidget(rlbl("缩放比:"), 1, 0);
     settingLayout->addWidget(ScreenRatio, 1, 1);
-    settingLayout->addWidget(ShowPlatformUL, 2, 0);
-    settingLayout->addWidget(ShowPlatformUR, 2, 1);
-    settingLayout->addWidget(ShowPlatformDL, 3, 0);
-    settingLayout->addWidget(ShowPlatformDR, 3, 1);
 
     // ---- 右侧控制面板:竖排 4 组 + 整体收起切换 ----
     QWidget *rightPanel = new QWidget(this);
@@ -310,15 +294,18 @@ void SimulationPlatform::setupUI()
 
     simLayout->addWidget(rightPanel);
 
-    // 将模拟平台页面添加到 TabWidget
-    tabWidget->addTab(simulationPage, "模拟平台");
+    // 模拟平台页加入栈
+    stack->addWidget(simulationPage);   // index 0
 
-    // ========== 图片显示页面 ==========
+    // 图片显示页
     setupPictureShowPage();
-    tabWidget->addTab(pictureShowPage, "图片显示");
+    stack->addWidget(pictureShowPage);  // index 1
 
-    // 连接 Tab 切换信号
-    connect(tabWidget, &QTabWidget::currentChanged, this, &SimulationPlatform::onTabChanged);
+    // 菜单栏(视图/模拟平台/图像)
+    buildMenuBar();
+
+    // 默认显示模拟页
+    showPage(0);
 
     // 设置初始值
     basePlatformXEdit->setText(QString::number(basePlatform.x));
@@ -342,6 +329,62 @@ void SimulationPlatform::setupUI()
 
     markCenterDistanceEdit->setText(QString::number(m_markSpacing));
     ScreenRatio->setText(QString::number(m_Ratio));
+}
+
+void SimulationPlatform::buildMenuBar()
+{
+    QMenuBar* mbar = menuBar();
+
+    // ===== 视图 =====
+    QMenu* viewMenu = mbar->addMenu(QStringLiteral("视图"));
+
+    QActionGroup* pageGroup = new QActionGroup(this);
+    pageGroup->setExclusive(true);
+    actPageSim = viewMenu->addAction(QStringLiteral("模拟平台"));
+    actPagePic = viewMenu->addAction(QStringLiteral("图片显示"));
+    for (QAction* a : { actPageSim, actPagePic }) { a->setCheckable(true); pageGroup->addAction(a); }
+    actPageSim->setChecked(true);
+    connect(actPageSim, &QAction::triggered, this, [this]() { showPage(0); });
+    connect(actPagePic, &QAction::triggered, this, [this]() { showPage(1); });
+
+    viewMenu->addSeparator();
+
+    // 窗口位置(四角,单选,两页共用)
+    QMenu* posMenu = viewMenu->addMenu(QStringLiteral("窗口位置"));
+    QActionGroup* posGroup = new QActionGroup(this);
+    posGroup->setExclusive(true);
+    const char* names[4] = { "左上", "右上", "左下", "右下" };
+    for (int i = 0; i < 4; ++i)
+    {
+        QAction* a = posMenu->addAction(QString::fromUtf8(names[i]));
+        a->setCheckable(true);
+        posGroup->addAction(a);
+        if (i == 0) a->setChecked(true);
+        connect(a, &QAction::triggered, this, [this, i]() { moveToScreenCorner(i); });
+    }
+}
+
+void SimulationPlatform::showPage(int index)
+{
+    stack->setCurrentIndex(index);
+    if (index == 0 && actPageSim) actPageSim->setChecked(true);
+    if (index == 1 && actPagePic) actPagePic->setChecked(true);
+}
+
+void SimulationPlatform::moveToScreenCorner(int corner)
+{
+    const QRect fg = this->frameGeometry();
+    const int totalWidth  = fg.width();
+    const int totalHeight = fg.height();
+    const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
+    switch (corner)
+    {
+    case 0: this->move(0, 0); break;                                              // 左上
+    case 1: this->move(avail.width() - totalWidth, 0); break;                     // 右上
+    case 2: this->move(0, avail.height() - totalHeight); break;                   // 左下
+    case 3: this->move(avail.width() - totalWidth, avail.height() - totalHeight); break; // 右下
+    default: break;
+    }
 }
 
 void SimulationPlatform::setupValidators()
@@ -417,39 +460,6 @@ void SimulationPlatform::setupConnections()
         canvas->update();
         emit parametersChanged(m_markSpacing, m_Ratio); });
 
-    connect(ShowPlatformUL->group(), &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
-            {
-    if (checked) {
-
-        QRect frameGeometry = this->frameGeometry();
-        int totalHeight = frameGeometry.height();  // 包含标题栏的高度
-        int totalWidth = frameGeometry.width();    // 包含边框的宽度
-
-        int screenWidth = QGuiApplication::primaryScreen()->availableGeometry().width();
-        int screenHeight = QGuiApplication::primaryScreen()->availableGeometry().height();
-        if(button == ShowPlatformUL)
-        {
-            //将当前窗口移动到屏幕左上角显示
-            this->move(0, 0);
-        }
-        else if(button == ShowPlatformUR)
-        {
-            //将当前窗口移动到屏幕右上角显示
-            this->move(screenWidth - totalWidth, 0);
-        }
-        else if(button == ShowPlatformDL)
-        {
-            //将当前窗口移动到屏幕左下角显示
-            this->move(0, screenHeight - totalHeight);
-        }
-        else if(button == ShowPlatformDR)
-        {
-            //将当前窗口移动到屏幕右下角显示
-            this->move(screenWidth - totalWidth, screenHeight - totalHeight);
-        }
-
-        //canvas->update();
-    } });
 }
 
 void SimulationPlatform::updateBasePlatform()
@@ -496,7 +506,7 @@ void SimulationPlatform::updateVirtualMark()
 void SimulationPlatform::paintEvent(QPaintEvent *event)
 {
     // 主窗口不需要绘制，由CanvasWidget负责绘制
-    QWidget::paintEvent(event);
+    QMainWindow::paintEvent(event);
 }
 
 void SimulationPlatform::drawCanvas(QPainter &painter)
@@ -541,7 +551,7 @@ void SimulationPlatform::drawCanvas(QPainter &painter)
 void SimulationPlatform::resizeEvent(QResizeEvent *event)
 {
     updateOriginAndScale();
-    QWidget::resizeEvent(event);
+    QMainWindow::resizeEvent(event);
     canvas->update();
 }
 
@@ -926,48 +936,9 @@ void SimulationPlatform::setupPictureShowPage()
     connect(imageViewer, &ImageViewerWidget::scaleChanged, this, [this](double scale)
             { zoomRatioEdit->setText(QString::number(scale, 'f', 2)); });
 
-    // 窗口位置按钮组
-    picShowPlatformUL = new QRadioButton("左上显示", this);
-    picShowPlatformUR = new QRadioButton("右上显示", this);
-    picShowPlatformDL = new QRadioButton("左下显示", this);
-    picShowPlatformDR = new QRadioButton("右下显示", this);
-
-    QButtonGroup *picPosGroup = new QButtonGroup(this);
-    picPosGroup->addButton(picShowPlatformUL);
-    picPosGroup->addButton(picShowPlatformUR);
-    picPosGroup->addButton(picShowPlatformDL);
-    picPosGroup->addButton(picShowPlatformDR);
-    picShowPlatformUL->setChecked(true);
-
-    funcLayout->addWidget(picShowPlatformUL);
-    funcLayout->addWidget(picShowPlatformUR);
-    funcLayout->addWidget(picShowPlatformDL);
-    funcLayout->addWidget(picShowPlatformDR);
     funcLayout->addStretch(1);
 
     picLayout->addWidget(funcGroup, 0, Qt::AlignTop);
-
-    // 连接位置按钮信号
-    connect(picPosGroup, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
-            {
-        if (checked) {
-            QRect frameGeometry = this->frameGeometry();
-            int totalHeight = frameGeometry.height();
-            int totalWidth = frameGeometry.width();
-
-            int screenWidth = QGuiApplication::primaryScreen()->availableGeometry().width();
-            int screenHeight = QGuiApplication::primaryScreen()->availableGeometry().height();
-
-            if (button == picShowPlatformUL) {
-                this->move(0, 0);
-            } else if (button == picShowPlatformUR) {
-                this->move(screenWidth - totalWidth, 0);
-            } else if (button == picShowPlatformDL) {
-                this->move(0, screenHeight - totalHeight);
-            } else if (button == picShowPlatformDR) {
-                this->move(screenWidth - totalWidth, screenHeight - totalHeight);
-            }
-        } });
 
     // 样式由全局主题(qApp 样式表)统一控制,不再设置局部样式
 
@@ -1063,8 +1034,3 @@ void SimulationPlatform::onSetImageClicked()
     }
 }
 
-void SimulationPlatform::onTabChanged(int index)
-{
-    Q_UNUSED(index);
-    // 页面切换时的处理逻辑（如有需要可以在这里添加）
-}

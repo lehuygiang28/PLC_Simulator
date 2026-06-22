@@ -30,7 +30,14 @@
 #include <QPalette>
 #include <QScreen>
 #include <QFont>
-#include <QTabWidget>
+#include <QMainWindow>
+#include <QStackedWidget>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QActionGroup>
+#include <QStatusBar>
+#include <QDialog>
 #include <QPushButton>
 #include <QImage>
 #include <QWheelEvent>
@@ -42,7 +49,7 @@
 #include "ImageViewerWidget.h"
 #include "CollapsibleGroupBox.h"
 
-class SimulationPlatform : public QWidget
+class SimulationPlatform : public QMainWindow
 {
     Q_OBJECT
 signals:
@@ -114,13 +121,16 @@ private:
     
     QLineEdit* markCenterDistanceEdit;
     QLineEdit* ScreenRatio;
-    QRadioButton* ShowPlatformUL;
-    QRadioButton* ShowPlatformUR;
-    QRadioButton* ShowPlatformDL;
-    QRadioButton* ShowPlatformDR;
+
+    // 页面/菜单/状态栏
+    QStackedWidget* stack;
+    QAction* actPageSim;
+    QAction* actPagePic;
+    void buildMenuBar();
+    void showPage(int index);
+    void moveToScreenCorner(int corner);
 
     // 页面切换相关
-    QTabWidget* tabWidget;
     QWidget* simulationPage;      // 模拟平台页面
     QWidget* pictureShowPage;     // 图片显示页面 (PictureShow)
 
@@ -128,15 +138,10 @@ private:
     ImageViewerWidget* imageViewer;
     QPushButton* setImageBtn;
     QLineEdit* zoomRatioEdit;  // 缩放倍率输入框
-    QRadioButton* picShowPlatformUL;
-    QRadioButton* picShowPlatformUR;
-    QRadioButton* picShowPlatformDL;
-    QRadioButton* picShowPlatformDR;
 
     void setupPictureShowPage();
     void loadDefaultImage();
     void onSetImageClicked();
-    void onTabChanged(int index);
 
     // 数据
     struct Platform {
