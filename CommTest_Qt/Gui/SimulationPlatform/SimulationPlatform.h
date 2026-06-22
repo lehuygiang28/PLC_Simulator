@@ -137,7 +137,7 @@ private:
     void buildMenuBar();
     void showPage(int index);
     void moveToScreenCorner(int corner);
-    void bindGroupToggle(CollapsibleGroupBox* g, const QString& title);
+    void bindGroupToggle(CollapsibleGroupBox* g, const QString& title, bool visible = true);
 
     // 页面切换相关
     QWidget* simulationPage;      // 模拟平台页面

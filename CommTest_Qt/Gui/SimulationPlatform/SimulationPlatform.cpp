@@ -179,7 +179,7 @@ void SimulationPlatform::setupUI()
     virtualMarkXEdit = new QLineEdit(this);
     virtualMarkYEdit = new QLineEdit(this);
     showVirtualMarkCheckBox = new QCheckBox("显示", this);
-    showVirtualMarkCheckBox->setChecked(true);
+    showVirtualMarkCheckBox->setChecked(false);  // 虚拟Mark 默认整体关闭(组隐藏 + 不绘制)
 
     // 数值输入框统一限宽,使分组更紧凑(数字无需太宽)
     for (QLineEdit *e : { basePlatformXEdit, basePlatformYEdit, basePlatformAngleEdit,
@@ -351,8 +351,8 @@ void SimulationPlatform::buildMenuBar()
     QMenu* posMenu = viewMenu->addMenu(QStringLiteral("窗口位置"));
     QActionGroup* posGroup = new QActionGroup(this);
     posGroup->setExclusive(true);
-    const char* names[4] = { "左上", "右上", "左下", "右下" };
-    for (int i = 0; i < 4; ++i)
+    const char* names[5] = { "左上", "右上", "左下", "右下", "居中" };
+    for (int i = 0; i < 5; ++i)
     {
         QAction* a = posMenu->addAction(QString::fromUtf8(names[i]));
         a->setCheckable(true);
@@ -370,7 +370,7 @@ void SimulationPlatform::buildMenuBar()
     bindGroupToggle(grpRealTime, QStringLiteral("实时平台"));
     bindGroupToggle(grpMark1,    QStringLiteral("基准Mark"));
     bindGroupToggle(grpMark2,    QStringLiteral("实时Mark"));
-    bindGroupToggle(grpVirtual,  QStringLiteral("虚拟Mark"));
+    bindGroupToggle(grpVirtual,  QStringLiteral("虚拟Mark"), false);  // 虚拟Mark 默认不显示
 
     // ===== 图像(仅图片页可用)=====
     imageMenu = mbar->addMenu(QStringLiteral("图像"));
@@ -445,15 +445,18 @@ void SimulationPlatform::moveToScreenCorner(int corner)
     case 1: this->move(avail.width() - totalWidth, 0); break;                     // 右上
     case 2: this->move(0, avail.height() - totalHeight); break;                   // 左下
     case 3: this->move(avail.width() - totalWidth, avail.height() - totalHeight); break; // 右下
+    case 4: this->move(avail.x() + (avail.width() - totalWidth) / 2,
+                       avail.y() + (avail.height() - totalHeight) / 2); break;     // 居中
     default: break;
     }
 }
 
-void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& title)
+void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& title, bool visible)
 {
     QAction* a = simMenu->addAction(title);
     a->setCheckable(true);
-    a->setChecked(true);
+    a->setChecked(visible);   // 初始勾选状态(connect 前设置,不触发)
+    g->setVisible(visible);   // 同步初始可见性
 
     // 菜单勾选 → 显示/隐藏整组
     connect(a, &QAction::toggled, this, [g](bool on) { g->setVisible(on); });
