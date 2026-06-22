@@ -85,6 +85,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
 private:
     /**
@@ -101,6 +102,8 @@ private:
     QPointF m_offset;         ///< 图像偏移量
     QPointF m_lastMousePos;   ///< 上次鼠标位置
     bool m_dragging;          ///< 是否正在拖拽
+    bool m_fitMode;           ///< 适应模式:true 时窗口缩放会重新铺满;用户缩放/平移后转为 false
+    bool m_pendingFit;        ///< 待适应:setImage 时尺寸未就绪,延迟到首次有效尺寸再 fit
 };
 
 #endif // IMAGEVIEWERWIDGET_H
