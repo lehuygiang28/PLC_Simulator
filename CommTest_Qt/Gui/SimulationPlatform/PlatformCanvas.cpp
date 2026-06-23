@@ -170,10 +170,20 @@ void PlatformCanvas::drawPlatform(QPainter& painter, const PlatformItem& item, Q
     painter.translate(center.x(), center.y());
     painter.rotate(item.pose.angleDeg);
 
-    // 绘制表示方向的十字线 (长度30mm)
-    double lineLength = 30 * scale;
-    painter.drawLine(-lineLength, 0, lineLength, 0); // X轴方向线
-    painter.drawLine(0, -lineLength, 0, lineLength); // Y轴方向线
+    // 绘制表示方向的十字线:四臂对称外延出圆外(半长 = 1.4×半径),保留指向感
+    double lineLength = radius * 1.4;
+    painter.drawLine(QPointF(-lineLength, 0), QPointF(lineLength, 0)); // X轴方向线
+    painter.drawLine(QPointF(0, -lineLength), QPointF(0, lineLength)); // Y轴方向线
+
+    // +X 与 +Y 正方向端各绘制开口箭头(尖端在臂端,箭翼向内回收);尺寸随半径自适应、两轴一致
+    double arrowLen = radius * 0.22;     // 箭头轴向长度
+    double arrowHalf = arrowLen * 0.55;  // 箭翼半展宽
+    // +X 端(屏幕右,未旋转时):尖端 (lineLength,0),箭翼回收向 -x
+    painter.drawLine(QPointF(lineLength, 0), QPointF(lineLength - arrowLen, -arrowHalf));
+    painter.drawLine(QPointF(lineLength, 0), QPointF(lineLength - arrowLen,  arrowHalf));
+    // +Y 端(屏幕上,未旋转时,画笔系为 -y):尖端 (0,-lineLength),箭翼回收向 +y
+    painter.drawLine(QPointF(0, -lineLength), QPointF(-arrowHalf, -lineLength + arrowLen));
+    painter.drawLine(QPointF(0, -lineLength), QPointF( arrowHalf, -lineLength + arrowLen));
 
     // 恢复变换矩阵
     painter.restore();
