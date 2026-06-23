@@ -208,7 +208,9 @@ void PlatformControlPanel::wireConnections()
     connect(m_baseMarkXEdit,     &QLineEdit::editingFinished, this, &PlatformControlPanel::pushBaseMarkToScene);
     connect(m_baseMarkYEdit,     &QLineEdit::editingFinished, this, &PlatformControlPanel::pushBaseMarkToScene);
     connect(m_baseMarkAngleEdit, &QLineEdit::editingFinished, this, &PlatformControlPanel::pushBaseMarkToScene);
-    connect(m_baseMarkFollowCheck, &QCheckBox::clicked, this, &PlatformControlPanel::pushBaseMarkToScene);
+    connect(m_baseMarkFollowCheck, &QCheckBox::clicked, this, [this](bool on) {
+        m_scene->setBaseMarkFollows(on);
+    });
     connect(m_showBaseMarkCheck, &QCheckBox::clicked, this, [this](bool on) {
         m_scene->setBaseMarkVisible(on);
     });
@@ -217,7 +219,9 @@ void PlatformControlPanel::wireConnections()
     connect(m_liveMarkXEdit,     &QLineEdit::editingFinished, this, &PlatformControlPanel::pushLiveMarkToScene);
     connect(m_liveMarkYEdit,     &QLineEdit::editingFinished, this, &PlatformControlPanel::pushLiveMarkToScene);
     connect(m_liveMarkAngleEdit, &QLineEdit::editingFinished, this, &PlatformControlPanel::pushLiveMarkToScene);
-    connect(m_liveMarkFollowCheck, &QCheckBox::clicked, this, &PlatformControlPanel::pushLiveMarkToScene);
+    connect(m_liveMarkFollowCheck, &QCheckBox::clicked, this, [this](bool on) {
+        m_scene->setLiveMarkFollows(on);
+    });
     connect(m_showLiveMarkCheck, &QCheckBox::clicked, this, [this](bool on) {
         m_scene->setLiveMarkVisible(on);
     });
@@ -249,18 +253,18 @@ void PlatformControlPanel::pushLiveToScene()
 
 void PlatformControlPanel::pushBaseMarkToScene()
 {
+    // 仅写 pose;followsPlatform 由 follow 复选框的 clicked 直接写入(避免与 refreshFromScene 重入冲突)
     m_scene->setBaseMarkPose({ m_baseMarkXEdit->text().toDouble(),
                                m_baseMarkYEdit->text().toDouble(),
                                m_baseMarkAngleEdit->text().toDouble() });
-    m_scene->setBaseMarkFollows(m_baseMarkFollowCheck->isChecked());
 }
 
 void PlatformControlPanel::pushLiveMarkToScene()
 {
+    // 仅写 pose;followsPlatform 由 follow 复选框的 clicked 直接写入(避免与 refreshFromScene 重入冲突)
     m_scene->setLiveMarkPose({ m_liveMarkXEdit->text().toDouble(),
                                m_liveMarkYEdit->text().toDouble(),
                                m_liveMarkAngleEdit->text().toDouble() });
-    m_scene->setLiveMarkFollows(m_liveMarkFollowCheck->isChecked());
 }
 
 void PlatformControlPanel::pushVirtualMarkToScene()
