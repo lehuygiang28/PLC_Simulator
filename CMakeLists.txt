@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(CommTestSolution VERSION 1.0.0 LANGUAGES CXX) 
+project(PLC_Simulator VERSION 1.0.0 LANGUAGES CXX) 
 
 # 只保留 Debug 和 Release 配置
 if(CMAKE_CONFIGURATION_TYPES)
@@ -86,7 +86,7 @@ endif()
 
 
 # 设置默认的启动项目(MSVC有效)
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT CommTest_Qt)
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PLC_Simulator)
 
 # 添加子项目
-add_subdirectory(CommTest_Qt)
+add_subdirectory(PLC_Simulator)

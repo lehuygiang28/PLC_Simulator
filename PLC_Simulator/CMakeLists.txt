@@ -1,7 +1,7 @@
-project(CommTest_Qt LANGUAGES CXX)
+project(PLC_Simulator LANGUAGES CXX)
 
 # 设置目标名称（Debug版本加'd'后缀，与原项目一致）
-set(TARGET_NAME "CommTest_Qt")
+set(TARGET_NAME "PLC_Simulator")
 
 # 按原项目过滤器结构组织文件
 set(SOURCE_FILES
@@ -9,15 +9,10 @@ set(SOURCE_FILES
 )
 
 set(RESOURCE_FILES
-    Resource_Files/CommTest_Qt.qrc
-    Resource_Files/CommTest_Qt.rc
+    Resource_Files/resources.qrc
     Resource_Files/PLC_Simulator.ico
     app.rc
     version.h
-)
-
-set(FORM_FILES
-    Gui/MainWindow/CommTest_Qt.ui
 )
 
 
@@ -56,15 +51,16 @@ set(COMM_PROTOCOL_HEADERS
 
 # Gui\MainWindow 模块(主窗口及其管理器)
 set(GUI_MAINWINDOW_SOURCES
-    Gui/MainWindow/CommTest_Qt.cpp
-    Gui/MainWindow/SubMainWindow.cpp
+    Gui/MainWindow/MainWindow.cpp
+    Gui/MainWindow/MainWindow.ui
+    Gui/MainWindow/QuickPanel.cpp
     Gui/MainWindow/RegisterTableManager.cpp
     Gui/MainWindow/ScriptManager.cpp
 )
 
 set(GUI_MAINWINDOW_HEADERS
-    Gui/MainWindow/CommTest_Qt.h
-    Gui/MainWindow/SubMainWindow.h
+    Gui/MainWindow/MainWindow.h
+    Gui/MainWindow/QuickPanel.h
     Gui/MainWindow/RegisterTableManager.h
     Gui/MainWindow/ScriptManager.h
 )
@@ -180,7 +176,6 @@ add_executable(${TARGET_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCE_FILES}
-    ${FORM_FILES}
 )
 
 # 设置目标属性
@@ -198,7 +193,6 @@ message(STATUS "为 ${TARGET_NAME} 启用多处理器编译 (/MP)")
 
 source_group("Source Files" FILES ${SOURCE_FILES})
 source_group("Resource Files" FILES ${RESOURCE_FILES})
-source_group("Form Files" FILES ${FORM_FILES})
 source_group("Comm" FILES ${COMM_SOURCES} ${COMM_HEADERS})
 source_group("Comm\\\\Socket" FILES ${COMM_SOCKET_SOURCES} ${COMM_SOCKET_HEADERS})
 source_group("Comm\\\\Protocol" FILES ${COMM_PROTOCOL_SOURCES} ${COMM_PROTOCOL_HEADERS})

@@ -1,4 +1,4 @@
-#include "SubMainWindow.h"
+#include "QuickPanel.h"
 #include <QCoreApplication>
 #include <QFrame>
 
@@ -8,7 +8,7 @@
 #endif
 #endif
 
-SubMainWindow::SubMainWindow(QWidget* parent)
+QuickPanel::QuickPanel(QWidget* parent)
     : QDialog(parent)
 {
 	// 注:窗口标志(独立窗口、隐藏最小/最大/关闭按钮)在主窗口创建小窗处统一设置
@@ -40,12 +40,12 @@ SubMainWindow::SubMainWindow(QWidget* parent)
         emit showMainWindow(); // 发射信号，通知主窗口显示
         });
 
-    connect(btn[0], &QPushButton::clicked, this, &SubMainWindow::onButton1Clicked);
-    connect(btn[1], &QPushButton::clicked, this, &SubMainWindow::onButton2Clicked);
-    connect(btn[2], &QPushButton::clicked, this, &SubMainWindow::onButton3Clicked);
-    connect(btn[3], &QPushButton::clicked, this, &SubMainWindow::onButton4Clicked);
-    connect(btn[4], &QPushButton::clicked, this, &SubMainWindow::onButton5Clicked);
-    connect(btn[5], &QPushButton::clicked, this, &SubMainWindow::onButton6Clicked);
+    connect(btn[0], &QPushButton::clicked, this, &QuickPanel::onButton1Clicked);
+    connect(btn[1], &QPushButton::clicked, this, &QuickPanel::onButton2Clicked);
+    connect(btn[2], &QPushButton::clicked, this, &QuickPanel::onButton3Clicked);
+    connect(btn[3], &QPushButton::clicked, this, &QuickPanel::onButton4Clicked);
+    connect(btn[4], &QPushButton::clicked, this, &QuickPanel::onButton5Clicked);
+    connect(btn[5], &QPushButton::clicked, this, &QuickPanel::onButton6Clicked);
 
     mainLayout->setContentsMargins(8, 8, 8, 8);
     mainLayout->setSpacing(8);
@@ -56,7 +56,7 @@ SubMainWindow::SubMainWindow(QWidget* parent)
     // 按钮样式由全局主题样式表(ThemeManager)统一控制,不再设置局部样式
 }
 
-void SubMainWindow::setButtonTexts(const QStringList& texts)
+void QuickPanel::setButtonTexts(const QStringList& texts)
 {
     for (int i = 0; i < 6; ++i) 
     {
@@ -67,37 +67,37 @@ void SubMainWindow::setButtonTexts(const QStringList& texts)
     }
 }
 
-void SubMainWindow::onButton1Clicked()
+void QuickPanel::onButton1Clicked()
 {
     //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script1.lua";
     emit executeLuaScript(1);
 }
 
-void SubMainWindow::onButton2Clicked()
+void QuickPanel::onButton2Clicked()
 {
     //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script2.lua";
     emit executeLuaScript(2);
 }
 
-void SubMainWindow::onButton3Clicked()
+void QuickPanel::onButton3Clicked()
 {
     //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script3.lua";
     emit executeLuaScript(3);
 }
 
-void SubMainWindow::onButton4Clicked()
+void QuickPanel::onButton4Clicked()
 {
    // QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script4.lua";
     emit executeLuaScript(4);
 }
 
-void SubMainWindow::onButton5Clicked()
+void QuickPanel::onButton5Clicked()
 {
     //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script5.lua";
     emit executeLuaScript(5);
 }
 
-void SubMainWindow::onButton6Clicked()
+void QuickPanel::onButton6Clicked()
 {
     //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script6.lua";
     emit executeLuaScript(6);

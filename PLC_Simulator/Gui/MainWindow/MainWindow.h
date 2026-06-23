@@ -6,11 +6,11 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef COMMTEST_QT_H
-#define COMMTEST_QT_H
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
 
-#include "ui_CommTest_Qt.h"
-#include "SubMainWindow.h"
+#include "ui_MainWindow.h"
+#include "QuickPanel.h"
 #include "SimulationPlatform/SimulationPlatform.h"
 #include "RegisterTableManager.h"
 #include "ScriptManager.h"
@@ -33,16 +33,16 @@
 #include <QFrame>
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class CommTest_QtClass; };
+namespace Ui { class MainWindow; };
 QT_END_NAMESPACE
 
-class CommTest_Qt : public QMainWindow
+class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    CommTest_Qt(QWidget* parent = nullptr);
-    ~CommTest_Qt();
+    MainWindow(QWidget* parent = nullptr);
+    ~MainWindow();
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -75,12 +75,12 @@ private:
     void UpdateLogDisplay(QString strNewLog);
 
 private:
-    Ui::CommTest_QtClass* ui;
+    Ui::MainWindow* ui;
     QAction* m_actLightTheme = nullptr;
     QAction* m_actDarkTheme = nullptr;
 
     // 子窗口
-    std::unique_ptr<SubMainWindow> m_subWindow;
+    std::unique_ptr<QuickPanel> m_subWindow;
     SimulationPlatform* m_simulationPlatform;
 
     // 工作流
@@ -105,4 +105,4 @@ private:
     int m_nLogStat;
 };
 
-#endif // COMMTEST_QT_H
+#endif // MAINWINDOW_H

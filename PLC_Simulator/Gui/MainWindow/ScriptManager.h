@@ -23,11 +23,11 @@
 #include "MainWorkFlow.h"
 
 /**
- * 20251225 wm 从CommTest_Qt.cpp拆分
+ * 20251225 wm 从MainWindow.cpp拆分
  * @brief 脚本管理器
  *
  * 负责管理Lua脚本的执行、编辑和循环控制。
- * 从 CommTest_Qt 中拆分出来，专注于脚本相关逻辑。
+ * 从 MainWindow 中拆分出来，专注于脚本相关逻辑。
  */
 class ScriptManager : public QObject
 {

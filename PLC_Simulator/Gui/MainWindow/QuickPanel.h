@@ -6,20 +6,20 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef SUBWINDOW_H
-#define SUBWINDOW_H
+#ifndef QUICKPANEL_H
+#define QUICKPANEL_H
 
 #include <QDialog>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QCloseEvent>
 
-class SubMainWindow :
+class QuickPanel :
     public QDialog
 {
     Q_OBJECT
 public:
-    explicit SubMainWindow(QWidget* parent = nullptr);
+    explicit QuickPanel(QWidget* parent = nullptr);
 
 	// 设置6个按钮的文本（从主窗口LineEdit获取）
 	void setButtonTexts(const QStringList& texts);
@@ -48,4 +48,4 @@ private slots:
     void onButton6Clicked();
 };
 
-#endif // SUBWINDOW_H
+#endif // QUICKPANEL_H
