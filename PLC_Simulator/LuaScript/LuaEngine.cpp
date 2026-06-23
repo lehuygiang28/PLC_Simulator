@@ -10,6 +10,36 @@
 #include "LuaEngine.h"
 #include "ILuaBinding.h"
 
+namespace {
+// 校验桩:IsLoopValid 返回 nil(假),sleep 无返回——与原 installEngineStubs 一致
+int StubVoid(lua_State*) { return 0; }
+
+// 内建真实实现(upvalue 为 LuaEngine*)
+int IsLoopValidReal(lua_State* L)
+{
+	LuaEngine* pThis = static_cast<LuaEngine*>(lua_touserdata(L, lua_upvalueindex(1)));
+	lua_pushboolean(L, pThis ? pThis->GetLoopValid() : 0);
+	return 1;
+}
+int SleepReal(lua_State* L)
+{
+	if (!lua_isnumber(L, 1)) {
+		return luaL_error(L, "Argument #1 (milliseconds) must be a number");
+	}
+	int milliseconds = lua_tointeger(L, 1);
+	QEventLoop loop;
+	QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
+	loop.exec();
+	return 0;
+}
+
+// 内建单一来源:注册/桩/文档均由此表派生
+struct Builtin { const char* name; lua_CFunction real; lua_CFunction stub; const char* snippet; };
+const Builtin kBuiltins[] = {
+	{"IsLoopValid", IsLoopValidReal, StubVoid, "IsLoopValid() -- 获取循环是否有效"},
+	{"sleep",       SleepReal,       StubVoid, "sleep(500) -- 睡眠500毫秒"},
+};
+} // namespace
 
 static int nLuaEngineNum = 0;	// 引擎数量
 LuaEngine* LuaEngine::InitialEngine(QObject* pParent /*= nullptr*/)
@@ -71,15 +101,11 @@ LuaEngine::LuaEngine(QObject* parent /*= nullptr*/)
 
 bool LuaEngine::RegisterLuaFunc()
 {
-	// 仅注册引擎内建函数：IsLoopValid 与 sleep
-	lua_pushlightuserdata(m_pLua, this);
-	lua_pushcclosure(m_pLua, IsLoopValidWrapper, 1);
-	lua_setglobal(m_pLua, "IsLoopValid");
-
-	lua_pushlightuserdata(m_pLua, this);
-	lua_pushcclosure(m_pLua, SleepWrapper, 1);
-	lua_setglobal(m_pLua, "sleep");
-
+	for (const Builtin& b : kBuiltins) {
+		lua_pushlightuserdata(m_pLua, this);
+		lua_pushcclosure(m_pLua, b.real, 1);
+		lua_setglobal(m_pLua, b.name);
+	}
 	return true;
 }
 
@@ -88,29 +114,20 @@ void LuaEngine::install(ILuaBinding& binding)
 	binding.install(m_pLua);
 }
 
-// ===== 循环状态函数实现 =====
-int LuaEngine::IsLoopValidWrapper(lua_State* L)
+// ===== 新静态接口 =====
+QList<LuaFunctionDoc> LuaEngine::builtinFunctionDocs()
 {
-	LuaEngine* pThis = static_cast<LuaEngine*>(lua_touserdata(L, lua_upvalueindex(1)));
-
-	bool bValid = pThis->GetLoopValid();
-	lua_pushboolean(L, bValid);
-	return 1;
+	QList<LuaFunctionDoc> docs;
+	for (const Builtin& b : kBuiltins) {
+		docs.append({QString::fromUtf8(b.name), QString::fromUtf8(b.snippet)});
+	}
+	return docs;
 }
 
-int LuaEngine::SleepWrapper(lua_State* L)
+void LuaEngine::installBuiltinStubs(lua_State* L)
 {
-	LuaEngine* pThis = static_cast<LuaEngine*>(lua_touserdata(L, lua_upvalueindex(1)));
-
-	// 获取参数
-	if (!lua_isnumber(L, 1)) {
-		return luaL_error(L, "Argument #1 (milliseconds) must be a number");
+	for (const Builtin& b : kBuiltins) {
+		lua_pushcfunction(L, b.stub);
+		lua_setglobal(L, b.name);
 	}
-	int milliseconds = lua_tointeger(L, 1);
-
-	/*QThread::msleep(milliseconds);*/
-	QEventLoop loop;
-	QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
-	loop.exec();
-	return 0;
 }

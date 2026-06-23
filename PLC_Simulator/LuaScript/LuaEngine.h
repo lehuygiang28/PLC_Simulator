@@ -17,7 +17,8 @@
 
 struct lua_State;  // 前向声明，避免 Lua.hpp 泄漏到包含方
 
-class ILuaBinding;  // 前向声明，避免 ILuaBinding.h 泄漏
+#include "ILuaBinding.h"  // LuaFunctionDoc / QList(内含 lua_State 前向声明)
+class ILuaBinding;        // install(ILuaBinding&) 仍用引用,保留前向声明
 
 class LuaEngine :public QObject
 {
@@ -58,10 +59,10 @@ private:
 
 	bool RegisterLuaFunc();
 
-private:
-	//注册到Lua的循环状态判断函数
-	static int IsLoopValidWrapper(lua_State* L);
-	static int SleepWrapper(lua_State* L);
+public:
+	// 引擎内建函数(IsLoopValid/sleep)的文档与校验桩——供 ScriptEngineHost 聚合
+	static QList<LuaFunctionDoc> builtinFunctionDocs();
+	static void installBuiltinStubs(lua_State* L);
 
 };
 
