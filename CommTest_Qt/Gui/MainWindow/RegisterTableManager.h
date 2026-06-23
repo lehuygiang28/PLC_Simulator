@@ -20,7 +20,7 @@
 #include <vector>
 #include <cfloat>
 
-#include "../MainFlow/MainWorkFlow.h"
+#include "MainWorkFlow.h"
 
 // 表格常量定义
 #define REGISTER_TABLE_COLUMN_COUNT 10

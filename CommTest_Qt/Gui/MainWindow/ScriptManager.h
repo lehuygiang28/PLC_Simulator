@@ -20,7 +20,7 @@
 #include <QCoreApplication>
 
 #include "ScriptEditor/ScriptEditor.h"
-#include "../MainFlow/MainWorkFlow.h"
+#include "MainWorkFlow.h"
 
 /**
  * 20251225 wm 从CommTest_Qt.cpp拆分

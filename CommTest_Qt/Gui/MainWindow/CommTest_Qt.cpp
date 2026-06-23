@@ -8,7 +8,7 @@
 
 #include "CommTest_Qt.h"
 #include "Theme/ThemeManager.h"
-#include "../version.h"
+#include "version.h"
 #include <QDir>
 #include <QFile>
 #include <cmath>
