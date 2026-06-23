@@ -11,7 +11,6 @@
 #include <QString>
 #include <QList>
 
-class ILuaBinding;
 struct lua_State;
 
 // 进程级 Lua 语法检查器：装入各绑定的桩 + 引擎内建桩(IsLoopValid/sleep)，
@@ -21,9 +20,6 @@ public:
     LuaSyntaxChecker();
     ~LuaSyntaxChecker();
 
-    // 注册绑定的桩(须在 check 前调用)
-    void addBinding(ILuaBinding* binding);
-
     // 返回 true 表示语法通过；否则 errorMsg 含错误信息
     bool check(const QString& script, QString& errorMsg);
 
@@ -32,7 +28,6 @@ public:
 
 private:
     lua_State* m_state;
-    void installEngineStubs();  // IsLoopValid / sleep 桩
 };
 
 #endif // LUASYNTAXCHECKER_H

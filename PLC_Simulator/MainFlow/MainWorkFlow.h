@@ -20,7 +20,6 @@
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
 #include "LuaScript/IRegisterAccess.h"
-#include "LuaScript/IPlatformController.h"
 #include "LuaScript/ScriptEngineHost.h"
 
 
