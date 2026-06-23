@@ -6,8 +6,8 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef IMAGEVIEWERWIDGET_H
-#define IMAGEVIEWERWIDGET_H
+#ifndef IMAGEVIEWER_H
+#define IMAGEVIEWER_H
 
 #include <QWidget>
 #include <QImage>
@@ -27,7 +27,7 @@
  * - 灰白棋盘格背景
  * - 窗口缩放时保持显示比例
  */
-class ImageViewerWidget : public QWidget
+class ImageViewer : public QWidget
 {
     Q_OBJECT
 
@@ -39,8 +39,8 @@ signals:
     void scaleChanged(double scale);
 
 public:
-    explicit ImageViewerWidget(QWidget* parent = nullptr);
-    ~ImageViewerWidget() override = default;
+    explicit ImageViewer(QWidget* parent = nullptr);
+    ~ImageViewer() override = default;
 
     /**
      * @brief 设置要显示的图像
@@ -106,4 +106,4 @@ private:
     bool m_pendingFit;        ///< 待适应:setImage 时尺寸未就绪,延迟到首次有效尺寸再 fit
 };
 
-#endif // IMAGEVIEWERWIDGET_H
+#endif // IMAGEVIEWER_H
