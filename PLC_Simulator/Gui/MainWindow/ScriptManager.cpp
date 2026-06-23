@@ -1,8 +1,9 @@
 #include "ScriptManager.h"
+#include "LuaScript/ScriptEngineHost.h"
 
-ScriptManager::ScriptManager(MainWorkFlow* workFlow, QWidget* parent)
+ScriptManager::ScriptManager(ScriptEngineHost* host, QWidget* parent)
     : QObject(parent)
-    , m_workFlow(workFlow)
+    , m_host(host)
     , m_parentWidget(parent)
     , m_pCurrentScriptEditor(nullptr)
     , m_nCurrentScriptIndex(-1)
@@ -17,14 +18,14 @@ ScriptManager::~ScriptManager()
 void ScriptManager::initScriptExecution()
 {
     connect(this, &ScriptManager::executeLuaScript, this, [this](int nLuaIndex, QString strLuaFile) {
-        if (m_workFlow == nullptr) return;
-        m_workFlow->RunLuaScript(nLuaIndex, strLuaFile);
+        if (m_host == nullptr) return;
+        m_host->runScript(nLuaIndex, strLuaFile);
     });
 }
 
 void ScriptManager::executeScript(int index)
 {
-    if (m_workFlow == nullptr) return;
+    if (m_host == nullptr) return;
 
     QString strLuaPath = QCoreApplication::applicationDirPath();
     strLuaPath += "/Config/LuaScript/";
@@ -36,13 +37,9 @@ void ScriptManager::executeScript(int index)
 
 void ScriptManager::setLoopEnable(int index, bool enable)
 {
-    if (m_workFlow == nullptr) return;
+    if (m_host == nullptr) return;
 
-    LuaEngine* pLua = m_workFlow->GetEngine(index);
-    if (pLua != nullptr)
-    {
-        pLua->SetLoopValid(enable);
-    }
+    m_host->setLoopValid(index, enable);
 }
 
 void ScriptManager::connectExecuteButton(int index, QPushButton* button)
@@ -74,7 +71,7 @@ void ScriptManager::connectLoopCheckBox(int index, QCheckBox* checkBox)
 
 void ScriptManager::openScriptEditor(int scriptIndex)
 {
-    if (m_workFlow == nullptr) return;
+    if (m_host == nullptr) return;
 
     // 获取可执行文件所在目录
     QString appDir = QCoreApplication::applicationDirPath();
@@ -152,9 +149,9 @@ void ScriptManager::openScriptEditor(int scriptIndex)
 
     // 创建新的编辑器窗口
     ScriptEditor* pScriptEditor = new ScriptEditor(m_parentWidget,
-        m_workFlow->GetScriptRunner(scriptIndex - 1));
-    pScriptEditor->setSyntaxChecker(m_workFlow->GetSyntaxChecker());
-    pScriptEditor->setFunctionDocs(m_workFlow->ScriptFunctionDocs());
+        m_host->scriptRunner(scriptIndex - 1));
+    pScriptEditor->setSyntaxChecker(m_host->syntaxChecker());
+    pScriptEditor->setFunctionDocs(m_host->functionDocs());
     pScriptEditor->setAttribute(Qt::WA_DeleteOnClose);
     pScriptEditor->setWindowModality(Qt::ApplicationModal);
     pScriptEditor->setScriptName(scriptPath);

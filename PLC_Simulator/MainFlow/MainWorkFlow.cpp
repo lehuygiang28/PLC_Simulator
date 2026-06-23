@@ -7,63 +7,7 @@
  */
 
 #include "MainWorkFlow.h"
-#include "MainWindow.h"
 #include "Comm/Socket/CommSocket.h"
-
-// ScriptRunner 实现 - 用于 ScriptEditor 的异步脚本执行
-class ScriptRunnerImpl : public IScriptRunner
-{
-public:
-    ScriptRunnerImpl(MainWorkFlow* workflow, int luaIndex)
-        : m_pWorkFlow(workflow), m_nLuaIndex(luaIndex) {}
-
-    void RunScriptAsync(const QString& scriptContent,
-                        std::function<void(bool success, const QString& errorMsg)> onFinished) override
-    {
-        if (!m_pWorkFlow) {
-            if (onFinished) onFinished(false, "Workflow not available");
-            return;
-        }
-
-        LuaEngine* pLuaEngine = m_pWorkFlow->GetEngine(m_nLuaIndex);
-        if (!pLuaEngine) {
-            if (onFinished) onFinished(false, "LuaEngine instance not found");
-            return;
-        }
-
-        // 创建异步任务
-        class EditorScriptTask : public QRunnable {
-        public:
-            LuaEngine* lua;
-            QString content;
-            std::function<void(bool, const QString&)> callback;
-            QMutex* mutex;
-
-            EditorScriptTask(LuaEngine* l, const QString& c,
-                           std::function<void(bool, const QString&)> cb, QMutex* m)
-                : lua(l), content(c), callback(std::move(cb)), mutex(m) {}
-
-            void run() override {
-                QMutexLocker locker(mutex);
-                QString err;
-                bool ok = lua->RunLuaScriptWithEditor(content, err);
-                if (callback) {
-                    callback(ok, err);
-                }
-            }
-        };
-
-        EditorScriptTask* task = new EditorScriptTask(
-            pLuaEngine, scriptContent, std::move(onFinished),
-            m_pWorkFlow->m_vLuaMutex[m_nLuaIndex].get());
-        task->setAutoDelete(true);
-        m_pWorkFlow->m_luaThreadPool->start(task);
-    }
-
-private:
-    MainWorkFlow* m_pWorkFlow;
-    int m_nLuaIndex;
-};
 
 //初始化静态实例
 MainWorkFlow* MainWorkFlow::s_pInstance = nullptr;
@@ -89,10 +33,6 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 	}
 
 	m_bDataChanged = false;
-
-	//m_pLuaScript = nullptr;
-    m_vpLuaScript.resize(LUA_SCRIPT_NUM);
-    m_vLuaMutex.resize(LUA_SCRIPT_NUM);
 
     // 仅实现寄存器读写，不含平台控制（平台控制由 PlatformBinding 负责）
     struct RegisterProvider : public IRegisterAccess {
@@ -165,42 +105,14 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     };
 
     m_registerAccess = std::make_unique<RegisterProvider>(this);
-    m_luaThreadPool = new QThreadPool(this);
-    m_luaThreadPool->setMaxThreadCount(QThread::idealThreadCount());
-
-    m_registerBinding = std::make_unique<RegisterBinding>(m_registerAccess.get());
-    m_platformBinding = std::make_unique<PlatformBinding>(m_registerAccess.get(), nullptr); // controller 延迟设置
-
-    // 构建语法检查器，装入各绑定桩
-    m_syntaxChecker = std::make_unique<LuaSyntaxChecker>();
-    m_syntaxChecker->addBinding(m_registerBinding.get());
-    m_syntaxChecker->addBinding(m_platformBinding.get());
-
-    m_vScriptRunners.resize(LUA_SCRIPT_NUM);
-    for (int i = 0; i < LUA_SCRIPT_NUM; ++i)
-    {
-        m_vpLuaScript[i] = std::unique_ptr<LuaEngine>(LuaEngine::InitialEngine());
-        m_vpLuaScript[i]->install(*m_registerBinding);
-        m_vpLuaScript[i]->install(*m_platformBinding);
-        m_vLuaMutex[i] = std::make_unique<QMutex>();
-        m_vScriptRunners[i] = std::make_unique<ScriptRunnerImpl>(this, i);
-    }
+    m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerAccess.get());
 }
 
 // 析构函数：确保所有资源正确释放
 MainWorkFlow::~MainWorkFlow()
 {
-	// 等待所有线程池任务完成，避免访问已释放的LuaScript
-	if (m_luaThreadPool != nullptr)
-	{
-		m_luaThreadPool->waitForDone();
-	}
-
-	// 显式清理脚本执行器（在LuaScript之前）
-	m_vScriptRunners.clear();
-
-	// 显式清理LuaScript实例
-	m_vpLuaScript.clear();
+	// m_scriptHost 先于 m_registerAccess 析构（声明顺序保证），此处显式 reset 以明示意图
+	m_scriptHost.reset();
 
 	// 关闭通信
 	if (m_pComm != nullptr)
@@ -218,11 +130,6 @@ MainWorkFlow::~MainWorkFlow()
 	}
 
 	// m_pCommInfo 会自动释放（unique_ptr）
-}
-
-void MainWorkFlow::SetPlatformController(IPlatformController* controller)
-{
-    if (m_platformBinding) m_platformBinding->setController(controller);
 }
 
 //初始化静态实例
@@ -582,61 +489,3 @@ bool MainWorkFlow::ResetAllRegisters(int16_t nsetVal)
 	return true;
 }
 
-bool MainWorkFlow::RunLuaScript(int nLuaIndex, const QString &strLuaFile)
-{
-    return RunLuaScriptAsync(nLuaIndex, strLuaFile);
-}
-
-bool MainWorkFlow::RunLuaScriptAsync(int nLuaIndex, const QString &strLuaFile)
-{
-    if (nLuaIndex < 0 || nLuaIndex >= LUA_SCRIPT_NUM) return false;
-    if (m_vpLuaScript[nLuaIndex] == nullptr) return false;
-    class LuaTask : public QRunnable {
-    public:
-        MainWorkFlow* self;
-        int idx;
-        QString file;
-        LuaTask(MainWorkFlow* s, int i, const QString& f) : self(s), idx(i), file(f) {}
-        void run() override {
-            QMutexLocker locker(self->m_vLuaMutex[idx].get());
-            QString err;
-            bool ok = self->m_vpLuaScript[idx]->RunLuaScript(file, err);
-            if (ok) {
-                QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-            } else {
-                QMetaObject::invokeMethod(self, "commLogRecord", Qt::QueuedConnection,
-                                          Q_ARG(QString, QString("Lua执行失败:%1").arg(err)));
-            }
-        }
-    };
-    LuaTask* t = new LuaTask(this, nLuaIndex, strLuaFile);
-    t->setAutoDelete(true);
-    m_luaThreadPool->start(t);
-    return true;
-}
-
-LuaEngine* MainWorkFlow::GetEngine(int nIndex)
-{
-    if (nIndex >= m_vpLuaScript.size()) return nullptr;
-
-	return m_vpLuaScript[nIndex].get();
-}
-
-IScriptRunner* MainWorkFlow::GetScriptRunner(int nIndex)
-{
-    if (nIndex < 0 || nIndex >= static_cast<int>(m_vScriptRunners.size())) return nullptr;
-    return m_vScriptRunners[nIndex].get();
-}
-
-LuaSyntaxChecker* MainWorkFlow::GetSyntaxChecker()
-{
-    return m_syntaxChecker.get();
-}
-
-QList<LuaFunctionDoc> MainWorkFlow::ScriptFunctionDocs() const
-{
-    QList<LuaFunctionDoc> docs;
-    if (m_registerBinding) docs.append(m_registerBinding->functions());
-    if (m_platformBinding) docs.append(m_platformBinding->functions());
-    return docs;
-}

@@ -11,7 +11,6 @@
 
 #include <QObject>
 #include <QMutex>
-#include <QThreadPool>
 #include <memory>
 #include <QVariant>
 
@@ -20,13 +19,9 @@
 #include "Comm/Protocol/CommProtocolBase.h"
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
-#include "LuaScript/LuaEngine.h"
 #include "LuaScript/IRegisterAccess.h"
 #include "LuaScript/IPlatformController.h"
-#include "LuaScript/ILuaBinding.h"
-#include "LuaScript/RegisterBinding.h"
-#include "LuaScript/PlatformBinding.h"
-#include "LuaScript/LuaSyntaxChecker.h"
+#include "LuaScript/ScriptEngineHost.h"
 
 
 #ifdef _WIN32
@@ -40,11 +35,6 @@
 #include <vector>
 #include <functional>
 
-#include "Gui/ScriptEditor/ScriptEditor.h"  // for IScriptRunner
-
-//lua脚本数量
-#define LUA_SCRIPT_NUM 6
-
 #define REGISTER_VAL_NUM 100000
 
 struct CommConfig {
@@ -53,12 +43,9 @@ struct CommConfig {
 	CommConfig() : type(CommBase::CommType::eSocket) {}
 };
 
-class ScriptRunnerImpl;  // 前向声明
-
 class MainWorkFlow :public QObject
 {
 	Q_OBJECT
-    friend class ScriptRunnerImpl;  // 友元声明，允许访问私有成员
 
 public:
 	MainWorkFlow(const MainWorkFlow& WorkFlow) = delete;				//禁用拷贝构造
@@ -93,26 +80,11 @@ public:
 	bool SetRegisterVal(int Addr, const int16_t& nsetVal);
 	bool ResetAllRegisters(int16_t nsetVal);
 
-	//执行lua脚本
-	bool RunLuaScript(int nLuaIndex,const QString& strLuaFile);
-	bool RunLuaScriptAsync(int nLuaIndex,const QString& strLuaFile);
-
-    LuaEngine* GetEngine(int nIndex);
-
-    // 获取指定索引的脚本执行器（实现 IScriptRunner 接口）
-    IScriptRunner* GetScriptRunner(int nIndex);
-
-    // 获取语法检查器
-    LuaSyntaxChecker* GetSyntaxChecker();
-
-    // 聚合所有绑定的函数文档列表（供编辑器函数菜单与高亮使用）
-    QList<LuaFunctionDoc> ScriptFunctionDocs() const;
+    // 获取 Lua 脚本引擎宿主
+    ScriptEngineHost* scriptHost() const { return m_scriptHost.get(); }
 
     bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
-
-	// 注入平台控制器（延迟注入，替代原 SetBaseController）
-	void SetPlatformController(IPlatformController* controller);
 
 //解析指令的详细信息
 private:
@@ -128,13 +100,6 @@ private:
 
 	static MainWorkFlow* s_pInstance;	// 唯一实例
 	static QMutex s_mutex;				//互斥锁保证线程安全
-
-//Lua脚本相关
-private:
-	std::vector<std::unique_ptr<LuaEngine>> m_vpLuaScript;
-    std::vector<std::unique_ptr<QMutex>> m_vLuaMutex;
-	QThreadPool* m_luaThreadPool;
-    std::vector<std::unique_ptr<IScriptRunner>> m_vScriptRunners;  // 脚本执行器
 
 //通信&寄存器相关
 private:
@@ -153,11 +118,10 @@ private:
 	CommProtocolBase* m_pComProBase;					//通信协议实例
     QMutex m_protocolMutex;
 
-	// 绑定相关成员
-	std::unique_ptr<IRegisterAccess>  m_registerAccess;   // 替代原 m_dataProvider
-	std::unique_ptr<RegisterBinding>  m_registerBinding;
-	std::unique_ptr<PlatformBinding>  m_platformBinding;
-	std::unique_ptr<LuaSyntaxChecker> m_syntaxChecker;    // 语法检查器
+	// 寄存器访问接口（RegisterProvider 在 cpp 内联定义）
+	std::unique_ptr<IRegisterAccess>  m_registerAccess;
+	// Lua 脚本引擎宿主（声明在 m_registerAccess 之后，确保先于后者析构）
+	std::unique_ptr<ScriptEngineHost> m_scriptHost;
 
 signals:
 	//通信实例的信号转发
