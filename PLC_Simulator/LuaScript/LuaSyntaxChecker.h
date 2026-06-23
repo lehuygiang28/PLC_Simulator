@@ -27,6 +27,9 @@ public:
     // 返回 true 表示语法通过；否则 errorMsg 含错误信息
     bool check(const QString& script, QString& errorMsg);
 
+    // 暴露校验状态机,供 Host 装入内建/模块桩
+    lua_State* state() const { return m_state; }
+
 private:
     lua_State* m_state;
     void installEngineStubs();  // IsLoopValid / sleep 桩

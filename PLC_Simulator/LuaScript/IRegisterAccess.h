@@ -27,6 +27,9 @@ public:
     virtual void SetFloat(int index, float value) = 0;
     virtual void SetDouble(int index, double value) = 0;
     virtual void SetString(int index, const QString& value) = 0;
+
+    // 通知寄存器数据已变更(批量刷新观察者,如寄存器表)
+    virtual void notifyChanged() = 0;
 };
 
 #endif // IREGISTERACCESS_H

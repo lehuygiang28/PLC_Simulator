@@ -159,6 +159,9 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
             self->SetRegisterVal(index, dt.u_Int16[0]);
             QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
         }
+        void notifyChanged() override {
+            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
+        }
     };
 
     m_registerAccess = std::make_unique<RegisterProvider>(this);
