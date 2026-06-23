@@ -1,4 +1,4 @@
-﻿/*
+/*
  * PLC Simulator - Industrial Communication Protocol Testing Tool
  * Copyright (c) 2025-2026 Wang Mao
  *
@@ -82,7 +82,7 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     m_strSendData.clear();
     m_strRecObjInfo = "";
     m_strRecData.clear();
-	
+
 	for (int i = 0 ; i < REGISTER_VAL_NUM;i++)
 	{
 		m_RegisterVal[i].store(0, std::memory_order_relaxed);
@@ -93,7 +93,9 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 	//m_pLuaScript = nullptr;
     m_vpLuaScript.resize(LUA_SCRIPT_NUM);
     m_vLuaMutex.resize(LUA_SCRIPT_NUM);
-    struct RegisterProvider : public LuaScript::IDataProvider {
+
+    // 仅实现寄存器读写，不含平台控制（平台控制由 PlatformBinding 负责）
+    struct RegisterProvider : public IRegisterAccess {
         MainWorkFlow* self;
         explicit RegisterProvider(MainWorkFlow* s) : self(s) {}
         int16_t GetInt16(int index) override { return self->GetRegisterVal(index); }
@@ -157,66 +159,21 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
             self->SetRegisterVal(index, dt.u_Int16[0]);
             QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
         }
-
-        void MovePlatformAbsInt32(int Xaddr, int Yaddr, int Angleaddr) override {
-            if (!self->m_pController) return;
-			int X, Y, Angle;
-			X = GetInt32(Xaddr);
-			Y = GetInt32(Yaddr);
-			Angle = GetInt32(Angleaddr);
-            self->m_pController->MovePlatformAbsInt32(X, Y, Angle);
-        }
-        void MovePlatformAbsFloat(int Xaddr, int Yaddr, int Angleaddr) override {
-            if (!self->m_pController) return;
-			double X, Y, Angle;
-			X = GetFloat(Xaddr);
-			Y = GetFloat(Yaddr);
-			Angle = GetFloat(Angleaddr);
-            self->m_pController->MovePlatformAbsFloat(X, Y, Angle);
-        }
-        void MovePlatformRelativeInt32(int Xaddr, int Yaddr, int Angleaddr) override {
-            if (!self->m_pController) return;
-            int X, Y, Angle;
-            X = GetInt32(Xaddr);
-            Y = GetInt32(Yaddr);
-            Angle = GetInt32(Angleaddr);
-            self->m_pController->MovePlatformRelativeInt32(X, Y, Angle);
-        }
-        void MovePlatformRelativeFloat(int Xaddr, int Yaddr, int Angleaddr) override {
-            if (!self->m_pController) return;
-			double X, Y, Angle;
-			X = GetFloat(Xaddr);
-			Y = GetFloat(Yaddr);
-			Angle = GetFloat(Angleaddr);
-            self->m_pController->MovePlatformRelativeFloat(X, Y, Angle);
-        }
-        void WriteCurrentPosInt32(int Xaddr, int Yaddr, int Angleaddr) override {
-            if (!self->m_pController) return;
-            int X, Y, Angle;
-            self->m_pController->GetCurrentPosInt32(X, Y, Angle);
-            SetInt32(Xaddr, X);
-            SetInt32(Yaddr, Y);
-            SetInt32(Angleaddr, Angle);
-        }
-        void WriteCurrentPosFloat(int Xaddr, int Yaddr, int Angleaddr) override {
-            if (!self->m_pController) return;
-            double dX, dY, dAngle;
-            self->m_pController->GetCurrentPosFloat(dX, dY, dAngle);
-            SetFloat(Xaddr, dX);
-            SetFloat(Yaddr, dY);
-            SetFloat(Angleaddr, dAngle);
-        }
     };
-    m_dataProvider = std::make_unique<RegisterProvider>(this);
+
+    m_registerAccess = std::make_unique<RegisterProvider>(this);
     m_luaThreadPool = new QThreadPool(this);
     m_luaThreadPool->setMaxThreadCount(QThread::idealThreadCount());
+
+    m_registerBinding = std::make_unique<RegisterBinding>(m_registerAccess.get());
+    m_platformBinding = std::make_unique<PlatformBinding>(m_registerAccess.get(), nullptr); // controller 延迟设置
 
     m_vScriptRunners.resize(LUA_SCRIPT_NUM);
     for (int i = 0; i < LUA_SCRIPT_NUM; ++i)
     {
         m_vpLuaScript[i] = std::unique_ptr<LuaScript>(LuaScript::InitialLuaScript());
-        m_vpLuaScript[i]->SetDataProvider(m_dataProvider.get());
-        ConnectLuaSignalSlot(m_vpLuaScript[i]);
+        m_vpLuaScript[i]->install(*m_registerBinding);
+        m_vpLuaScript[i]->install(*m_platformBinding);
         m_vLuaMutex[i] = std::make_unique<QMutex>();
         m_vScriptRunners[i] = std::make_unique<ScriptRunnerImpl>(this, i);
     }
@@ -258,13 +215,9 @@ MainWorkFlow::~MainWorkFlow()
 	// m_pCommInfo 会自动释放（unique_ptr）
 }
 
-void MainWorkFlow::ConnectLuaSignalSlot(std::unique_ptr<LuaScript> &pLuaScript)
+void MainWorkFlow::SetPlatformController(IPlatformController* controller)
 {
-
-
-
-
-
+    if (m_platformBinding) m_platformBinding->setController(controller);
 }
 
 //初始化静态实例
@@ -273,20 +226,20 @@ MainWorkFlow* MainWorkFlow::InitialWorkFlow(QObject* pParent /*= nullptr*/)
 	QMutexLocker locker(&s_mutex);
 
 	//不存在则创建
-	if (s_pInstance == nullptr) 
+	if (s_pInstance == nullptr)
 	{
 		s_pInstance = new MainWorkFlow(pParent);
 	}
 
 	return s_pInstance;
-	
+
 }
 
 //释放单例实例
 void MainWorkFlow::ReleaseWorkFlow()
 {
 	QMutexLocker locker(&s_mutex);
-	
+
 	if (s_pInstance != nullptr)
 	{
 		delete s_pInstance;
@@ -378,8 +331,8 @@ bool MainWorkFlow::OpenComm()
 
                     emit dataReceived(objectInfo,strData);
                 }
-                
-				
+
+
 			});
 
 			connect(m_pComm, &CommBase::dataSend, this, [this](QString objectInfo, QByteArray strData) {
@@ -449,7 +402,7 @@ bool MainWorkFlow::CreateCommProtocol(ProtocolType ProType)
 		m_pComProBase = new CommProMitsubishiQBinary(this);
 	}
 	break;
-	case ProtocolType::eProRegKeyencePCLink:				
+	case ProtocolType::eProRegKeyencePCLink:
 	{
 		if (m_pComProBase != nullptr)
 		{
@@ -475,55 +428,6 @@ bool MainWorkFlow::CreateCommProtocol(ProtocolType ProType)
 	return true;
 }
 
-// void MainWorkFlow::WorkProcess(QByteArray& RecInfo)
-// {
-// 	if (RecInfo  == "") return;
-// 
-// 	CmdType CurrentCmd = CmdType::eCmdUnkown;
-// 
-// 	//1. 先解析接收到的内容是否符合当前通信协议格式
-// 	if (!WorkProcess_AnalyzeReceiveInfo(RecInfo, CurrentCmd))
-// 		return;
-// 
-// 	QByteArray strSend;
-// 
-// 	int nCurAddr = 0;
-// 	int nDataNum = 0;
-// 
-// 	//2. 解析当前指令的详细信息
-// 	switch (CurrentCmd)
-// 	{
-// 	case CmdType::eCmdWriteReg:
-// 
-// 		if (!WorkProcess_WriteReg(RecInfo, strSend, nCurAddr, nDataNum))
-// 		{
-// 			return;
-// 		}
-// 		break;
-// 	case CmdType::eCmdReadReg:
-// 		if (!WorkProcess_ReadReg(RecInfo, strSend, nCurAddr, nDataNum))
-// 		{
-// 			return;
-// 		}
-// 		break;
-// 	default:
-// 		return;
-// 		break;
-// 	}
-// 
-// 	//3. 若是写入指令需要发送一个更新GUI表格显示的信号
-// 	if (m_bDataChanged)
-// 	{
-// 		emit RegisterDataUpdate();
-// 		m_bDataChanged = false;
-// 	}
-// 
-// 
-// 	//4. 回复客户端消息
-// 	WorkProcess_SendCommInfo(strSend);
-// 
-// }
-
 bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
 {
     if (RecInfo == "") return false;
@@ -531,7 +435,6 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
     if (m_pComProBase == nullptr) return false;
 
 	std::unique_ptr<CommProtocolBase> pro;
-   // CommProtocolBase* pro = nullptr;
     if (dynamic_cast<CommProMitsubishiQBinary*>(m_pComProBase) != nullptr)
     {
         pro = std::make_unique<CommProMitsubishiQBinary>(nullptr);
@@ -548,7 +451,6 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
     CmdType CurrentCmd = CmdType::eCmdUnkown;
     if (!pro->AnalyzeCmdInfo(RecInfo, CurrentCmd))
     {
-        //delete pro;
         return false;
     }
 
@@ -564,7 +466,6 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         std::vector<int16_t> vnCmdWriteData;
         if (!pro->AnalyzeWriteReg(RecInfo, nCmdRegAddr, nCmdRedNum, vnCmdWriteData))
         {
-           // delete pro;
             return false;
         }
         nCurAddr = nCmdRegAddr;
@@ -586,7 +487,6 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         QByteArray strSend;
         if (!pro->PackReportWriteRegInfo(strSend))
         {
-            //delete pro;
             return false;
         }
         Reply = strSend;
@@ -598,7 +498,6 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         int nCmdRedNum = 0;
         if (!pro->AnalyzeReadReg(RecInfo, nCmdRegAddr, nCmdRedNum))
         {
-          //  delete pro;
             return false;
         }
         nCurAddr = nCmdRegAddr;
@@ -617,14 +516,12 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         QByteArray strSend;
         if (!pro->PackReportReadRegInfo(strSend, nCmdRegAddr, nCmdRedNum, vnCmdData))
         {
-          //  delete pro;
             return false;
         }
         Reply = strSend;
     }
     break;
     default:
-       // delete pro;
         return false;
     }
 
@@ -634,7 +531,6 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         m_bDataChanged = false;
     }
 
-  //  delete pro;
     return true;
 }
 
@@ -663,7 +559,7 @@ int16_t MainWorkFlow::GetRegisterVal(int Addr)
 bool MainWorkFlow::SetRegisterVal(int Addr, const int16_t& nsetVal)
 {
 	if (Addr >= m_RegisterVal.size())	return false;
-	
+
 	m_RegisterVal.at(Addr).store(nsetVal);
 
 	return true;
@@ -726,114 +622,3 @@ IScriptRunner* MainWorkFlow::GetScriptRunner(int nIndex)
     if (nIndex < 0 || nIndex >= static_cast<int>(m_vScriptRunners.size())) return nullptr;
     return m_vScriptRunners[nIndex].get();
 }
-
-// bool MainWorkFlow::WorkProcess_AnalyzeReceiveInfo(QByteArray& strRecevie,CmdType& CurCmdType)
-// {
-// 	if (m_pComProBase == nullptr)	return false;
-// 
-// 	//2. 解析数据
-// 	if (!m_pComProBase->AnalyzeCmdInfo(strRecevie, CurCmdType))
-// 	{
-// // 		if (m_pComm != nullptr)
-// // 		{
-// // 			m_pComm->SendData("");
-// // 		}
-// 		return false;
-// 	}
-// 
-// 	return true;
-// }
-// 
-// bool MainWorkFlow::WorkProcess_WriteReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum)
-// {
-// 	//2.20250612	wm	解析客户端信息
-// 	if (m_pComProBase == nullptr)	return false;
-// 
-// 	long nCmdRegAddr = 0;
-// 	int nCmdRedNum = 0;
-// 
-// 	std::vector<int16_t> vnCmdWriteData;
-// 
-// 	if (!m_pComProBase->AnalyzeWriteReg(strRecevie, nCmdRegAddr, nCmdRedNum, vnCmdWriteData))
-// 	{
-// 		return false;
-// 	}
-// 
-// 	nAddress = nCmdRegAddr;
-// 	nDataNum = nCmdRedNum;
-// 	//3.20250612	wm	根据客户端信息进行相应处理，写入数据值
-// 	for (int i = 0; i < nCmdRedNum; i++)
-// 	{
-// 		int nPLCAddr = nCmdRegAddr + i;
-// 		if (nPLCAddr > m_RegisterVal.size())
-// 		{
-// 			break;
-// 		}
-// 		int nPreData = m_RegisterVal.at(nPLCAddr).load();
-// 
-// 		m_RegisterVal.at(nPLCAddr).store(vnCmdWriteData.at(i));
-// 
-// 		if (nPreData != vnCmdWriteData.at(i))
-// 		{
-// 			m_bDataChanged = true;
-// 		}
-// 	}
-// 
-// 
-// 	//4.20250612	wm	打包回复给客户端的信息
-// 	if (!m_pComProBase->PackReportWriteRegInfo(strSend))
-// 	{
-// 		return false;
-// 	}
-// 
-// 	return true;
-// }
-// 
-// bool MainWorkFlow::WorkProcess_ReadReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum)
-// {
-// 	//2.20250612	wm	解析客户端信息
-// 	if (m_pComProBase == nullptr)	return false;
-// 
-// 	long nCmdRegAddr = 0;
-// 	int nCmdRedNum = 0;
-// 
-// 	if (!m_pComProBase->AnalyzeReadReg(strRecevie, nCmdRegAddr, nCmdRedNum))
-// 	{
-// 		return false;
-// 	}
-// 
-// 	nAddress = nCmdRegAddr;
-// 	nDataNum = nCmdRedNum;
-// 	//3.20250612	wm	根据客户端信息进行相应处理,读取数据值
-// 	std::vector<int16_t> vnCmdData;
-// 	vnCmdData.resize(nCmdRedNum);
-// 
-// 	for (int i = 0; i < nCmdRedNum; i++)
-// 	{
-// 		int nPLCAddr = nCmdRegAddr + i;
-// 		if (nPLCAddr > m_RegisterVal.size())
-// 		{
-// 			break;
-// 		}
-// 
-// 		vnCmdData.at(i) = m_RegisterVal.at(nPLCAddr).load();
-// 	}
-// 
-// 	//4.20250612	wm	打包回复给客户端的信息
-// 	if (!m_pComProBase->PackReportReadRegInfo(strSend, nCmdRegAddr, nCmdRedNum, vnCmdData))
-// 	{
-// 		return false;
-// 	}
-// 
-// 
-// 	return true;
-// }
-// 
-// bool MainWorkFlow::WorkProcess_SendCommInfo(const QByteArray& strSend)
-// {
-// 	if (m_pComm == nullptr)	return false;
-// 
-// 	if (!m_pComm->SendData(strSend)) return false;
-// 
-// 	return true;
-// }

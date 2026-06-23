@@ -21,7 +21,10 @@
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
 #include "LuaScript/LuaScript.h"
-
+#include "LuaScript/IRegisterAccess.h"
+#include "LuaScript/IPlatformController.h"
+#include "LuaScript/RegisterBinding.h"
+#include "LuaScript/PlatformBinding.h"
 
 
 #ifdef _WIN32
@@ -76,10 +79,10 @@ public:
 	bool CreateCommProtocol(ProtocolType ProType);
 
 	//主要工作函数.当接收到数据时,通过该函数进行流程处理
-	void	WorkProcess(QByteArray& RecInfo);	
+	void	WorkProcess(QByteArray& RecInfo);
 	bool	ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply);
 
-	
+
 	CommBase* GetCommBase();
 
 	//寄存器相关
@@ -99,10 +102,12 @@ public:
 
     bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
-    
+
+	// 注入平台控制器（延迟注入，替代原 SetBaseController）
+	void SetPlatformController(IPlatformController* controller);
 
 //解析指令的详细信息
-private:	
+private:
 	bool	WorkProcess_AnalyzeReceiveInfo(QByteArray& strRecevie,CmdType& CurCmdType);
 
 	bool	WorkProcess_WriteReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum);
@@ -110,7 +115,7 @@ private:
 
 	bool	WorkProcess_SendCommInfo(const QByteArray& strSend);
 //MainWorkFlow初始化相关
-private:	
+private:
 	explicit MainWorkFlow(QObject* pParent = nullptr);	//构造函数私有化,全局只能有一个MainWorkFlow实例
 
 	static MainWorkFlow* s_pInstance;	// 唯一实例
@@ -123,11 +128,8 @@ private:
 	QThreadPool* m_luaThreadPool;
     std::vector<std::unique_ptr<IScriptRunner>> m_vScriptRunners;  // 脚本执行器
 
-	//链接lua信号槽
-	void ConnectLuaSignalSlot(std::unique_ptr<LuaScript> &pLuaScript);
-
-//通信&寄存器相关	
-private:	
+//通信&寄存器相关
+private:
 	std::vector<std::atomic_int16_t> m_RegisterVal;		//寄存器数据
 	QString m_strSendObjInfo;						//发送数据的对象信息
 	QByteArray m_strSendData;							//发送的数据
@@ -139,11 +141,15 @@ private:
 	CommBase::CommInfoBase* m_pCommInfo;//通信信息实例（智能指针管理）
 	std::unique_ptr<CommBase::CommInfoBase> m_ownedCommInfo; // 业务层自持有的通信信息
 	bool	m_bValidComm;								//通信实例是否有效标志
-	//CommStatus						m_CommStatus;		// 通信状态
 
 	CommProtocolBase* m_pComProBase;					//通信协议实例
     QMutex m_protocolMutex;
-    std::unique_ptr<LuaScript::IDataProvider> m_dataProvider;
+
+	// 绑定相关成员
+	std::unique_ptr<IRegisterAccess>  m_registerAccess;   // 替代原 m_dataProvider
+	std::unique_ptr<RegisterBinding>  m_registerBinding;
+	std::unique_ptr<PlatformBinding>  m_platformBinding;
+
 signals:
 	//通信实例的信号转发
 	void commLogRecord(QString strLogInfo);
@@ -151,27 +157,6 @@ signals:
 	void dataSend(QString objectInfo, QByteArray recData);
 
 	void RegisterDataUpdate();	//寄存器数据发生改变的信号
-
-public:
-
-	//平台控制器
-	class IBaseController
-	{
-	public:
-		virtual ~IBaseController() = default;
-		virtual void MovePlatformAbsFloat(double dX, double dY, double dAngle) = 0;
-		virtual void MovePlatformRelativeFloat(double dX, double dY, double dAngle) = 0;
-		virtual void MovePlatformAbsInt32(int32_t nX, int32_t nY, int32_t nAngle) = 0;
-		virtual void MovePlatformRelativeInt32(int32_t nX, int32_t nY, int32_t nAngle) = 0;
-		virtual void GetCurrentPosInt32(int32_t& nX, int32_t& nY, int32_t& nAngle) = 0;
-		virtual void GetCurrentPosFloat(double& dX, double& dY, double& dAngle) = 0;
-	};
-	void SetBaseController(IBaseController* provider) { m_pController = provider; }
-
-private:
-	IBaseController* m_pController = nullptr;
-
-	
 };
 
 #endif //MAIN_WORK_FLOW_H

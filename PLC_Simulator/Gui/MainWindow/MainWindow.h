@@ -16,6 +16,7 @@
 #include "ScriptManager.h"
 #include "Config/ConfigManager.h"
 #include "MainWorkFlow.h"
+#include "LuaScript/IPlatformController.h"
 #include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>
@@ -85,7 +86,7 @@ private:
 
     // 工作流
     MainWorkFlow* m_pWorkFlow;
-    std::unique_ptr<MainWorkFlow::IBaseController> m_PlatformController;
+    std::unique_ptr<IPlatformController> m_PlatformController;
     std::unique_ptr<CommBase::CommInfoBase> m_CurInfo;
 
     // 配置管理

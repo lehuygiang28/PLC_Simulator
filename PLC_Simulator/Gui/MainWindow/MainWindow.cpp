@@ -88,7 +88,7 @@ MainWindow::MainWindow(QWidget *parent)
 	// 更新表格显示
 	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
 
-	struct SimulationPlatformController : public MainWorkFlow::IBaseController
+	struct SimulationPlatformController : public IPlatformController
 	{
 		MainWindow *m_pParent;
 		explicit SimulationPlatformController(MainWindow *parent) : m_pParent(parent) {}
@@ -170,7 +170,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	if (m_pWorkFlow == nullptr)
 		return;
-	m_pWorkFlow->SetBaseController(m_PlatformController.get());
+	m_pWorkFlow->SetPlatformController(m_PlatformController.get());
 
 	// 平台位姿变化信号 → 自动写入寄存器
 	connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
