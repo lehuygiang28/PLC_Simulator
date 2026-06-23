@@ -153,6 +153,8 @@ void ScriptManager::openScriptEditor(int scriptIndex)
     // 创建新的编辑器窗口
     ScriptEditor* pScriptEditor = new ScriptEditor(m_parentWidget,
         m_workFlow->GetScriptRunner(scriptIndex - 1));
+    pScriptEditor->setSyntaxChecker(m_workFlow->GetSyntaxChecker());
+    pScriptEditor->setFunctionDocs(m_workFlow->ScriptFunctionDocs());
     pScriptEditor->setAttribute(Qt::WA_DeleteOnClose);
     pScriptEditor->setWindowModality(Qt::ApplicationModal);
     pScriptEditor->setScriptName(scriptPath);

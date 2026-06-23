@@ -62,21 +62,6 @@ private:
 	static int IsLoopValidWrapper(lua_State* L);
 	static int SleepWrapper(lua_State* L);
 
-private:
-	static lua_State* g_LuaCompileState;	//脚本编译检查状态机
-	static void InitialCompileLuaState();	//初始化脚本编译检查状态机
-
-public:
-	static void ReleaseCompileLuaState();	//释放脚本编译检查状态机
-	static bool CheckLuaScript(const QString& strLuaFile,QString& strErrorInfo);	//检查脚本是否正常
-	static QStringList getRegisteredFunctions() {
-        // 返回所有已注册到Lua状态机的函数列表
-        return QStringList() << "SetInt16" << "SetInt32" << "SetFloat" << "SetDouble" << "SetString"
-                            << "GetInt16" << "GetInt32" << "GetFloat" << "GetDouble" << "GetString"
-                            << "IsLoopValid"<< "sleep"
-                            << "MoveAbsInt32" << "MoveAbsFloat" << "MoveRelativeInt32" << "MoveRelativeFloat"
-							<< "WriteCurrentPosInt32" << "WriteCurrentPosFloat";
-    }
 };
 
 #endif	// LUASCRIPT_H

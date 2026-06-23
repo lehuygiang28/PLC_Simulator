@@ -19,8 +19,9 @@
 
 #include "CodeEditor.h"
 #include "LuaHighlighter.h"
+#include "ILuaBinding.h"
 
-class LuaScript;
+class LuaSyntaxChecker;
 
 // 脚本执行器接口,用于解耦 ScriptEditor 与具体执行实现
 class IScriptRunner
@@ -45,6 +46,13 @@ public:
 
     // 设置脚本执行器(依赖注入)
     void setScriptRunner(IScriptRunner* runner) { m_pScriptRunner = runner; }
+
+    // 注入语法检查器（由 ScriptManager 在创建编辑器后调用）
+    void setSyntaxChecker(LuaSyntaxChecker* checker) { m_pSyntaxChecker = checker; }
+
+    // 注入绑定函数文档列表（供函数菜单与语法高亮使用）
+    void setFunctionDocs(const QList<LuaFunctionDoc>& docs);
+
 
     void setScriptName(const QString &name);
     void loadScript(const QString &content);
@@ -92,6 +100,8 @@ private:
 
 private:
     IScriptRunner* m_pScriptRunner;
+    LuaSyntaxChecker* m_pSyntaxChecker = nullptr;  // 注入的语法检查器
+    QList<LuaFunctionDoc> m_functionDocs;           // 注入的绑定函数文档列表
 
     // 执行状态相关
     bool m_bExecuting = false;           // 是否正在执行脚本

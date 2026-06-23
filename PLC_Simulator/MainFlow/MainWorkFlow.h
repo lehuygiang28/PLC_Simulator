@@ -23,8 +23,10 @@
 #include "LuaScript/LuaScript.h"
 #include "LuaScript/IRegisterAccess.h"
 #include "LuaScript/IPlatformController.h"
+#include "LuaScript/ILuaBinding.h"
 #include "LuaScript/RegisterBinding.h"
 #include "LuaScript/PlatformBinding.h"
+#include "LuaScript/LuaSyntaxChecker.h"
 
 
 #ifdef _WIN32
@@ -100,6 +102,12 @@ public:
     // 获取指定索引的脚本执行器（实现 IScriptRunner 接口）
     IScriptRunner* GetScriptRunner(int nIndex);
 
+    // 获取语法检查器
+    LuaSyntaxChecker* GetSyntaxChecker();
+
+    // 聚合所有绑定的函数文档列表（供编辑器函数菜单与高亮使用）
+    QList<LuaFunctionDoc> ScriptFunctionDocs() const;
+
     bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
 
@@ -149,6 +157,7 @@ private:
 	std::unique_ptr<IRegisterAccess>  m_registerAccess;   // 替代原 m_dataProvider
 	std::unique_ptr<RegisterBinding>  m_registerBinding;
 	std::unique_ptr<PlatformBinding>  m_platformBinding;
+	std::unique_ptr<LuaSyntaxChecker> m_syntaxChecker;    // 语法检查器
 
 signals:
 	//通信实例的信号转发

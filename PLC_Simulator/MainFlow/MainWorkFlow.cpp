@@ -168,6 +168,11 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     m_registerBinding = std::make_unique<RegisterBinding>(m_registerAccess.get());
     m_platformBinding = std::make_unique<PlatformBinding>(m_registerAccess.get(), nullptr); // controller 延迟设置
 
+    // 构建语法检查器，装入各绑定桩
+    m_syntaxChecker = std::make_unique<LuaSyntaxChecker>();
+    m_syntaxChecker->addBinding(m_registerBinding.get());
+    m_syntaxChecker->addBinding(m_platformBinding.get());
+
     m_vScriptRunners.resize(LUA_SCRIPT_NUM);
     for (int i = 0; i < LUA_SCRIPT_NUM; ++i)
     {
@@ -193,9 +198,6 @@ MainWorkFlow::~MainWorkFlow()
 
 	// 显式清理LuaScript实例
 	m_vpLuaScript.clear();
-
-	// 释放全局编译检查状态机
-	LuaScript::ReleaseCompileLuaState();
 
 	// 关闭通信
 	if (m_pComm != nullptr)
@@ -621,4 +623,17 @@ IScriptRunner* MainWorkFlow::GetScriptRunner(int nIndex)
 {
     if (nIndex < 0 || nIndex >= static_cast<int>(m_vScriptRunners.size())) return nullptr;
     return m_vScriptRunners[nIndex].get();
+}
+
+LuaSyntaxChecker* MainWorkFlow::GetSyntaxChecker()
+{
+    return m_syntaxChecker.get();
+}
+
+QList<LuaFunctionDoc> MainWorkFlow::ScriptFunctionDocs() const
+{
+    QList<LuaFunctionDoc> docs;
+    if (m_registerBinding) docs.append(m_registerBinding->functions());
+    if (m_platformBinding) docs.append(m_platformBinding->functions());
+    return docs;
 }
