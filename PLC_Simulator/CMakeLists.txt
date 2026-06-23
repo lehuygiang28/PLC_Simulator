@@ -129,6 +129,7 @@ set(MAINFLOW_HEADERS
 set(LUA_SOURCES
     LuaScript/LuaScript.cpp
     LuaScript/LuaBindingUtil.cpp
+    LuaScript/RegisterBinding.cpp
 )
 
 set(LUA_HEADERS
@@ -137,6 +138,7 @@ set(LUA_HEADERS
     LuaScript/IRegisterAccess.h
     LuaScript/IPlatformController.h
     LuaScript/LuaBindingUtil.h
+    LuaScript/RegisterBinding.h
 )
 # Config 模块
 set(CONFIG_SOURCES
