@@ -69,7 +69,6 @@ private:
     double m_markCenterDistance = 20.0;
     double m_screenRatio = 200.0;
     double m_pixelsPerMm = 0.0;
-    double m_screenWidthPx = 0.0;
 };
 
 #endif // PLATFORMSCENE_H

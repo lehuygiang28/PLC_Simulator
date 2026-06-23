@@ -163,10 +163,7 @@ void PlatformCanvas::drawPlatform(QPainter& painter, const PlatformItem& item, Q
 
     painter.drawEllipse(center, radius, radius);
 
-    // 保存当前变换矩阵
-    painter.save();
-
-    // 移动到平台中心并旋转
+    // 移动到平台中心并旋转(translate/rotate 由函数末尾的 restore 统一撤销)
     painter.translate(center.x(), center.y());
     painter.rotate(item.pose.angleDeg);
 
@@ -185,7 +182,7 @@ void PlatformCanvas::drawPlatform(QPainter& painter, const PlatformItem& item, Q
     painter.drawLine(QPointF(0, -lineLength), QPointF(-arrowHalf, -lineLength + arrowLen));
     painter.drawLine(QPointF(0, -lineLength), QPointF( arrowHalf, -lineLength + arrowLen));
 
-    // 恢复变换矩阵
+    // 恢复画笔/画刷/变换
     painter.restore();
 }
 
@@ -203,10 +200,7 @@ void PlatformCanvas::drawBaseMark(QPainter& painter)
     painter.setPen(pen);
     painter.setBrush(colMark1());
 
-    // 保存当前变换
-    painter.save();
-
-    // 移动到Mark位置并旋转
+    // 移动到Mark位置并旋转(translate/rotate 由函数末尾的 restore 统一撤销)
     painter.translate(pos.x(), pos.y());
     painter.rotate(finalPose.angleDeg);
 
@@ -227,10 +221,8 @@ void PlatformCanvas::drawBaseMark(QPainter& painter)
     // 垂直部分（竖杠）- 右边
     painter.drawRect(spacing, -rectHeight, rectWidth, rectHeight);
 
-    // 恢复变换
+    // 恢复画笔/画刷/变换
     painter.restore();
-
-    // painter.restore();  // 原注释掉的标签绘制区域
 }
 
 void PlatformCanvas::drawLiveMark(QPainter& painter)
@@ -247,10 +239,7 @@ void PlatformCanvas::drawLiveMark(QPainter& painter)
     painter.setPen(pen);
     painter.setBrush(colMark2());
 
-    // 保存当前变换
-    painter.save();
-
-    // 移动到Mark位置并旋转
+    // 移动到Mark位置并旋转(translate/rotate 由函数末尾的 restore 统一撤销)
     painter.translate(pos.x(), pos.y());
     painter.rotate(finalPose.angleDeg);
 
@@ -269,10 +258,8 @@ void PlatformCanvas::drawLiveMark(QPainter& painter)
     // 绘制垂直部分
     painter.drawRect(spacing - rectWidth, 0, rectWidth, rectHeight);
 
-    // 恢复变换
+    // 恢复画笔/画刷/变换
     painter.restore();
-
-    // painter.restore();  // 原注释掉的标签绘制区域
 }
 
 void PlatformCanvas::drawVirtualMark(QPainter& painter)

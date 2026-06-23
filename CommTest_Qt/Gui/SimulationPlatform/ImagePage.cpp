@@ -37,6 +37,13 @@ double ImagePage::scale() const
     return m_viewer->scale();
 }
 
+void ImagePage::applyImage(const QImage& image, const QString& path)
+{
+    m_viewer->setImage(image);
+    m_imagePath = path;
+    emit imagePathChanged(m_imagePath);   // 路径变必发信号:加载图片的唯一出口
+}
+
 void ImagePage::loadDefaultImage()
 {
     QString appDir = QCoreApplication::applicationDirPath();
@@ -62,10 +69,7 @@ void ImagePage::loadDefaultImage()
         QString imagePath = configDir + "/" + files.first();
         QImage image(imagePath);
         if (!image.isNull())
-        {
-            m_viewer->setImage(image);
-            m_imagePath = imagePath;
-        }
+            applyImage(image, imagePath);
     }
 }
 
@@ -99,9 +103,7 @@ void ImagePage::loadImage()
     }
 
     // 显示图像
-    m_viewer->setImage(image);
-    m_imagePath = filePath;
-    emit imagePathChanged(m_imagePath);
+    applyImage(image, filePath);
 
     // 获取原文件的扩展名
     QFileInfo fileInfo(filePath);

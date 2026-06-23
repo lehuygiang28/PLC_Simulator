@@ -9,22 +9,23 @@
 #include <QGuiApplication>
 #include <QScreen>
 
-namespace {
-// 默认 Mark 可见性:虚拟 Mark 默认隐藏(与原行为一致)
-}
-
 PlatformScene::PlatformScene(QObject* parent)
     : QObject(parent)
 {
     m_virtualMark.visible = false;  // 原 showVirtualMarkCheckBox 默认 false
-    m_screenWidthPx = QGuiApplication::primaryScreen()->availableGeometry().width();
     recomputeScale();
 }
 
 void PlatformScene::recomputeScale()
 {
-    if (m_screenRatio > 0.0)
-        m_pixelsPerMm = m_screenWidthPx / m_screenRatio;  // 原 m_scale = m_ScreenWidth / m_Ratio
+    if (m_screenRatio <= 0.0)
+        return;
+    QScreen* screen = QGuiApplication::primaryScreen();
+    if (!screen)
+        return;   // headless 环境下 primaryScreen 可能为空
+    // 现取主屏宽度,不缓存:换屏/改分辨率后再次调参即可跟上(原 m_scale = m_ScreenWidth / m_Ratio)
+    const double screenWidthPx = screen->availableGeometry().width();
+    m_pixelsPerMm = screenWidthPx / m_screenRatio;
 }
 
 PlatformItem& PlatformScene::itemRef(Platform which)

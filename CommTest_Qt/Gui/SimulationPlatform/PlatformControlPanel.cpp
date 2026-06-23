@@ -27,13 +27,17 @@ PlatformControlPanel::PlatformControlPanel(PlatformScene* scene, QWidget* parent
     wireConnections();
 
     // 把初始复选框状态写入 scene(保证 scene 与 UI 初值一致)
-    m_scene->setPlatformVisible(Platform::Base, m_showBaseCheck->isChecked());
-    m_scene->setPlatformVisible(Platform::Live, m_showLiveCheck->isChecked());
-    m_scene->setBaseMarkVisible(m_showBaseMarkCheck->isChecked());
-    m_scene->setLiveMarkVisible(m_showLiveMarkCheck->isChecked());
-    m_scene->setVirtualMarkVisible(m_showVirtualMarkCheck->isChecked());
-    m_scene->setBaseMarkFollows(m_baseMarkFollowCheck->isChecked());
-    m_scene->setLiveMarkFollows(m_liveMarkFollowCheck->isChecked());
+    // 屏蔽 scene 信号:7 次写入只在末尾统一刷新一次,避免重复 refreshFromScene/重绘
+    {
+        QSignalBlocker blk(m_scene);
+        m_scene->setPlatformVisible(Platform::Base, m_showBaseCheck->isChecked());
+        m_scene->setPlatformVisible(Platform::Live, m_showLiveCheck->isChecked());
+        m_scene->setBaseMarkVisible(m_showBaseMarkCheck->isChecked());
+        m_scene->setLiveMarkVisible(m_showLiveMarkCheck->isChecked());
+        m_scene->setVirtualMarkVisible(m_showVirtualMarkCheck->isChecked());
+        m_scene->setBaseMarkFollows(m_baseMarkFollowCheck->isChecked());
+        m_scene->setLiveMarkFollows(m_liveMarkFollowCheck->isChecked());
+    }
 
     // 同步一次初值
     refreshFromScene();

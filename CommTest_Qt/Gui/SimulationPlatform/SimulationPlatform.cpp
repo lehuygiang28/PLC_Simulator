@@ -7,17 +7,35 @@
  */
 
 #include "SimulationPlatform.h"
+#include "PlatformCanvas.h"
+#include "PlatformControlPanel.h"
+#include "PlatformScene.h"
+#include "PlatformParamsDialog.h"
+#include "CollapsibleGroupBox.h"
 #include "ImagePage.h"
 #include "ThemeManager.h"
+
 #include <QStackedWidget>
 #include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QActionGroup>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QLabel>
+#include <QStatusBar>
+#include <QDialog>
+#include <QRect>
+#include <QGuiApplication>
+#include <QScreen>
 
 SimulationPlatform::SimulationPlatform(QWidget *parent)
     : QMainWindow(parent)
-    , simMenu(nullptr)
-    , imageMenu(nullptr)
-    , statusLeft(nullptr)
-    , statusRight(nullptr)
+    , m_simMenu(nullptr)
+    , m_imageMenu(nullptr)
+    , m_statusLeft(nullptr)
+    , m_statusRight(nullptr)
 {
     m_scene = new PlatformScene(this);
 
@@ -28,7 +46,7 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
 
     // 主题切换时实时重绘画布与图像区(控件由全局 qss 自动重绘)
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this](Theme) {
-        if (canvas) canvas->update();
+        if (m_canvas) m_canvas->update();
         if (m_imagePage) m_imagePage->update();
         update();
     });
@@ -62,12 +80,12 @@ void SimulationPlatform::setSceneParams(double markCenterDistance, double screen
 
 void SimulationPlatform::setupUI()
 {
-    stack = new QStackedWidget(this);
-    setCentralWidget(stack);
+    m_stack = new QStackedWidget(this);
+    setCentralWidget(m_stack);
 
     // ========== 模拟平台页面 ==========
-    simulationPage = new QWidget(this);
-    QVBoxLayout *simPageLayout = new QVBoxLayout(simulationPage);  // 上:收起按钮栏  下:画布+控制面板
+    m_simulationPage = new QWidget(this);
+    QVBoxLayout *simPageLayout = new QVBoxLayout(m_simulationPage);  // 上:收起按钮栏  下:画布+控制面板
     simPageLayout->setContentsMargins(9, 6, 9, 9);  // 四周留白,避免画布贴左、面板贴右
 
     // 顶栏:收起/展开按钮(右对齐,提到画布与面板的共同上方;折叠后画布全宽时按钮仍在右上角)
@@ -81,8 +99,8 @@ void SimulationPlatform::setupUI()
     simPageLayout->addLayout(simLayout, 1);
 
     // 画布(占左侧主区)
-    canvas = new PlatformCanvas(m_scene, this);
-    simLayout->addWidget(canvas, 1);
+    m_canvas = new PlatformCanvas(m_scene, this);
+    simLayout->addWidget(m_canvas, 1);
 
     // 右侧控制面板
     m_controlPanel = new PlatformControlPanel(m_scene, this);
@@ -96,42 +114,42 @@ void SimulationPlatform::setupUI()
     });
 
     // 模拟平台页加入栈
-    stack->addWidget(simulationPage);   // index 0
+    m_stack->addWidget(m_simulationPage);   // index 0
 
     // 图片显示页
     m_imagePage = new ImagePage(this);
-    stack->addWidget(m_imagePage);      // index 1
+    m_stack->addWidget(m_imagePage);      // index 1
 
     // 菜单栏(视图/模拟平台/图像)
     buildMenuBar();
 
     // 状态栏:左 = 上下文文本(路径/参数),右 = 缩放百分比
-    statusLeft  = new QLabel(this);
-    statusRight = new QLabel(this);
-    statusBar()->addWidget(statusLeft, 1);
-    statusBar()->addPermanentWidget(statusRight);
+    m_statusLeft  = new QLabel(this);
+    m_statusRight = new QLabel(this);
+    statusBar()->addWidget(m_statusLeft, 1);
+    statusBar()->addPermanentWidget(m_statusRight);
 
     // 图片缩放变化 → 状态栏右侧百分比(仅图片页显示)
     connect(m_imagePage, &ImagePage::scaleChanged, this, [this](double scale) {
-        if (stack->currentIndex() == 1)
-            statusRight->setText(QStringLiteral("缩放: %1%").arg(QString::number(scale * 100.0, 'f', 0)));
+        if (m_stack->currentIndex() == 1)
+            m_statusRight->setText(QStringLiteral("缩放: %1%").arg(QString::number(scale * 100.0, 'f', 0)));
     });
 
     // 图片路径变化 → 状态栏左侧路径更新(仅图片页显示)
     connect(m_imagePage, &ImagePage::imagePathChanged, this, [this](const QString& path) {
-        if (stack->currentIndex() == 1)
-            statusLeft->setText(path.isEmpty() ? QStringLiteral("未加载图片") : path);
+        if (m_stack->currentIndex() == 1)
+            m_statusLeft->setText(path.isEmpty() ? QStringLiteral("未加载图片") : path);
     });
 
     // 参数变化 → 模拟页状态栏文本刷新
     connect(this, &SimulationPlatform::sceneParamsChanged, this, [this](double, double) {
-        if (stack->currentIndex() == 0)
+        if (m_stack->currentIndex() == 0)
             updateStatusBarForPage(0);
     });
 
     // 场景数据变化 → 模拟页状态栏实时刷新（预览期对话框修改场景时同步更新）
     connect(m_scene, &PlatformScene::changed, this, [this]() {
-        if (stack->currentIndex() == 0)
+        if (m_stack->currentIndex() == 0)
             updateStatusBarForPage(0);
     });
 
@@ -148,12 +166,12 @@ void SimulationPlatform::buildMenuBar()
 
     QActionGroup* pageGroup = new QActionGroup(this);
     pageGroup->setExclusive(true);
-    actPageSim = viewMenu->addAction(QStringLiteral("模拟平台"));
-    actPagePic = viewMenu->addAction(QStringLiteral("图片显示"));
-    for (QAction* a : { actPageSim, actPagePic }) { a->setCheckable(true); pageGroup->addAction(a); }
-    actPageSim->setChecked(true);
-    connect(actPageSim, &QAction::triggered, this, [this]() { showPage(0); });
-    connect(actPagePic, &QAction::triggered, this, [this]() { showPage(1); });
+    m_actPageSim = viewMenu->addAction(QStringLiteral("模拟平台"));
+    m_actPagePic = viewMenu->addAction(QStringLiteral("图片显示"));
+    for (QAction* a : { m_actPageSim, m_actPagePic }) { a->setCheckable(true); pageGroup->addAction(a); }
+    m_actPageSim->setChecked(true);
+    connect(m_actPageSim, &QAction::triggered, this, [this]() { showPage(0); });
+    connect(m_actPagePic, &QAction::triggered, this, [this]() { showPage(1); });
 
     viewMenu->addSeparator();
 
@@ -172,10 +190,10 @@ void SimulationPlatform::buildMenuBar()
     }
 
     // ===== 模拟平台(仅模拟页可用)=====
-    simMenu = mbar->addMenu(QStringLiteral("模拟平台"));
-    QAction* actParam = simMenu->addAction(QStringLiteral("参数设置…"));
+    m_simMenu = mbar->addMenu(QStringLiteral("模拟平台"));
+    QAction* actParam = m_simMenu->addAction(QStringLiteral("参数设置…"));
     connect(actParam, &QAction::triggered, this, &SimulationPlatform::openParamDialog);
-    simMenu->addSeparator();
+    m_simMenu->addSeparator();
     bindGroupToggle(m_controlPanel->baseGroup(),        QStringLiteral("基准平台"));
     bindGroupToggle(m_controlPanel->liveGroup(),        QStringLiteral("实时平台"));
     bindGroupToggle(m_controlPanel->baseMarkGroup(),    QStringLiteral("基准Mark"));
@@ -183,35 +201,35 @@ void SimulationPlatform::buildMenuBar()
     bindGroupToggle(m_controlPanel->virtualMarkGroup(), QStringLiteral("虚拟Mark"), false);  // 虚拟Mark 默认不显示
 
     // ===== 图像(仅图片页可用)=====
-    imageMenu = mbar->addMenu(QStringLiteral("图像"));
-    QAction* actLoad = imageMenu->addAction(QStringLiteral("加载图片…"));
+    m_imageMenu = mbar->addMenu(QStringLiteral("图像"));
+    QAction* actLoad = m_imageMenu->addAction(QStringLiteral("加载图片…"));
     connect(actLoad, &QAction::triggered, m_imagePage, &ImagePage::loadImage);
 }
 
 void SimulationPlatform::showPage(int index)
 {
     // 切页前记住离开页的窗口尺寸(仅本会话,不落盘)
-    const int prev = stack->currentIndex();
+    const int prev = m_stack->currentIndex();
     if (prev != index && prev >= 0 && prev < 2)
         m_pageSize[prev] = size();
 
-    stack->setCurrentIndex(index);
+    m_stack->setCurrentIndex(index);
 
     // 让窗口最小尺寸只受当前页约束:非当前页 sizePolicy 设为 Ignored,
     // 其 qSmartMinSize 归 0,QStackedLayout 不再用它钳制最小高度。
-    for (int i = 0; i < stack->count(); ++i)
+    for (int i = 0; i < m_stack->count(); ++i)
     {
         const bool cur = (i == index);
-        stack->widget(i)->setSizePolicy(cur ? QSizePolicy::Preferred : QSizePolicy::Ignored,
+        m_stack->widget(i)->setSizePolicy(cur ? QSizePolicy::Preferred : QSizePolicy::Ignored,
                                         cur ? QSizePolicy::Preferred : QSizePolicy::Ignored);
     }
 
-    if (index == 0 && actPageSim) actPageSim->setChecked(true);
-    if (index == 1 && actPagePic) actPagePic->setChecked(true);
+    if (index == 0 && m_actPageSim) m_actPageSim->setChecked(true);
+    if (index == 1 && m_actPagePic) m_actPagePic->setChecked(true);
 
     // 页面专属菜单互斥启用:模拟页→模拟平台菜单可用、图像菜单置灰;反之亦然
-    if (simMenu)   simMenu->menuAction()->setEnabled(index == 0);
-    if (imageMenu) imageMenu->menuAction()->setEnabled(index == 1);
+    if (m_simMenu)   m_simMenu->menuAction()->setEnabled(index == 0);
+    if (m_imageMenu) m_imageMenu->menuAction()->setEnabled(index == 1);
 
     updateStatusBarForPage(index);
 
@@ -222,24 +240,24 @@ void SimulationPlatform::showPage(int index)
 
 void SimulationPlatform::updateStatusBarForPage(int index)
 {
-    if (!statusLeft || !statusRight)
+    if (!m_statusLeft || !m_statusRight)
         return;
 
     if (index == 0)
     {
         // 模拟页:产品尺寸 + 缩放比
-        statusLeft->setText(QStringLiteral("产品尺寸: %1 mm    缩放比: %2 px/mm")
+        m_statusLeft->setText(QStringLiteral("产品尺寸: %1 mm    缩放比: %2 px/mm")
                                 .arg(QString::number(m_scene->markCenterDistance()))
                                 .arg(QString::number(m_scene->screenRatio())));
-        statusRight->clear();
+        m_statusRight->clear();
     }
     else
     {
         // 图片页:路径 + 缩放百分比
         const QString path = m_imagePage ? m_imagePage->imagePath() : QString();
-        statusLeft->setText(path.isEmpty() ? QStringLiteral("未加载图片") : path);
+        m_statusLeft->setText(path.isEmpty() ? QStringLiteral("未加载图片") : path);
         if (m_imagePage)
-            statusRight->setText(QStringLiteral("缩放: %1%")
+            m_statusRight->setText(QStringLiteral("缩放: %1%")
                                      .arg(QString::number(m_imagePage->scale() * 100.0, 'f', 0)));
     }
 }
@@ -264,7 +282,7 @@ void SimulationPlatform::moveToScreenCorner(int corner)
 
 void SimulationPlatform::bindGroupToggle(CollapsibleGroupBox* g, const QString& title, bool visible)
 {
-    QAction* a = simMenu->addAction(title);
+    QAction* a = m_simMenu->addAction(title);
     a->setCheckable(true);
     a->setChecked(visible);   // 初始勾选状态(connect 前设置,不触发)
     g->setVisible(visible);   // 同步初始可见性
@@ -282,12 +300,7 @@ void SimulationPlatform::openParamDialog()
     PlatformParamsDialog dlg(m_scene, this);
     if (dlg.exec() == QDialog::Accepted)
         emit sceneParamsChanged(m_scene->markCenterDistance(), m_scene->screenRatio());
-    if (stack->currentIndex() == 0)
+    if (m_stack->currentIndex() == 0)
         updateStatusBarForPage(0);
-}
-
-void SimulationPlatform::resizeEvent(QResizeEvent *event)
-{
-    QMainWindow::resizeEvent(event);
 }
 

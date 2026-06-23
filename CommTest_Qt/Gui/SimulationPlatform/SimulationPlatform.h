@@ -9,41 +9,21 @@
 #ifndef SIMULATIONPLATFORM_H
 #define SIMULATIONPLATFORM_H
 
-#include <QApplication>
-#include <QWidget>
-#include <QPainter>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QResizeEvent>
-#include <QPointF>
-#include <QPoint>
-#include <QMap>
-#include <QTimer>
-#include <QPalette>
-#include <QScreen>
-#include <QFont>
 #include <QMainWindow>
-#include <QStackedWidget>
-#include <QMenuBar>
-#include <QMenu>
-#include <QAction>
-#include <QActionGroup>
-#include <QStatusBar>
-#include <QDialog>
-#include <QPushButton>
-#include <QImage>
-#include <QWheelEvent>
-#include <QMouseEvent>
-#include <cmath>
+#include <QSize>
+#include <QString>
+#include "PlatformTypes.h"   // 信号参数 Pose / Platform
 
-// 包含拆分出的控件头文件
-#include "PlatformCanvas.h"
-#include "ImagePage.h"
-#include "CollapsibleGroupBox.h"
-#include "PlatformScene.h"
-#include "PlatformControlPanel.h"
-#include "PlatformParamsDialog.h"
+// 成员均为指针,前向声明即可;完整定义在 .cpp 中包含
+class QStackedWidget;
+class QMenu;
+class QAction;
+class QLabel;
+class PlatformCanvas;
+class PlatformControlPanel;
+class PlatformScene;
+class ImagePage;
+class CollapsibleGroupBox;
 
 class SimulationPlatform : public QMainWindow
 {
@@ -64,22 +44,19 @@ public:
 
     void setSceneParams(double markCenterDistance, double screenRatio);
 
-protected:
-    void resizeEvent(QResizeEvent *event) override;
-
 private:
     // UI控件
-    PlatformCanvas* canvas;
+    PlatformCanvas* m_canvas;
 
     // 右侧控制面板
     PlatformControlPanel* m_controlPanel = nullptr;
 
     // 页面/菜单/状态栏
-    QStackedWidget* stack;
-    QAction* actPageSim;
-    QAction* actPagePic;
-    QMenu* simMenu;
-    QMenu* imageMenu;
+    QStackedWidget* m_stack;
+    QAction* m_actPageSim;
+    QAction* m_actPagePic;
+    QMenu* m_simMenu;
+    QMenu* m_imageMenu;
     QSize m_pageSize[2];   // 各页窗口尺寸的会话内记忆(0=模拟页 1=图片页),不落盘
     void buildMenuBar();
     void showPage(int index);
@@ -88,12 +65,12 @@ private:
     void openParamDialog();
 
     // 页面切换相关
-    QWidget* simulationPage;      // 模拟平台页面
+    QWidget* m_simulationPage;      // 模拟平台页面
     ImagePage* m_imagePage = nullptr;  // 图片显示页面
 
     // 状态栏
-    QLabel* statusLeft;
-    QLabel* statusRight;
+    QLabel* m_statusLeft;
+    QLabel* m_statusRight;
     void updateStatusBarForPage(int index);
 
     // 场景数据模型(单一数据源)

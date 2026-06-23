@@ -12,6 +12,7 @@
 #include <QWidget>
 #include <QString>
 class ImageViewer;
+class QImage;
 
 class ImagePage : public QWidget
 {
@@ -30,6 +31,7 @@ public slots:
 
 private:
     void loadDefaultImage();        // 原 loadDefaultImage
+    void applyImage(const QImage& image, const QString& path);  // 成对更新:显示图 + 记录路径并发 imagePathChanged
 
     ImageViewer* m_viewer = nullptr;
     QString m_imagePath;
