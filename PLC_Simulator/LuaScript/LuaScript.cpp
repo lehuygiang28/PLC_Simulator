@@ -6,6 +6,7 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
+#include "Lua.hpp"
 #include "LuaScript.h"
 #include "ILuaBinding.h"
 

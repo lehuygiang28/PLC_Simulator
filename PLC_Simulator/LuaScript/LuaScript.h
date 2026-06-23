@@ -14,7 +14,8 @@
 #include <QTimer>
 #include <QEventLoop>
 #include <QDebug>
-#include "Lua.hpp"
+
+struct lua_State;  // 前向声明，避免 Lua.hpp 泄漏到包含方
 
 class ILuaBinding;  // 前向声明，避免 ILuaBinding.h 泄漏
 
