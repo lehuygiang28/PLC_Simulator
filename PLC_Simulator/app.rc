@@ -36,5 +36,5 @@ BEGIN
     END
 END
 
-// 应用程序图标 (如果存在)
-// IDI_ICON1 ICON "resources/app.ico"
+// 应用程序图标
+IDI_ICON1 ICON "Resource_Files/PLC_Simulator.ico"

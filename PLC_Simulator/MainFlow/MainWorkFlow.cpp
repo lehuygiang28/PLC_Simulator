@@ -7,7 +7,7 @@
  */
 
 #include "MainWorkFlow.h"
-#include "CommTest_Qt.h"
+#include "MainWindow.h"
 #include "Comm/Socket/CommSocket.h"
 
 // ScriptRunner 实现 - 用于 ScriptEditor 的异步脚本执行

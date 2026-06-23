@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "CommTest_Qt.h"
+#include "MainWindow.h"
 #include "version.h"
 #include <QtWidgets/QApplication>
 #include <QStyleFactory>
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 
     int result = 0;
     {
-        CommTest_Qt window;
+        MainWindow window;
         window.show();
 
         result = app.exec();

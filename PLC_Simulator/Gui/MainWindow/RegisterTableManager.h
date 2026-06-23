@@ -20,18 +20,18 @@
 #include <vector>
 #include <cfloat>
 
-#include "../MainFlow/MainWorkFlow.h"
+#include "MainWorkFlow.h"
 
 // 表格常量定义
 #define REGISTER_TABLE_COLUMN_COUNT 10
 #define REGISTER_TABLE_ROW_COUNT    21
 
 /**
- * 20251225 wm 从CommTest_Qt.cpp拆分
+ * 20251225 wm 从MainWindow.cpp拆分
  * @brief 寄存器表格管理器
  *
  * 负责管理寄存器数据的显示、编辑和验证。
- * 从 CommTest_Qt 中拆分出来，专注于表格相关逻辑。
+ * 从 MainWindow 中拆分出来，专注于表格相关逻辑。
  */
 class RegisterTableManager : public QObject
 {

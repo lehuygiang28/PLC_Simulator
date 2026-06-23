@@ -6,16 +6,16 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#include "CommTest_Qt.h"
+#include "MainWindow.h"
 #include "Theme/ThemeManager.h"
-#include "../version.h"
+#include "version.h"
 #include <QDir>
 #include <QFile>
 #include <cmath>
 #include <QWindow>
 
-CommTest_Qt::CommTest_Qt(QWidget *parent)
-	: QMainWindow(parent), ui(new Ui::CommTest_QtClass()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configManager(nullptr), m_nLogStat(0)
+MainWindow::MainWindow(QWidget *parent)
+	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configManager(nullptr), m_nLogStat(0)
 {
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(APP_NAME).arg(APP_VERSION));
@@ -90,8 +90,8 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 
 	struct SimulationPlatformController : public MainWorkFlow::IBaseController
 	{
-		CommTest_Qt *m_pParent;
-		explicit SimulationPlatformController(CommTest_Qt *parent) : m_pParent(parent) {}
+		MainWindow *m_pParent;
+		explicit SimulationPlatformController(MainWindow *parent) : m_pParent(parent) {}
 		void MovePlatformAbsFloat(double x, double y, double angleDeg) override
 		{
 			if (m_pParent && m_pParent->m_simulationPlatform)
@@ -190,7 +190,7 @@ CommTest_Qt::CommTest_Qt(QWidget *parent)
 	ui->Btn_WriteAxisFloat->setEnabled(!isAutoEnabled);
 }
 
-CommTest_Qt::~CommTest_Qt()
+MainWindow::~MainWindow()
 {
 	// 先关闭并释放模拟平台
 	if (m_simulationPlatform != nullptr)
@@ -206,7 +206,7 @@ CommTest_Qt::~CommTest_Qt()
 	delete ui;
 }
 
-void CommTest_Qt::InitialAllConfigs()
+void MainWindow::InitialAllConfigs()
 {
 	// 加载之前保存的配置
 	if (m_configManager)
@@ -270,7 +270,7 @@ void CommTest_Qt::InitialAllConfigs()
 	}
 }
 
-void CommTest_Qt::InitializeMember()
+void MainWindow::InitializeMember()
 {
 	m_configManager = new ConfigManager(this);
 
@@ -280,7 +280,7 @@ void CommTest_Qt::InitializeMember()
 	}
 
 	// 初始化小窗口
-	m_subWindow = std::make_unique<SubMainWindow>();
+	m_subWindow = std::make_unique<QuickPanel>();
 	// 将当前窗口的名称设置为小窗名称
 	m_subWindow->setWindowTitle(this->windowTitle() + " - 子窗口");
 	// 独立窗口,标题栏保留标题与最小化按钮(支持任务栏最小化/还原),不显示最大化/关闭按钮
@@ -405,14 +405,14 @@ void CommTest_Qt::InitializeMember()
 	}
 }
 
-void CommTest_Qt::InitialSignalConnect()
+void MainWindow::InitialSignalConnect()
 {
 	// 初始化菜单栏
 	QMenu *helpMenu = ui->menuBar->addMenu("帮助(&H)");
 	QAction *aboutAction = helpMenu->addAction("关于(&A)");
 	QAction *changelogAction = helpMenu->addAction("更新日志(&U)");
-	connect(aboutAction, &QAction::triggered, this, &CommTest_Qt::OnShowAboutDialog);
-	connect(changelogAction, &QAction::triggered, this, &CommTest_Qt::OnShowChangeLog);
+	connect(aboutAction, &QAction::triggered, this, &MainWindow::OnShowAboutDialog);
+	connect(changelogAction, &QAction::triggered, this, &MainWindow::OnShowChangeLog);
 
 	// 视图菜单:主题切换
 	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
@@ -436,9 +436,9 @@ void CommTest_Qt::InitialSignalConnect()
 	connect(m_actDarkTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
 
 	// 连接小窗口的显示主窗口信号到主窗口的show()槽
-	connect(m_subWindow.get(), &SubMainWindow::showMainWindow, this, &CommTest_Qt::show);
+	connect(m_subWindow.get(), &QuickPanel::showMainWindow, this, &MainWindow::show);
 
-	connect(m_subWindow.get(), &SubMainWindow::executeLuaScript, this, [=](int buttonId)
+	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [=](int buttonId)
 			{
         if (m_pWorkFlow == nullptr) return;
         int idx = buttonId;
@@ -474,11 +474,11 @@ void CommTest_Qt::InitialSignalConnect()
 		} });
 
 	// 连接轴位置写入按钮
-	connect(ui->Btn_WriteAxisDoubleWord, &QPushButton::clicked, this, &CommTest_Qt::OnWriteAxisDoubleWord);
-	connect(ui->Btn_WriteAxisFloat, &QPushButton::clicked, this, &CommTest_Qt::OnWriteAxisFloat);
+	connect(ui->Btn_WriteAxisDoubleWord, &QPushButton::clicked, this, &MainWindow::OnWriteAxisDoubleWord);
+	connect(ui->Btn_WriteAxisFloat, &QPushButton::clicked, this, &MainWindow::OnWriteAxisFloat);
 
 	// 连接自动写入复选框
-	connect(ui->ChkBox_WritePosAutoEnable, &QCheckBox::stateChanged, this, &CommTest_Qt::OnWritePosAutoEnableChanged);
+	connect(ui->ChkBox_WritePosAutoEnable, &QCheckBox::stateChanged, this, &MainWindow::OnWritePosAutoEnableChanged);
 
 	// 隐藏主窗口槽函数
 	connect(ui->Btn_HideMainWindow, &QPushButton::clicked, this, [=]()
@@ -750,7 +750,7 @@ void CommTest_Qt::InitialSignalConnect()
 		} });
 }
 
-void CommTest_Qt::InitialLineEditValidator()
+void MainWindow::InitialLineEditValidator()
 {
 	QIntValidator *PortValid = new QIntValidator(0, 65535, this);
 	QIntValidator *RegisterShowAddr = new QIntValidator(0,
@@ -769,7 +769,7 @@ void CommTest_Qt::InitialLineEditValidator()
 	ui->edit_IP->setInputMask("000.000.000.000;"); // IP地址格式
 }
 
-void CommTest_Qt::CreateCurrentProtocol()
+void MainWindow::CreateCurrentProtocol()
 {
 	int nCurIndex = ui->cmbBox_ProtocolType->currentIndex();
 
@@ -787,7 +787,7 @@ void CommTest_Qt::CreateCurrentProtocol()
 // ====================平台控制相关槽函数实现====================
 
 // 辅助函数：从控件获取幂次值并计算10的幂次方作为除数
-double CommTest_Qt::GetDivisorFromPowerEdit(QLineEdit *edit, double defaultPower)
+double MainWindow::GetDivisorFromPowerEdit(QLineEdit *edit, double defaultPower)
 {
 	if (edit == nullptr)
 	{
@@ -807,7 +807,7 @@ double CommTest_Qt::GetDivisorFromPowerEdit(QLineEdit *edit, double defaultPower
 
 // ====================轴位置写入相关槽函数实现====================
 
-void CommTest_Qt::OnWriteAxisDoubleWord()
+void MainWindow::OnWriteAxisDoubleWord()
 {
 	if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr)
 	{
@@ -867,7 +867,7 @@ void CommTest_Qt::OnWriteAxisDoubleWord()
 	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
 }
 
-void CommTest_Qt::OnWriteAxisFloat()
+void MainWindow::OnWriteAxisFloat()
 {
 	if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr)
 	{
@@ -919,7 +919,7 @@ void CommTest_Qt::OnWriteAxisFloat()
 
 // ====================自动写入相关槽函数实现====================
 
-void CommTest_Qt::OnWritePosAutoEnableChanged(int state)
+void MainWindow::OnWritePosAutoEnableChanged(int state)
 {
 	bool isAutoEnabled = (state == Qt::Checked);
 
@@ -931,7 +931,7 @@ void CommTest_Qt::OnWritePosAutoEnableChanged(int state)
 	ui->Btn_WriteAxisFloat->setEnabled(!isAutoEnabled);
 }
 
-void CommTest_Qt::OnPlatformPoseChanged(Platform which, const Pose& pose)
+void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 {
 	// 检查是否启用自动写入
 	if (!ui->ChkBox_WritePosAutoEnable->isChecked())
@@ -1003,7 +1003,7 @@ void CommTest_Qt::OnPlatformPoseChanged(Platform which, const Pose& pose)
 
 // ====================菜单栏相关槽函数实现====================
 
-void CommTest_Qt::OnShowAboutDialog()
+void MainWindow::OnShowAboutDialog()
 {
 	QDialog aboutDialog(this);
 	aboutDialog.setWindowTitle(QString("关于 %1").arg(APP_NAME));
@@ -1016,7 +1016,7 @@ void CommTest_Qt::OnShowAboutDialog()
 
 	// 图标显示（居中）
 	QLabel *iconLabel = new QLabel(&aboutDialog);
-	QPixmap iconPixmap(":/CommTest_Qt/PLC_Simulator.ico");
+	QPixmap iconPixmap(":/app/PLC_Simulator.ico");
 	iconLabel->setPixmap(iconPixmap.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 	iconLabel->setAlignment(Qt::AlignCenter);
 	mainLayout->addWidget(iconLabel);
@@ -1128,7 +1128,7 @@ void CommTest_Qt::OnShowAboutDialog()
 	aboutDialog.exec();
 }
 
-void CommTest_Qt::OnShowChangeLog()
+void MainWindow::OnShowChangeLog()
 {
 	QString changeLogPath = QCoreApplication::applicationDirPath() + "/ChangeLog.txt";
 		QFile licenseFile(changeLogPath);
@@ -1169,7 +1169,7 @@ void CommTest_Qt::OnShowChangeLog()
 	licenseDialog->exec();
 }
 
-void CommTest_Qt::OnThemeSelected(Theme theme)
+void MainWindow::OnThemeSelected(Theme theme)
 {
 	ThemeManager::instance().applyTheme(theme);
 	if (m_configManager != nullptr)
@@ -1178,7 +1178,7 @@ void CommTest_Qt::OnThemeSelected(Theme theme)
 	}
 }
 
-bool CommTest_Qt::eventFilter(QObject *watched, QEvent *event)
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
 	// 小窗最小化/还原时,模拟平台跟随其窗口状态(主窗口隐藏、仅小窗显示的场景)
 	if (watched == m_subWindow.get() && event->type() == QEvent::WindowStateChange)
@@ -1192,7 +1192,7 @@ bool CommTest_Qt::eventFilter(QObject *watched, QEvent *event)
 	return QMainWindow::eventFilter(watched, event);
 }
 
-void CommTest_Qt::UpdateLogDisplay(QString strNewLog)
+void MainWindow::UpdateLogDisplay(QString strNewLog)
 {
 	QTextDocument *document = ui->text_CommLog->document();
 

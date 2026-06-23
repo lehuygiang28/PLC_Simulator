@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>CommTest_QtClass</class>
- <widget class="QMainWindow" name="CommTest_QtClass">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>CommTest_Qt</string>
+   <string>PLC_Simulator</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -961,7 +961,7 @@
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../Resource_Files/CommTest_Qt.qrc"/>
+  <include location="../../Resource_Files/resources.qrc"/>
  </resources>
  <connections/>
 </ui>

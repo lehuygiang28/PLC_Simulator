@@ -1,7 +1,7 @@
-project(CommTest_Qt LANGUAGES CXX)
+project(PLC_Simulator LANGUAGES CXX)
 
 # 设置目标名称（Debug版本加'd'后缀，与原项目一致）
-set(TARGET_NAME "CommTest_Qt")
+set(TARGET_NAME "PLC_Simulator")
 
 # 按原项目过滤器结构组织文件
 set(SOURCE_FILES
@@ -9,15 +9,10 @@ set(SOURCE_FILES
 )
 
 set(RESOURCE_FILES
-    Resource_Files/CommTest_Qt.qrc
-    Resource_Files/CommTest_Qt.rc
+    Resource_Files/resources.qrc
     Resource_Files/PLC_Simulator.ico
     app.rc
     version.h
-)
-
-set(FORM_FILES
-    Gui/CommTest_Qt.ui
 )
 
 
@@ -54,19 +49,20 @@ set(COMM_PROTOCOL_HEADERS
     Comm/Protocol/CommProKeyencePCLink.h
 )
 
-# Gui 模块
-set(GUI_SOURCES
-    Gui/CommTest_Qt.cpp
-    Gui/SubMainWindow.cpp
-    Gui/RegisterTableManager.cpp
-    Gui/ScriptManager.cpp
+# Gui\MainWindow 模块(主窗口及其管理器)
+set(GUI_MAINWINDOW_SOURCES
+    Gui/MainWindow/MainWindow.cpp
+    Gui/MainWindow/MainWindow.ui
+    Gui/MainWindow/QuickPanel.cpp
+    Gui/MainWindow/RegisterTableManager.cpp
+    Gui/MainWindow/ScriptManager.cpp
 )
 
-set(GUI_HEADERS
-    Gui/CommTest_Qt.h
-    Gui/SubMainWindow.h
-    Gui/RegisterTableManager.h
-    Gui/ScriptManager.h
+set(GUI_MAINWINDOW_HEADERS
+    Gui/MainWindow/MainWindow.h
+    Gui/MainWindow/QuickPanel.h
+    Gui/MainWindow/RegisterTableManager.h
+    Gui/MainWindow/ScriptManager.h
 )
 
 # Gui\Theme 模块
@@ -151,7 +147,7 @@ set(SOURCES
     ${COMM_SOURCES}
     ${COMM_SOCKET_SOURCES}
     ${COMM_PROTOCOL_SOURCES}
-    ${GUI_SOURCES}
+    ${GUI_MAINWINDOW_SOURCES}
     ${GUI_THEME_SOURCES}
     ${GUI_WIDGETS_SOURCES}
     ${GUI_SCRIPTEDITOR_SOURCES}
@@ -165,7 +161,7 @@ set(HEADERS
     ${COMM_HEADERS}
     ${COMM_SOCKET_HEADERS}
     ${COMM_PROTOCOL_HEADERS}
-    ${GUI_HEADERS}
+    ${GUI_MAINWINDOW_HEADERS}
     ${GUI_THEME_HEADERS}
     ${GUI_WIDGETS_HEADERS}
     ${GUI_SCRIPTEDITOR_HEADERS}
@@ -180,7 +176,6 @@ add_executable(${TARGET_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCE_FILES}
-    ${FORM_FILES}
 )
 
 # 设置目标属性
@@ -198,11 +193,10 @@ message(STATUS "为 ${TARGET_NAME} 启用多处理器编译 (/MP)")
 
 source_group("Source Files" FILES ${SOURCE_FILES})
 source_group("Resource Files" FILES ${RESOURCE_FILES})
-source_group("Form Files" FILES ${FORM_FILES})
 source_group("Comm" FILES ${COMM_SOURCES} ${COMM_HEADERS})
 source_group("Comm\\\\Socket" FILES ${COMM_SOCKET_SOURCES} ${COMM_SOCKET_HEADERS})
 source_group("Comm\\\\Protocol" FILES ${COMM_PROTOCOL_SOURCES} ${COMM_PROTOCOL_HEADERS})
-source_group("Gui" FILES ${GUI_SOURCES} ${GUI_HEADERS})
+source_group("Gui\\\\MainWindow" FILES ${GUI_MAINWINDOW_SOURCES} ${GUI_MAINWINDOW_HEADERS})
 source_group("Gui\\\\Theme" FILES ${GUI_THEME_SOURCES} ${GUI_THEME_HEADERS})
 source_group("Gui\\\\Widgets" FILES ${GUI_WIDGETS_SOURCES} ${GUI_WIDGETS_HEADERS})
 source_group("Gui\\\\ScriptEditor" FILES ${GUI_SCRIPTEDITOR_SOURCES} ${GUI_SCRIPTEDITOR_HEADERS})
@@ -276,6 +270,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui
+    ${CMAKE_CURRENT_SOURCE_DIR}/Gui/MainWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/ScriptEditor
