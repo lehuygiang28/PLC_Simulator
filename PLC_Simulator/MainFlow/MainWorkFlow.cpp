@@ -25,21 +25,21 @@ public:
             return;
         }
 
-        LuaScript* pLuaScript = m_pWorkFlow->GetLuaScript(m_nLuaIndex);
-        if (!pLuaScript) {
-            if (onFinished) onFinished(false, "LuaScript instance not found");
+        LuaEngine* pLuaEngine = m_pWorkFlow->GetEngine(m_nLuaIndex);
+        if (!pLuaEngine) {
+            if (onFinished) onFinished(false, "LuaEngine instance not found");
             return;
         }
 
         // 创建异步任务
         class EditorScriptTask : public QRunnable {
         public:
-            LuaScript* lua;
+            LuaEngine* lua;
             QString content;
             std::function<void(bool, const QString&)> callback;
             QMutex* mutex;
 
-            EditorScriptTask(LuaScript* l, const QString& c,
+            EditorScriptTask(LuaEngine* l, const QString& c,
                            std::function<void(bool, const QString&)> cb, QMutex* m)
                 : lua(l), content(c), callback(std::move(cb)), mutex(m) {}
 
@@ -54,7 +54,7 @@ public:
         };
 
         EditorScriptTask* task = new EditorScriptTask(
-            pLuaScript, scriptContent, std::move(onFinished),
+            pLuaEngine, scriptContent, std::move(onFinished),
             m_pWorkFlow->m_vLuaMutex[m_nLuaIndex].get());
         task->setAutoDelete(true);
         m_pWorkFlow->m_luaThreadPool->start(task);
@@ -176,7 +176,7 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     m_vScriptRunners.resize(LUA_SCRIPT_NUM);
     for (int i = 0; i < LUA_SCRIPT_NUM; ++i)
     {
-        m_vpLuaScript[i] = std::unique_ptr<LuaScript>(LuaScript::InitialLuaScript());
+        m_vpLuaScript[i] = std::unique_ptr<LuaEngine>(LuaEngine::InitialEngine());
         m_vpLuaScript[i]->install(*m_registerBinding);
         m_vpLuaScript[i]->install(*m_platformBinding);
         m_vLuaMutex[i] = std::make_unique<QMutex>();
@@ -612,7 +612,7 @@ bool MainWorkFlow::RunLuaScriptAsync(int nLuaIndex, const QString &strLuaFile)
     return true;
 }
 
-LuaScript* MainWorkFlow::GetLuaScript(int nIndex)
+LuaEngine* MainWorkFlow::GetEngine(int nIndex)
 {
     if (nIndex >= m_vpLuaScript.size()) return nullptr;
 

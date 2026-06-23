@@ -127,7 +127,7 @@ set(MAINFLOW_HEADERS
 
 # LuaScript 模块
 set(LUA_SOURCES
-    LuaScript/LuaScript.cpp
+    LuaScript/LuaEngine.cpp
     LuaScript/LuaBindingUtil.cpp
     LuaScript/RegisterBinding.cpp
     LuaScript/PlatformBinding.cpp
@@ -135,7 +135,7 @@ set(LUA_SOURCES
 )
 
 set(LUA_HEADERS
-    LuaScript/LuaScript.h
+    LuaScript/LuaEngine.h
     LuaScript/ILuaBinding.h
     LuaScript/IRegisterAccess.h
     LuaScript/IPlatformController.h

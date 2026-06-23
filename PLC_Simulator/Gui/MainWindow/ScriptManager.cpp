@@ -38,7 +38,7 @@ void ScriptManager::setLoopEnable(int index, bool enable)
 {
     if (m_workFlow == nullptr) return;
 
-    LuaScript* pLua = m_workFlow->GetLuaScript(index);
+    LuaEngine* pLua = m_workFlow->GetEngine(index);
     if (pLua != nullptr)
     {
         pLua->SetLoopValid(enable);

@@ -7,19 +7,19 @@
  */
 
 #include "Lua.hpp"
-#include "LuaScript.h"
+#include "LuaEngine.h"
 #include "ILuaBinding.h"
 
 
-static int nLuaScriptNum = 0;	// 脚本数量
-LuaScript* LuaScript::InitialLuaScript(QObject* pParent /*= nullptr*/)
+static int nLuaEngineNum = 0;	// 引擎数量
+LuaEngine* LuaEngine::InitialEngine(QObject* pParent /*= nullptr*/)
 {
-	nLuaScriptNum++;
+	nLuaEngineNum++;
 
-	return new LuaScript(pParent);
+	return new LuaEngine(pParent);
 }
 
-bool LuaScript::RunLuaScript(const QString& strLuaFile,QString& errorMsg)
+bool LuaEngine::RunLuaScript(const QString& strLuaFile,QString& errorMsg)
 {
 	QByteArray filePathData = strLuaFile.toLocal8Bit();
 	if (luaL_dofile(m_pLua, filePathData.constData()) != LUA_OK)
@@ -33,7 +33,7 @@ bool LuaScript::RunLuaScript(const QString& strLuaFile,QString& errorMsg)
 	return true;
 }
 
-bool LuaScript::RunLuaScriptWithEditor(const QString &strLuaContent,QString& errorMsg)
+bool LuaEngine::RunLuaScriptWithEditor(const QString &strLuaContent,QString& errorMsg)
 {
 	QByteArray contentData = strLuaContent.toLocal8Bit();
 	if (luaL_dostring(m_pLua, contentData.constData()) != LUA_OK)
@@ -48,18 +48,18 @@ bool LuaScript::RunLuaScriptWithEditor(const QString &strLuaContent,QString& err
     return true;
 }
 
-LuaScript::~LuaScript()
+LuaEngine::~LuaEngine()
 {
 	if (m_pLua)
 	{
         lua_close(m_pLua);
 		m_pLua = nullptr;
-		nLuaScriptNum--;
+		nLuaEngineNum--;
 	}
 
 }
 
-LuaScript::LuaScript(QObject* parent /*= nullptr*/)
+LuaEngine::LuaEngine(QObject* parent /*= nullptr*/)
 	:QObject(parent),
 	m_pLua(luaL_newstate()),
 	m_bLoopValid(false)
@@ -69,7 +69,7 @@ LuaScript::LuaScript(QObject* parent /*= nullptr*/)
 	RegisterLuaFunc();
 }
 
-bool LuaScript::RegisterLuaFunc()
+bool LuaEngine::RegisterLuaFunc()
 {
 	// 仅注册引擎内建函数：IsLoopValid 与 sleep
 	lua_pushlightuserdata(m_pLua, this);
@@ -83,24 +83,24 @@ bool LuaScript::RegisterLuaFunc()
 	return true;
 }
 
-void LuaScript::install(ILuaBinding& binding)
+void LuaEngine::install(ILuaBinding& binding)
 {
 	binding.install(m_pLua);
 }
 
 // ===== 循环状态函数实现 =====
-int LuaScript::IsLoopValidWrapper(lua_State* L)
+int LuaEngine::IsLoopValidWrapper(lua_State* L)
 {
-	LuaScript* pThis = static_cast<LuaScript*>(lua_touserdata(L, lua_upvalueindex(1)));
+	LuaEngine* pThis = static_cast<LuaEngine*>(lua_touserdata(L, lua_upvalueindex(1)));
 
 	bool bValid = pThis->GetLoopValid();
 	lua_pushboolean(L, bValid);
 	return 1;
 }
 
-int LuaScript::SleepWrapper(lua_State* L)
+int LuaEngine::SleepWrapper(lua_State* L)
 {
-	LuaScript* pThis = static_cast<LuaScript*>(lua_touserdata(L, lua_upvalueindex(1)));
+	LuaEngine* pThis = static_cast<LuaEngine*>(lua_touserdata(L, lua_upvalueindex(1)));
 
 	// 获取参数
 	if (!lua_isnumber(L, 1)) {
@@ -114,4 +114,3 @@ int LuaScript::SleepWrapper(lua_State* L)
 	loop.exec();
 	return 0;
 }
-

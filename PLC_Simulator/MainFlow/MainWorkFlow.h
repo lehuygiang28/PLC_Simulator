@@ -20,7 +20,7 @@
 #include "Comm/Protocol/CommProtocolBase.h"
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
-#include "LuaScript/LuaScript.h"
+#include "LuaScript/LuaEngine.h"
 #include "LuaScript/IRegisterAccess.h"
 #include "LuaScript/IPlatformController.h"
 #include "LuaScript/ILuaBinding.h"
@@ -97,7 +97,7 @@ public:
 	bool RunLuaScript(int nLuaIndex,const QString& strLuaFile);
 	bool RunLuaScriptAsync(int nLuaIndex,const QString& strLuaFile);
 
-    LuaScript* GetLuaScript(int nIndex);
+    LuaEngine* GetEngine(int nIndex);
 
     // 获取指定索引的脚本执行器（实现 IScriptRunner 接口）
     IScriptRunner* GetScriptRunner(int nIndex);
@@ -131,7 +131,7 @@ private:
 
 //Lua脚本相关
 private:
-	std::vector<std::unique_ptr<LuaScript>> m_vpLuaScript;
+	std::vector<std::unique_ptr<LuaEngine>> m_vpLuaScript;
     std::vector<std::unique_ptr<QMutex>> m_vLuaMutex;
 	QThreadPool* m_luaThreadPool;
     std::vector<std::unique_ptr<IScriptRunner>> m_vScriptRunners;  // 脚本执行器

@@ -6,8 +6,8 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef LUASCRIPT_H
-#define LUASCRIPT_H
+#ifndef LUAENGINE_H
+#define LUAENGINE_H
 
 #include <QObject>
 #include <QThread>
@@ -19,18 +19,18 @@ struct lua_State;  // 前向声明，避免 Lua.hpp 泄漏到包含方
 
 class ILuaBinding;  // 前向声明，避免 ILuaBinding.h 泄漏
 
-class LuaScript :public QObject
+class LuaEngine :public QObject
 {
 	Q_OBJECT
 public:
 	//构造函数
-    ~LuaScript() ;
+    ~LuaEngine() ;
 
 	//禁用拷贝构造&赋值构造
-    LuaScript(const LuaScript&) = delete;
-    LuaScript& operator=(const LuaScript&) = delete;
+    LuaEngine(const LuaEngine&) = delete;
+    LuaEngine& operator=(const LuaEngine&) = delete;
 
-    static LuaScript* InitialLuaScript(QObject* pParent = nullptr);
+    static LuaEngine* InitialEngine(QObject* pParent = nullptr);
 
 	//设置循环是否有效
 	void SetLoopValid(bool bValid) {
@@ -50,7 +50,7 @@ public:
 
 private:
 	//构造函数
-	LuaScript(QObject* parent = nullptr);
+	LuaEngine(QObject* parent = nullptr);
 
 	lua_State* m_pLua;
 
@@ -65,6 +65,6 @@ private:
 
 };
 
-#endif	// LUASCRIPT_H
+#endif	// LUAENGINE_H
 
 
