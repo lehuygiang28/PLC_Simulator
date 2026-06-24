@@ -110,8 +110,7 @@ private:
 	std::unique_ptr<CommBase::CommInfoBase> m_ownedCommInfo; // 业务层自持有的通信信息
 	bool	m_bValidComm;								//通信实例是否有效标志
 
-	CommProtocolBase* m_pComProBase;					//通信协议实例
-    QMutex m_protocolMutex;
+	std::atomic<ProtocolType> m_eProtocolType;			//当前通信协议类型（仅作类型标签，按类型在解析时创建局部实例）
 
 	std::unique_ptr<RegisterStore> m_registerStore;   // 寄存器数据唯一所有者
 	// Lua 脚本引擎宿主（声明在 m_registerStore 之后，确保先于后者析构）

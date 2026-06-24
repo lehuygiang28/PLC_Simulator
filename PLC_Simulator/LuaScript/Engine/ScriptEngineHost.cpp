@@ -133,6 +133,9 @@ void ScriptEngineHost::setLoopValid(int index, bool valid)
 void ScriptEngineHost::installModule(std::unique_ptr<ILuaBinding> module)
 {
     if (!module) return;
+    // 必须在脚本运行前注册:此刻不应有任何池任务在执行,否则 install 会与运行中的引擎竞争
+    Q_ASSERT_X(!m_threadPool || m_threadPool->activeThreadCount() == 0,
+               "ScriptEngineHost::installModule", "模块必须在脚本运行前注册");
     for (auto& e : m_engines)
         if (e) e->install(*module);
     m_modules.push_back(std::move(module));

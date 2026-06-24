@@ -21,7 +21,7 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 	m_pCommInfo = nullptr;
 
 	m_bValidComm = false;
-	m_pComProBase = nullptr;
+	m_eProtocolType = ProtocolType::eProUnknown;
 
     m_strSendObjInfo = "";
     m_strSendData.clear();
@@ -49,12 +49,7 @@ MainWorkFlow::~MainWorkFlow()
 		m_pComm = nullptr;
 	}
 
-	// 释放协议实例
-	if (m_pComProBase != nullptr)
-	{
-		delete m_pComProBase;
-		m_pComProBase = nullptr;
-	}
+	// 协议类型为值类型成员，无需释放
 
 	// m_pCommInfo 会自动释放（unique_ptr）
 }
@@ -228,64 +223,36 @@ bool MainWorkFlow::IsCommOpen()
 
 bool MainWorkFlow::CreateCommProtocol(ProtocolType ProType)
 {
+	// 仅记录当前协议类型；实际解析时按类型创建局部协议实例，避免跨线程共享同一对象
 	switch (ProType)
 	{
 	case ProtocolType::eProRegMitsubishiQBinary:
-	{
-		if (m_pComProBase != nullptr)
-		{
-			delete m_pComProBase;
-			m_pComProBase = nullptr;
-		}
-
-		m_pComProBase = new CommProMitsubishiQBinary(this);
-	}
-	break;
 	case ProtocolType::eProRegKeyencePCLink:
-	{
-		if (m_pComProBase != nullptr)
-		{
-			delete m_pComProBase;
-			m_pComProBase = nullptr;
-		}
-
-		m_pComProBase = new CommProKeyencePCLink(this);
-	}
-	break;
-
+		m_eProtocolType = ProType;
+		return true;
 	default:
-		if (m_pComProBase != nullptr)
-		{
-			delete m_pComProBase;
-			m_pComProBase = nullptr;
-		}
-		break;
+		m_eProtocolType = ProtocolType::eProUnknown;
+		return false;
 	}
-
-	if (m_pComProBase == nullptr) return false;
-
-	return true;
 }
 
 bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
 {
     if (RecInfo == "") return false;
 
-    if (m_pComProBase == nullptr) return false;
-
+	// 按当前协议类型创建局部实例；m_eProtocolType 为原子量，可被 GUI 线程并发更新
 	std::unique_ptr<CommProtocolBase> pro;
-    if (dynamic_cast<CommProMitsubishiQBinary*>(m_pComProBase) != nullptr)
-    {
-        pro = std::make_unique<CommProMitsubishiQBinary>(nullptr);
-    }
-    else if (dynamic_cast<CommProKeyencePCLink*>(m_pComProBase) != nullptr)
-    {
+	switch (m_eProtocolType.load())
+	{
+	case ProtocolType::eProRegMitsubishiQBinary:
+		pro = std::make_unique<CommProMitsubishiQBinary>(nullptr);
+		break;
+	case ProtocolType::eProRegKeyencePCLink:
 		pro = std::make_unique<CommProKeyencePCLink>(nullptr);
-    }
-    else
-    {
-        return false;
-    }
+		break;
+	default:
+		return false;
+	}
 
     CmdType CurrentCmd = CmdType::eCmdUnkown;
     if (!pro->AnalyzeCmdInfo(RecInfo, CurrentCmd))
