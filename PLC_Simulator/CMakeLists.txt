@@ -157,10 +157,12 @@ set(CONFIG_HEADERS
 
 # Core 模块
 set(CORE_SOURCES
+    Core/RegisterStore.cpp
 )
 
 set(CORE_HEADERS
     Core/DataTypeConvert.h
+    Core/RegisterStore.h
 )
 
 # 合并所有文件
