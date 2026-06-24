@@ -14,6 +14,7 @@
 #include "SimulationPlatform/SimulationPlatform.h"
 #include "RegisterTableManager.h"
 #include "ScriptManager.h"
+#include "PlatformController.h"
 #include "Config/ConfigManager.h"
 #include "MainWorkFlow.h"
 #include "IPlatformController.h"
@@ -87,6 +88,7 @@ private:
     // 工作流
     MainWorkFlow* m_pWorkFlow;
     std::unique_ptr<IPlatformController> m_PlatformController;
+    std::unique_ptr<PlatformController> m_platformController;
     std::unique_ptr<CommBase::CommInfoBase> m_CurInfo;
 
     // 配置管理

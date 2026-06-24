@@ -168,6 +168,10 @@ MainWindow::MainWindow(QWidget *parent)
 		}
 	};
 	m_PlatformController = std::make_unique<SimulationPlatformController>(this);
+	m_platformController = std::make_unique<PlatformController>(
+		m_pWorkFlow ? m_pWorkFlow->registerStore() : nullptr,
+		m_simulationPlatform,
+		ui->edit_Unit_XY, ui->edit_Unit_D, this);
 
 	if (m_pWorkFlow == nullptr)
 		return;
@@ -814,96 +818,30 @@ double MainWindow::GetDivisorFromPowerEdit(QLineEdit *edit, double defaultPower)
 
 void MainWindow::OnWriteAxisDoubleWord()
 {
-	if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr)
-	{
-		return;
-	}
+    if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr) return;
 
-	// 获取平台实时位置
-	const Pose p = m_simulationPlatform->pose(Platform::Live);
-	const double x = p.x, y = p.y, angle = p.angleDeg;
+    bool ok = false;
+    int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
+    if (!ok) { UpdateLogDisplay("错误: 轴位置地址无效"); return; }
+    if (startAddr >= REGISTER_VAL_NUM - 6) { UpdateLogDisplay("错误: 寄存器地址超出范围"); return; }
 
-	// 获取幂次值并计算乘数（注意：这里是乘以幂次，与平台控制时除以幂次相反）
-	double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY); // 10^powerXY
-	double multiplierD = GetDivisorFromPowerEdit(ui->edit_Unit_D);	 // 10^powerD
-
-	// 将坐标值乘以10的幂次方并转换为int32
-	int32_t xInt32 = static_cast<int32_t>(x * multiplierXY);
-	int32_t yInt32 = static_cast<int32_t>(y * multiplierXY);
-	int32_t angleInt32 = static_cast<int32_t>(angle * multiplierD);
-
-	// 获取对应的寄存器地址
-	bool ok = false;
-	int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
-	if (!ok)
-	{
-		UpdateLogDisplay("错误: 轴位置地址无效");
-		return;
-	}
-
-	// 计算需要的数组索引
-	// 每个DataTypeConvert包含4个int16，可以存储2个int32
-	// X占用2个int16（地址startAddr和startAddr+1）
-	// Y占用2个int16（地址startAddr+2和startAddr+3）
-	// Angle占用2个int16（地址startAddr+4和startAddr+5）
-	if (startAddr >= REGISTER_VAL_NUM - 6)
-	{
-		UpdateLogDisplay("错误: 寄存器地址超出范围");
-		return;
-	}
-
-	RegisterStore* store = m_pWorkFlow->registerStore();
-	store->SetInt32(startAddr,     xInt32);
-	store->SetInt32(startAddr + 2, yInt32);
-	store->SetInt32(startAddr + 4, angleInt32);
-
-	UpdateLogDisplay(QString("轴位置双字写入成功: X=%1, Y=%2, Angle=%3 (地址:%4)")
-						 .arg(xInt32)
-						 .arg(yInt32)
-						 .arg(angleInt32)
-						 .arg(startAddr));
+    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4,
+                                          PlatformController::NumFormat::Int32, Platform::Live);
+    UpdateLogDisplay(QString("轴位置双字写入成功 (地址:%1)").arg(startAddr));
 }
 
 void MainWindow::OnWriteAxisFloat()
 {
-	if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr)
-	{
-		return;
-	}
+    if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr) return;
 
-	// 获取平台实时位置
-	const Pose p = m_simulationPlatform->pose(Platform::Live);
+    bool ok = false;
+    int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
+    if (!ok) { UpdateLogDisplay("错误: 轴位置地址无效"); return; }
+    if (startAddr >= REGISTER_VAL_NUM - 6) { UpdateLogDisplay("错误: 寄存器地址超出范围"); return; }
 
-	// 转换为float（直接使用，不需要乘幂次）
-	float xFloat = static_cast<float>(p.x);
-	float yFloat = static_cast<float>(p.y);
-	float angleFloat = static_cast<float>(p.angleDeg);
-
-	// 获取对应的寄存器地址
-	bool ok = false;
-	int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
-	if (!ok)
-	{
-		UpdateLogDisplay("错误: 轴位置地址无效");
-		return;
-	}
-
-	if (startAddr >= REGISTER_VAL_NUM - 6)
-	{
-		UpdateLogDisplay("错误: 寄存器地址超出范围");
-		return;
-	}
-
-	RegisterStore* store = m_pWorkFlow->registerStore();
-	store->SetFloat(startAddr,     xFloat);
-	store->SetFloat(startAddr + 2, yFloat);
-	store->SetFloat(startAddr + 4, angleFloat);
-
-	UpdateLogDisplay(QString("轴位置浮点写入成功: X=%1, Y=%2, Angle=%3 (地址:%4)")
-						 .arg(xFloat)
-						 .arg(yFloat)
-						 .arg(angleFloat)
-						 .arg(startAddr));
+    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4,
+                                          PlatformController::NumFormat::Float, Platform::Live);
+    UpdateLogDisplay(QString("轴位置浮点写入成功 (地址:%1)").arg(startAddr));
 }
 
 // ====================自动写入相关槽函数实现====================
@@ -922,57 +860,27 @@ void MainWindow::OnWritePosAutoEnableChanged(int state)
 
 void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 {
-	// 检查是否启用自动写入
-	if (!ui->ChkBox_WritePosAutoEnable->isChecked())
-	{
-		return;
-	}
+    Q_UNUSED(pose);
+    if (!ui->ChkBox_WritePosAutoEnable->isChecked()) return;
+    if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr) return;
 
-	if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr)
-	{
-		return;
-	}
+    QLineEdit* addrEdit = (which == Platform::Live)
+        ? ui->edit_AxisPosRegisterAddr
+        : ui->edit_AxisPosRegisterAddr_2;
 
-	// 根据平台类型选择目标寄存器地址
-	QLineEdit* addrEdit = (which == Platform::Live)
-		? ui->edit_AxisPosRegisterAddr
-		: ui->edit_AxisPosRegisterAddr_2;
+    bool ok = false;
+    int startAddr = addrEdit->text().toInt(&ok);
+    if (!ok || startAddr >= REGISTER_VAL_NUM - 6) return;
 
-	bool ok = false;
-	int startAddr = addrEdit->text().toInt(&ok);
-	if (!ok || startAddr >= REGISTER_VAL_NUM - 6)
-	{
-		return;
-	}
+    PlatformController::NumFormat fmt;
+    if (ui->Radio_AxisPos_Float->isChecked())
+        fmt = PlatformController::NumFormat::Float;
+    else if (ui->Radio_AxisPos_Int32->isChecked())
+        fmt = PlatformController::NumFormat::Int32;
+    else
+        return; // 两者都未选中,不写
 
-	RegisterStore* store = m_pWorkFlow->registerStore();
-
-	// 根据Radio选择写入方式
-	if (ui->Radio_AxisPos_Float->isChecked())
-	{
-		// 使用Float方式写入
-		float xFloat     = static_cast<float>(pose.x);
-		float yFloat     = static_cast<float>(pose.y);
-		float angleFloat = static_cast<float>(pose.angleDeg);
-
-		store->SetFloat(startAddr,     xFloat);
-		store->SetFloat(startAddr + 2, yFloat);
-		store->SetFloat(startAddr + 4, angleFloat);
-	}
-	else if (ui->Radio_AxisPos_Int32->isChecked())
-	{
-		// 使用Int32方式写入
-		double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY);
-		double multiplierD  = GetDivisorFromPowerEdit(ui->edit_Unit_D);
-
-		int32_t xInt32     = static_cast<int32_t>(pose.x        * multiplierXY);
-		int32_t yInt32     = static_cast<int32_t>(pose.y        * multiplierXY);
-		int32_t angleInt32 = static_cast<int32_t>(pose.angleDeg * multiplierD);
-
-		store->SetInt32(startAddr,     xInt32);
-		store->SetInt32(startAddr + 2, yInt32);
-		store->SetInt32(startAddr + 4, angleInt32);
-	}
+    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4, fmt, which);
 }
 
 // ====================菜单栏相关槽函数实现====================
