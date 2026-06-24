@@ -18,22 +18,17 @@
 #include "ILuaBinding.h"                     // LuaFunctionDoc / ILuaBinding
 
 class RegisterStore;
-class IPlatformController;
 class LuaEngine;
-class PlatformBinding;
 class QMutex;
 class QThreadPool;
 
 // Lua 子系统拥有者:引擎 + 业务绑定 + 线程池/锁 + 执行。
-// 对外仅注入 RegisterStore* 与 IPlatformController*。
 class ScriptEngineHost : public QObject
 {
     Q_OBJECT
 public:
     explicit ScriptEngineHost(RegisterStore* store, int engineCount = 6, QObject* parent = nullptr);
     ~ScriptEngineHost() override;
-
-    void setPlatformController(IPlatformController* controller);
 
     // 外部构造的绑定注册进本宿主:install 进所有已建引擎 + 纳入文档清单。须在脚本运行前调用。
     void installModule(std::unique_ptr<ILuaBinding> module);
@@ -65,7 +60,6 @@ private:
     std::vector<std::unique_ptr<QMutex>> m_mutexes;
     QThreadPool* m_threadPool;
     std::vector<std::unique_ptr<ILuaBinding>> m_modules;  // register + platform
-    PlatformBinding* m_platformBinding = nullptr;         // 指向 m_modules 中的平台绑定,供 setPlatformController
 };
 
 #endif // SCRIPTENGINEHOST_H

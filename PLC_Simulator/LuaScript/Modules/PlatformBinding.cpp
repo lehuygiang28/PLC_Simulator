@@ -6,13 +6,12 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 #include "PlatformBinding.h"
-#include "Core/RegisterStore.h"
-#include "IPlatformController.h"
+#include "PlatformController.h"
 #include "LuaBindingUtil.h"
 #include "Lua.hpp"
 
-PlatformBinding::PlatformBinding(RegisterStore* store, IPlatformController* controller)
-    : m_store(store), m_controller(controller)
+PlatformBinding::PlatformBinding(PlatformController* controller)
+    : m_controller(controller)
 {
 }
 
@@ -66,8 +65,7 @@ int PlatformBinding::MoveAbsInt32Wrapper(lua_State* L)
     PlatformBinding* b = self_from(L);
     int x, y, a;
     if (!parseThreeAddr(L, x, y, a)) return 0;
-    if (!b->m_controller) return 0;
-    b->m_controller->MovePlatformAbsInt32(b->m_store->GetInt32(x), b->m_store->GetInt32(y), b->m_store->GetInt32(a));
+    b->m_controller->moveAbsolute(x, y, a, PlatformController::NumFormat::Int32);
     return 0;
 }
 
@@ -76,8 +74,7 @@ int PlatformBinding::MoveAbsFloatWrapper(lua_State* L)
     PlatformBinding* b = self_from(L);
     int x, y, a;
     if (!parseThreeAddr(L, x, y, a)) return 0;
-    if (!b->m_controller) return 0;
-    b->m_controller->MovePlatformAbsFloat(b->m_store->GetFloat(x), b->m_store->GetFloat(y), b->m_store->GetFloat(a));
+    b->m_controller->moveAbsolute(x, y, a, PlatformController::NumFormat::Float);
     return 0;
 }
 
@@ -86,8 +83,7 @@ int PlatformBinding::MoveRelativeInt32Wrapper(lua_State* L)
     PlatformBinding* b = self_from(L);
     int x, y, a;
     if (!parseThreeAddr(L, x, y, a)) return 0;
-    if (!b->m_controller) return 0;
-    b->m_controller->MovePlatformRelativeInt32(b->m_store->GetInt32(x), b->m_store->GetInt32(y), b->m_store->GetInt32(a));
+    b->m_controller->moveRelative(x, y, a, PlatformController::NumFormat::Int32);
     return 0;
 }
 
@@ -96,8 +92,7 @@ int PlatformBinding::MoveRelativeFloatWrapper(lua_State* L)
     PlatformBinding* b = self_from(L);
     int x, y, a;
     if (!parseThreeAddr(L, x, y, a)) return 0;
-    if (!b->m_controller) return 0;
-    b->m_controller->MovePlatformRelativeFloat(b->m_store->GetFloat(x), b->m_store->GetFloat(y), b->m_store->GetFloat(a));
+    b->m_controller->moveRelative(x, y, a, PlatformController::NumFormat::Float);
     return 0;
 }
 
@@ -106,12 +101,7 @@ int PlatformBinding::WriteCurrentPosInt32Wrapper(lua_State* L)
     PlatformBinding* b = self_from(L);
     int x, y, a;
     if (!parseThreeAddr(L, x, y, a)) return 0;
-    if (!b->m_controller) return 0;
-    int32_t cx, cy, ca;
-    b->m_controller->GetCurrentPosInt32(cx, cy, ca);
-    b->m_store->SetInt32(x, cx);
-    b->m_store->SetInt32(y, cy);
-    b->m_store->SetInt32(a, ca);
+    b->m_controller->writeCurrentPos(x, y, a, PlatformController::NumFormat::Int32, Platform::Live);
     return 0;
 }
 
@@ -120,11 +110,6 @@ int PlatformBinding::WriteCurrentPosFloatWrapper(lua_State* L)
     PlatformBinding* b = self_from(L);
     int x, y, a;
     if (!parseThreeAddr(L, x, y, a)) return 0;
-    if (!b->m_controller) return 0;
-    double cx, cy, ca;
-    b->m_controller->GetCurrentPosFloat(cx, cy, ca);
-    b->m_store->SetFloat(x, static_cast<float>(cx));
-    b->m_store->SetFloat(y, static_cast<float>(cy));
-    b->m_store->SetFloat(a, static_cast<float>(ca));
+    b->m_controller->writeCurrentPos(x, y, a, PlatformController::NumFormat::Float, Platform::Live);
     return 0;
 }

@@ -17,7 +17,6 @@
 #include "PlatformController.h"
 #include "Config/ConfigManager.h"
 #include "MainWorkFlow.h"
-#include "IPlatformController.h"
 #include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>
@@ -60,7 +59,6 @@ private:
     void CreateCurrentProtocol();
 
     // 平台控制相关
-    double GetDivisorFromPowerEdit(QLineEdit* edit, double defaultPower = 0.0);
     void OnWriteAxisDoubleWord();
     void OnWriteAxisFloat();
 
@@ -87,7 +85,6 @@ private:
 
     // 工作流
     MainWorkFlow* m_pWorkFlow;
-    std::unique_ptr<IPlatformController> m_PlatformController;
     std::unique_ptr<PlatformController> m_platformController;
     std::unique_ptr<CommBase::CommInfoBase> m_CurInfo;
 

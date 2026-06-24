@@ -10,9 +10,7 @@
 #include "LuaEngine.h"
 #include "LuaStaticCheck.h"
 #include "Core/RegisterStore.h"
-#include "IPlatformController.h"
 #include "RegisterBinding.h"
-#include "PlatformBinding.h"
 
 #include <QSet>
 #include <QThreadPool>
@@ -29,11 +27,8 @@ ScriptEngineHost::ScriptEngineHost(RegisterStore* store, int engineCount, QObjec
     m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
 
     // 业务绑定:注册一次,install/文档三处自动跟随
-    auto reg  = std::make_unique<RegisterBinding>(m_store);
-    auto plat = std::make_unique<PlatformBinding>(m_store, nullptr); // controller 延迟设置
-    m_platformBinding = plat.get();
+    auto reg = std::make_unique<RegisterBinding>(m_store);
     m_modules.push_back(std::move(reg));
-    m_modules.push_back(std::move(plat));
 
     // 引擎:构造自注册内建;装入各模块
     m_engines.resize(m_engineCount);
@@ -50,11 +45,6 @@ ScriptEngineHost::~ScriptEngineHost()
     if (m_threadPool) m_threadPool->waitForDone();  // 等待池中任务,避免访问已释放引擎
     m_engines.clear();   // 引擎(持绑定闭包)先于绑定释放
     m_modules.clear();
-}
-
-void ScriptEngineHost::setPlatformController(IPlatformController* controller)
-{
-    if (m_platformBinding) m_platformBinding->setController(controller);
 }
 
 void ScriptEngineHost::runOnPool(int index,

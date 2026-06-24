@@ -9,10 +9,10 @@
 #include "MainWindow.h"
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
+#include "PlatformBinding.h"
 #include "version.h"
 #include <QDir>
 #include <QFile>
-#include <cmath>
 #include <QWindow>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -89,85 +89,6 @@ MainWindow::MainWindow(QWidget *parent)
 	// 更新表格显示
 	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
 
-	struct SimulationPlatformController : public IPlatformController
-	{
-		MainWindow *m_pParent;
-		explicit SimulationPlatformController(MainWindow *parent) : m_pParent(parent) {}
-		void MovePlatformAbsFloat(double x, double y, double angleDeg) override
-		{
-			if (m_pParent && m_pParent->m_simulationPlatform)
-			{
-				m_pParent->m_simulationPlatform->moveAbsolute({x, y, angleDeg});
-			}
-		}
-		void MovePlatformRelativeFloat(double x, double y, double angleDeg) override
-		{
-			if (m_pParent && m_pParent->m_simulationPlatform)
-			{
-				m_pParent->m_simulationPlatform->moveRelative({x, y, angleDeg});
-			}
-		}
-		void MovePlatformRelativeInt32(int32_t nX, int32_t nY, int32_t nAngle) override
-		{
-			if (m_pParent && m_pParent->m_simulationPlatform)
-			{
-				// 获取除数：10的幂次方
-				double divisorXY = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_XY);
-				double divisorD = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_D);
-
-				// 转换坐标值：除以10的幂次方
-				double x = static_cast<double>(nX) / divisorXY;
-				double y = static_cast<double>(nY) / divisorXY;
-				double angleDeg = static_cast<double>(nAngle) / divisorD;
-
-				// 控制平台移动
-				m_pParent->m_simulationPlatform->moveRelative({x, y, angleDeg});
-			}
-		}
-		void MovePlatformAbsInt32(int32_t nX, int32_t nY, int32_t nAngle) override
-		{
-			if (m_pParent && m_pParent->m_simulationPlatform)
-			{
-				// 获取除数：10的幂次方
-				double divisorXY = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_XY);
-				double divisorD = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_D);
-
-				// 转换坐标值：除以10的幂次方
-				double x = static_cast<double>(nX) / divisorXY;
-				double y = static_cast<double>(nY) / divisorXY;
-				double angleDeg = static_cast<double>(nAngle) / divisorD;
-
-				// 控制平台移动
-				m_pParent->m_simulationPlatform->moveAbsolute({x, y, angleDeg});
-			}
-		}
-
-		void GetCurrentPosInt32(int32_t &nX, int32_t &nY, int32_t &nAngle) override
-		{
-			if (m_pParent && m_pParent->m_simulationPlatform)
-			{
-				const Pose p = m_pParent->m_simulationPlatform->pose(Platform::Live);
-
-				// 获取幂次值并计算乘数（注意：这里是乘以幂次，与平台控制时除以幂次相反）
-				double multiplierXY = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_XY); // 10^powerXY
-				double multiplierD = m_pParent->GetDivisorFromPowerEdit(m_pParent->ui->edit_Unit_D);   // 10^powerD
-
-				// 将坐标值乘以10的幂次方并转换为int32
-				nX = static_cast<int32_t>(p.x * multiplierXY);
-				nY = static_cast<int32_t>(p.y * multiplierXY);
-				nAngle = static_cast<int32_t>(p.angleDeg * multiplierD);
-			}
-		}
-		void GetCurrentPosFloat(double &x, double &y, double &angleDeg) override
-		{
-			if (m_pParent && m_pParent->m_simulationPlatform)
-			{
-				const Pose p = m_pParent->m_simulationPlatform->pose(Platform::Live);
-				x = p.x; y = p.y; angleDeg = p.angleDeg;
-			}
-		}
-	};
-	m_PlatformController = std::make_unique<SimulationPlatformController>(this);
 	m_platformController = std::make_unique<PlatformController>(
 		m_pWorkFlow ? m_pWorkFlow->registerStore() : nullptr,
 		m_simulationPlatform,
@@ -175,7 +96,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 	if (m_pWorkFlow == nullptr)
 		return;
-	m_pWorkFlow->scriptHost()->setPlatformController(m_PlatformController.get());
+	m_pWorkFlow->scriptHost()->installModule(
+		std::make_unique<PlatformBinding>(m_platformController.get()));
 
 	// 平台位姿变化信号 → 自动写入寄存器
 	connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
@@ -791,27 +713,6 @@ void MainWindow::CreateCurrentProtocol()
 		return;
 
 	m_pWorkFlow->CreateCommProtocol(data.value<ProtocolType>());
-}
-
-// ====================平台控制相关槽函数实现====================
-
-// 辅助函数：从控件获取幂次值并计算10的幂次方作为除数
-double MainWindow::GetDivisorFromPowerEdit(QLineEdit *edit, double defaultPower)
-{
-	if (edit == nullptr)
-	{
-		return std::pow(10.0, defaultPower);
-	}
-
-	bool ok = false;
-	double power = edit->text().toDouble(&ok);
-
-	if (!ok)
-	{
-		power = defaultPower;
-	}
-
-	return std::pow(10.0, power);
 }
 
 // ====================轴位置写入相关槽函数实现====================
