@@ -32,17 +32,6 @@ enum class CmdType //指令类型
 
 };
 
-//数据类型枚举类
-enum class RegisterDataType
-{
-	eDataTypeUnkown = -1,
-	eDataTypeInt16,
-	eDataTypeInt32,
-	eDataTypeFloat,
-	eDataTypeDouble,
-	eDataTypeChar8,
-};
-
 enum class ProcessType
 {
 	eProcessUnDef = -1,

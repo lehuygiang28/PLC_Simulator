@@ -1,17 +1,18 @@
 #include "RegisterTableManager.h"
+#include "Core/RegisterStore.h"
 #include <QApplication>
 
 RegisterTableManager::RegisterTableManager(
     QTableWidget* tableWidget,
     QComboBox* dataTypeCombo,
     QLineEdit* addrEdit,
-    MainWorkFlow* workFlow,
+    RegisterStore* store,
     QWidget* parent)
     : QObject(parent)
     , m_tableWidget(tableWidget)
     , m_dataTypeCombo(dataTypeCombo)
     , m_addrEdit(addrEdit)
-    , m_workFlow(workFlow)
+    , m_store(store)
     , m_parentWidget(parent)
     , m_nIntStat(0)
     , m_bShouldFlash(true)
@@ -66,7 +67,7 @@ void RegisterTableManager::initTable()
 
 void RegisterTableManager::updateTableInfo(int nStart, bool bInitialize)
 {
-    if (!m_tableWidget || !m_workFlow) return;
+    if (!m_tableWidget || !m_store) return;
 
     const int rowCount = m_tableWidget->rowCount();
     const int colCount = m_tableWidget->columnCount();
@@ -93,33 +94,33 @@ void RegisterTableManager::updateTableInfo(int nStart, bool bInitialize)
 
 void RegisterTableManager::getRegisterVals(int nStart)
 {
-    if (!m_workFlow) return;
+    if (!m_store) return;
 
     for (size_t i = 0; i < m_vecRegisterVal.size(); i++)
     {
         for (int j = 0; j < 4; j++)
         {
-            m_vecRegisterVal[i].u_Int16[j] = m_workFlow->GetRegisterVal(nStart + i * 4 + j);
+            m_vecRegisterVal[i].u_Int16[j] = m_store->cell(nStart + i * 4 + j);
         }
     }
 }
 
 void RegisterTableManager::setRegisterVals(int nStart)
 {
-    if (!m_workFlow) return;
+    if (!m_store) return;
 
     for (size_t i = 0; i < m_vecRegisterVal.size(); i++)
     {
         for (int j = 0; j < 4; j++)
         {
-            m_workFlow->SetRegisterVal(nStart + i * 4 + j, m_vecRegisterVal[i].u_Int16[j]);
+            m_store->setCell(nStart + i * 4 + j, m_vecRegisterVal[i].u_Int16[j]);
         }
     }
 }
 
 void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
 {
-    if (!pItem || !m_tableWidget || !m_workFlow || !m_addrEdit) return;
+    if (!pItem || !m_tableWidget || !m_store || !m_addrEdit) return;
 
     checkInput(pItem);
 
@@ -157,7 +158,7 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
             m_vecRegisterVal[nRegisterValIndex].u_chars[ncharIndex] = nchar;
             nCurChar++;
         }
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
+        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
     }
     break;
     case RegisterDataType::eDataTypeInt16:
@@ -173,7 +174,7 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
             nVal = (pItem->text().toInt(&bOk, 16) & 0xFFFF);
         }
         m_vecRegisterVal[nRegisterValIndex].u_Int16[ndataIndex % 4] = nVal;
-        m_workFlow->SetRegisterVal(addr, nVal);
+        m_store->setCell(addr, nVal);
     }
     break;
     case RegisterDataType::eDataTypeInt32:
@@ -191,8 +192,8 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
         // 每个 Int32 占 2 个 Int16:子下标按 ndataIndex%4 推导,与 display/读取端保持一致
         int nInt16Index = ndataIndex % 4;
         m_vecRegisterVal[nRegisterValIndex].u_Int32[nInt16Index / 2] = nVal;
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
-        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
+        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
+        m_store->setCell(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
     }
     break;
     case RegisterDataType::eDataTypeFloat:
@@ -201,18 +202,18 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
         // 每个 float 占 2 个 Int16:子下标按 ndataIndex%4 推导,与 display/读取端保持一致
         int nInt16Index = ndataIndex % 4;
         m_vecRegisterVal[nRegisterValIndex].u_float[nInt16Index / 2] = nVal;
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
-        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
+        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
+        m_store->setCell(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
     }
     break;
     case RegisterDataType::eDataTypeDouble:
     {
         double nVal = pItem->text().toDouble();
         m_vecRegisterVal[nRegisterValIndex].u_double = nVal;
-        m_workFlow->SetRegisterVal(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[0]);
-        m_workFlow->SetRegisterVal(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[1]);
-        m_workFlow->SetRegisterVal(addr + 2, m_vecRegisterVal[nRegisterValIndex].u_Int16[2]);
-        m_workFlow->SetRegisterVal(addr + 3, m_vecRegisterVal[nRegisterValIndex].u_Int16[3]);
+        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[0]);
+        m_store->setCell(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[1]);
+        m_store->setCell(addr + 2, m_vecRegisterVal[nRegisterValIndex].u_Int16[2]);
+        m_store->setCell(addr + 3, m_vecRegisterVal[nRegisterValIndex].u_Int16[3]);
     }
     break;
     default:

@@ -42,7 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
 		ui->table_RegisterData,
 		ui->cmbBox_DataType,
 		ui->edit_RegisterAddr,
-		m_pWorkFlow,
+		m_pWorkFlow->registerStore(),
 		this);
 	m_registerTableManager->initTable();
 	ui->table_RegisterData->installEventFilter(this);
