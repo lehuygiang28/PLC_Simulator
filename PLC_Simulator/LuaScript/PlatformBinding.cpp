@@ -53,15 +53,6 @@ void PlatformBinding::install(lua_State* L)
     }
 }
 
-static int StubVoid(lua_State*) { return 0; }
-
-void PlatformBinding::installStubs(lua_State* L)
-{
-    const char* fns[] = {"MoveAbsInt32","MoveAbsFloat","MoveRelativeInt32",
-                         "MoveRelativeFloat","WriteCurrentPosInt32","WriteCurrentPosFloat"};
-    for (const char* n : fns) { lua_pushcfunction(L, StubVoid); lua_setglobal(L, n); }
-}
-
 QList<LuaFunctionDoc> PlatformBinding::functions() const
 {
     return {

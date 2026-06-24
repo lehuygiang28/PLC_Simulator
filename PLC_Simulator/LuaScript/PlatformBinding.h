@@ -22,7 +22,6 @@ public:
     void setController(IPlatformController* controller) { m_controller = controller; }
 
     void install(lua_State* L) override;
-    void installStubs(lua_State* L) override;
     QList<LuaFunctionDoc> functions() const override;
 
 private:

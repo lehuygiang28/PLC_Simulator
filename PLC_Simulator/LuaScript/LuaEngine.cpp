@@ -11,9 +11,6 @@
 #include "ILuaBinding.h"
 
 namespace {
-// 校验桩:IsLoopValid 返回 nil(假),sleep 无返回——与原 installEngineStubs 一致
-int StubVoid(lua_State*) { return 0; }
-
 // 内建真实实现(upvalue 为 LuaEngine*)
 int IsLoopValidReal(lua_State* L)
 {
@@ -33,11 +30,11 @@ int SleepReal(lua_State* L)
 	return 0;
 }
 
-// 内建单一来源:注册/桩/文档均由此表派生
-struct Builtin { const char* name; lua_CFunction real; lua_CFunction stub; const char* snippet; };
+// 内建单一来源:注册/文档均由此表派生
+struct Builtin { const char* name; lua_CFunction real; const char* snippet; };
 const Builtin kBuiltins[] = {
-	{"IsLoopValid", IsLoopValidReal, StubVoid, "IsLoopValid() -- 获取循环是否有效"},
-	{"sleep",       SleepReal,       StubVoid, "sleep(500) -- 睡眠500毫秒"},
+	{"IsLoopValid", IsLoopValidReal, "IsLoopValid() -- 获取循环是否有效"},
+	{"sleep",       SleepReal,       "sleep(500) -- 睡眠500毫秒"},
 };
 } // namespace
 
@@ -124,10 +121,3 @@ QList<LuaFunctionDoc> LuaEngine::builtinFunctionDocs()
 	return docs;
 }
 
-void LuaEngine::installBuiltinStubs(lua_State* L)
-{
-	for (const Builtin& b : kBuiltins) {
-		lua_pushcfunction(L, b.stub);
-		lua_setglobal(L, b.name);
-	}
-}

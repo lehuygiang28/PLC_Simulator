@@ -27,9 +27,6 @@ public:
     // 把真实实现注册进给定 lua_State
     virtual void install(lua_State* L) = 0;
 
-    // 把 Dummy 桩注册进校验状态机(供 LuaSyntaxChecker)
-    virtual void installStubs(lua_State* L) = 0;
-
     // 本绑定提供的全部函数(唯一清单源)
     virtual QList<LuaFunctionDoc> functions() const = 0;
 };

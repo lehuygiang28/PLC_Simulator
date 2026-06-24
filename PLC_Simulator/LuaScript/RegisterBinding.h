@@ -20,7 +20,6 @@ public:
     explicit RegisterBinding(IRegisterAccess* access);
 
     void install(lua_State* L) override;
-    void installStubs(lua_State* L) override;
     QList<LuaFunctionDoc> functions() const override;
 
 private:

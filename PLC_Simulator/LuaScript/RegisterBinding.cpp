@@ -54,18 +54,6 @@ void RegisterBinding::install(lua_State* L)
     }
 }
 
-// 校验状态机用的桩：Set 系列返回 0；Get 系列压一个 0 返回值
-static int StubVoid(lua_State*) { return 0; }
-static int StubReturn1(lua_State* L) { lua_pushinteger(L, 0); return 1; }
-
-void RegisterBinding::installStubs(lua_State* L)
-{
-    const char* voidFns[] = {"SetInt16","SetInt32","SetFloat","SetDouble","SetString"};
-    const char* retFns[]  = {"GetInt16","GetInt32","GetFloat","GetDouble","GetString"};
-    for (const char* n : voidFns) { lua_pushcfunction(L, StubVoid); lua_setglobal(L, n); }
-    for (const char* n : retFns)  { lua_pushcfunction(L, StubReturn1); lua_setglobal(L, n); }
-}
-
 QList<LuaFunctionDoc> RegisterBinding::functions() const
 {
     return {

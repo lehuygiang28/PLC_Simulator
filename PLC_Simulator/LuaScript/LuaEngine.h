@@ -62,9 +62,8 @@ private:
 	bool RegisterLuaFunc();
 
 public:
-	// 引擎内建函数(IsLoopValid/sleep)的文档与校验桩——供 ScriptEngineHost 聚合
+	// 引擎内建函数(IsLoopValid/sleep)的文档——供 ScriptEngineHost 聚合
 	static QList<LuaFunctionDoc> builtinFunctionDocs();
-	static void installBuiltinStubs(lua_State* L);
 
 };
 
