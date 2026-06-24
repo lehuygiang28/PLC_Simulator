@@ -8,12 +8,14 @@
 #include "ScriptEngineHost.h"
 
 #include "LuaEngine.h"
+#include "LuaStaticCheck.h"
 #include "LuaSyntaxChecker.h"
 #include "IRegisterAccess.h"
 #include "IPlatformController.h"
 #include "RegisterBinding.h"
 #include "PlatformBinding.h"
 
+#include <QSet>
 #include <QThreadPool>
 #include <QThread>
 #include <QMutex>
@@ -83,56 +85,67 @@ void ScriptEngineHost::setPlatformController(IPlatformController* controller)
     if (m_platformBinding) m_platformBinding->setController(controller);
 }
 
-bool ScriptEngineHost::runScript(int index, const QString& luaFile)
-{
-    if (index < 0 || index >= m_engineCount) return false;
-    if (!m_engines[index]) return false;
-
-    class LuaTask : public QRunnable {
-    public:
-        ScriptEngineHost* host; int idx; QString file;
-        LuaTask(ScriptEngineHost* h, int i, const QString& f) : host(h), idx(i), file(f) {}
-        void run() override {
-            QMutexLocker locker(host->m_mutexes[idx].get());
-            QString err;
-            bool ok = host->m_engines[idx]->RunLuaScript(file, err);
-            if (ok) {
-                if (host->m_registerAccess) host->m_registerAccess->notifyChanged();
-            } else {
-                QMetaObject::invokeMethod(host, "scriptLog", Qt::QueuedConnection,
-                                          Q_ARG(QString, QString("Lua执行失败:%1").arg(err)));
-            }
-        }
-    };
-    LuaTask* t = new LuaTask(this, index, luaFile);
-    t->setAutoDelete(true);
-    m_threadPool->start(t);
-    return true;
-}
-
-void ScriptEngineHost::runEditorScriptAsync(int index, const QString& content,
-                                            std::function<void(bool, const QString&)> onFinished)
+void ScriptEngineHost::runOnPool(int index,
+    std::function<bool(LuaEngine*, QString&)> exec,
+    std::function<void(bool, const QString&)> onFinished)
 {
     if (index < 0 || index >= m_engineCount || !m_engines[index]) {
         if (onFinished) onFinished(false, "LuaEngine instance not found");
         return;
     }
-    class EditorScriptTask : public QRunnable {
+    class Task : public QRunnable {
     public:
-        LuaEngine* lua; QString content; std::function<void(bool, const QString&)> callback; QMutex* mutex;
-        EditorScriptTask(LuaEngine* l, const QString& c, std::function<void(bool, const QString&)> cb, QMutex* m)
-            : lua(l), content(c), callback(std::move(cb)), mutex(m) {}
+        LuaEngine* lua = nullptr; QMutex* mutex = nullptr;
+        std::function<bool(LuaEngine*, QString&)> exec;
+        std::function<void(bool, const QString&)> done;
         void run() override {
             QMutexLocker locker(mutex);
             QString err;
-            bool ok = lua->RunLuaScriptWithEditor(content, err);
-            if (callback) callback(ok, err);
+            const bool ok = exec(lua, err);
+            if (done) done(ok, err);
         }
     };
-    EditorScriptTask* task = new EditorScriptTask(
-        m_engines[index].get(), content, std::move(onFinished), m_mutexes[index].get());
-    task->setAutoDelete(true);
-    m_threadPool->start(task);
+    Task* t = new Task;
+    t->lua   = m_engines[index].get();
+    t->mutex = m_mutexes[index].get();
+    t->exec  = std::move(exec);
+    t->done  = std::move(onFinished);
+    t->setAutoDelete(true);
+    m_threadPool->start(t);
+}
+
+bool ScriptEngineHost::runScript(int index, const QString& luaFile)
+{
+    if (index < 0 || index >= m_engineCount || !m_engines[index]) return false;
+    runOnPool(index,
+        [luaFile](LuaEngine* e, QString& err){ return e->RunLuaScript(luaFile, err); },
+        [this](bool ok, const QString& err){
+            if (ok) { if (m_registerAccess) m_registerAccess->notifyChanged(); }
+            else QMetaObject::invokeMethod(this, "scriptLog", Qt::QueuedConnection,
+                     Q_ARG(QString, QString("Lua执行失败:%1").arg(err)));
+        });
+    return true;
+}
+
+void ScriptEngineHost::runScriptAsync(int index, const QString& content,
+    std::function<void(bool, const QString&)> onFinished)
+{
+    runOnPool(index,
+        [content](LuaEngine* e, QString& err){ return e->RunLuaScriptWithEditor(content, err); },
+        std::move(onFinished));
+}
+
+bool ScriptEngineHost::checkScript(const QString& script, QString& errorMsg) const
+{
+    QSet<QString> known;
+    for (const LuaFunctionDoc& d : functionDocs()) known.insert(d.name);
+    return LuaStaticCheck::run(script, known, errorMsg);
+}
+
+void ScriptEngineHost::runEditorScriptAsync(int index, const QString& content,
+                                            std::function<void(bool, const QString&)> onFinished)
+{
+    runScriptAsync(index, content, std::move(onFinished));
 }
 
 LuaEngine* ScriptEngineHost::engine(int index) const

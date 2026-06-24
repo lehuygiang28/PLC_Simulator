@@ -43,6 +43,12 @@ public:
     void runEditorScriptAsync(int index, const QString& content,
                               std::function<void(bool, const QString&)> onFinished);
 
+    // 同步语法检查(GUI 线程):仅编译+字节码扫描,检测语法错与未定义全局
+    bool checkScript(const QString& script, QString& errorMsg) const;
+    // 编辑器内容异步执行(带完成回调)
+    void runScriptAsync(int index, const QString& content,
+                        std::function<void(bool, const QString&)> onFinished);
+
     LuaEngine* engine(int index) const;
     IScriptRunner* scriptRunner(int index) const;
     LuaSyntaxChecker* syntaxChecker() const;
@@ -53,6 +59,10 @@ signals:
     void scriptLog(QString msg);
 
 private:
+    void runOnPool(int index,
+                   std::function<bool(LuaEngine*, QString&)> exec,
+                   std::function<void(bool, const QString&)> onFinished);
+
     IRegisterAccess* m_registerAccess;
     int m_engineCount;
     std::vector<std::unique_ptr<LuaEngine>> m_engines;
