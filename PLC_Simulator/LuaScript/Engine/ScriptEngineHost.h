@@ -35,6 +35,9 @@ public:
 
     void setPlatformController(IPlatformController* controller);
 
+    // 外部构造的绑定注册进本宿主:install 进所有已建引擎 + 纳入文档清单。须在脚本运行前调用。
+    void installModule(std::unique_ptr<ILuaBinding> module);
+
     // 文件路径异步执行(面板/QuickPanel);成功后 notifyChanged,失败 emit scriptLog
     bool runScript(int index, const QString& luaFile);
 

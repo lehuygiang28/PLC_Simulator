@@ -131,3 +131,11 @@ void ScriptEngineHost::setLoopValid(int index, bool valid)
 {
     if (LuaEngine* e = engine(index)) e->SetLoopValid(valid);
 }
+
+void ScriptEngineHost::installModule(std::unique_ptr<ILuaBinding> module)
+{
+    if (!module) return;
+    for (auto& e : m_engines)
+        if (e) e->install(*module);
+    m_modules.push_back(std::move(module));
+}
