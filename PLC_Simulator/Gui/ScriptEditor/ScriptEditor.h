@@ -21,34 +21,20 @@
 #include "LuaHighlighter.h"
 #include "ILuaBinding.h"
 
-class LuaSyntaxChecker;
-
-// 脚本执行器接口,用于解耦 ScriptEditor 与具体执行实现
-class IScriptRunner
-{
-public:
-    virtual ~IScriptRunner() = default;
-
-    // 异步执行脚本内容
-    // scriptContent: 脚本代码
-    // onFinished: 执行完成回调,参数为 (是否成功, 错误信息)
-    virtual void RunScriptAsync(const QString& scriptContent,
-                                std::function<void(bool success, const QString& errorMsg)> onFinished) = 0;
-};
-
 class ScriptEditor : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    explicit ScriptEditor(QWidget *parent = nullptr, IScriptRunner* pScriptRunner = nullptr);
+    explicit ScriptEditor(QWidget *parent = nullptr);
     ~ScriptEditor();
 
-    // 设置脚本执行器(依赖注入)
-    void setScriptRunner(IScriptRunner* runner) { m_pScriptRunner = runner; }
-
-    // 注入语法检查器（由 ScriptManager 在创建编辑器后调用）
-    void setSyntaxChecker(LuaSyntaxChecker* checker) { m_pSyntaxChecker = checker; }
+    // 注入运行函数(std::function 形式，由 ScriptManager 通过 lambda 提供)
+    using RunFn   = std::function<void(const QString& content,
+                                       std::function<void(bool, const QString&)> onFinished)>;
+    using CheckFn = std::function<bool(const QString& script, QString& err)>;
+    void setRunFn(RunFn fn)     { m_runFn = std::move(fn); }
+    void setCheckFn(CheckFn fn) { m_checkFn = std::move(fn); }
 
     // 注入绑定函数文档列表（供函数菜单与语法高亮使用）
     void setFunctionDocs(const QList<LuaFunctionDoc>& docs);
@@ -74,12 +60,13 @@ private:
     void createMenus();
     void setupHighlighter();
     void updateFunctionMenu();
+    void addFunctionMenuGroup(const QList<LuaFunctionDoc>& docs);  // 向函数菜单添加一组(绑定/语言结构)
     void updateWindowTitle();  // 更新窗口标题(添加/移除星号)
 
     CodeEditor *editor;
     LuaHighlighter *highlighter;
     QString scriptFileName;
-    QMap<QString, QString> functionTemplates;
+    QList<LuaFunctionDoc> m_langTemplates;  // 语言结构模板(if/while/for/...),与绑定函数同构
 
     // 文件修改状态跟踪
     bool m_isModified;       // 文件是否被修改
@@ -99,9 +86,9 @@ private:
     QMenu *functionsMenu;
 
 private:
-    IScriptRunner* m_pScriptRunner;
-    LuaSyntaxChecker* m_pSyntaxChecker = nullptr;  // 注入的语法检查器
-    QList<LuaFunctionDoc> m_functionDocs;           // 注入的绑定函数文档列表
+    RunFn   m_runFn;                        // 注入的脚本运行函数
+    CheckFn m_checkFn;                      // 注入的语法检查函数
+    QList<LuaFunctionDoc> m_functionDocs;  // 注入的绑定函数文档列表
 
     // 执行状态相关
     bool m_bExecuting = false;           // 是否正在执行脚本

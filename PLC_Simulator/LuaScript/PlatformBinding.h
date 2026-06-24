@@ -22,12 +22,15 @@ public:
     void setController(IPlatformController* controller) { m_controller = controller; }
 
     void install(lua_State* L) override;
-    void installStubs(lua_State* L) override;
     QList<LuaFunctionDoc> functions() const override;
 
 private:
     IRegisterAccess* m_access;
     IPlatformController* m_controller;
+
+    // 单一来源:install(取 fn)/functions(取 name/snippet/description) 均由此表派生
+    struct Fn { const char* name; int (*fn)(lua_State*); const char* snippet; const char* description; };
+    static const Fn kFns[];
 
     // 解析三个地址参数(X/Y/Angle)；失败时已 luaL_error 不返回
     static bool parseThreeAddr(lua_State* L, int& nX, int& nY, int& nA);

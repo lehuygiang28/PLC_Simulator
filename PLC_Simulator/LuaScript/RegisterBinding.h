@@ -20,11 +20,14 @@ public:
     explicit RegisterBinding(IRegisterAccess* access);
 
     void install(lua_State* L) override;
-    void installStubs(lua_State* L) override;
     QList<LuaFunctionDoc> functions() const override;
 
 private:
     IRegisterAccess* m_access;
+
+    // 单一来源:install(取 fn)/functions(取 name/snippet/description) 均由此表派生
+    struct Fn { const char* name; int (*fn)(lua_State*); const char* snippet; const char* description; };
+    static const Fn kFns[];
 
     // Lua C 封装函数(upvalue=RegisterBinding*)
     static int SetInt16Wrapper(lua_State* L);
