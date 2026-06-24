@@ -61,6 +61,9 @@ private:
 
 	bool RegisterLuaFunc();
 
+	// 统一执行核:从缓冲加载(chunkName 决定错误信息里的来源名/行号) + pcall + 错误处理
+	bool runChunk(const QByteArray& code, const QByteArray& chunkName, QString& errorMsg);
+
 public:
 	// 引擎内建函数(IsLoopValid/sleep)的文档——供 ScriptEngineHost 聚合
 	static QList<LuaFunctionDoc> builtinFunctionDocs();

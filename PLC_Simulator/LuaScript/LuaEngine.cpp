@@ -10,6 +10,9 @@
 #include "LuaEngine.h"
 #include "ILuaBinding.h"
 
+#include <QFile>
+#include <QByteArray>
+
 namespace {
 // 内建真实实现(upvalue 为 LuaEngine*)
 int IsLoopValidReal(lua_State* L)
@@ -46,33 +49,39 @@ LuaEngine* LuaEngine::InitialEngine(QObject* pParent /*= nullptr*/)
 	return new LuaEngine(pParent);
 }
 
-bool LuaEngine::RunLuaScript(const QString& strLuaFile,QString& errorMsg)
+bool LuaEngine::runChunk(const QByteArray& code, const QByteArray& chunkName, QString& errorMsg)
 {
-	QByteArray filePathData = strLuaFile.toLocal8Bit();
-	if (luaL_dofile(m_pLua, filePathData.constData()) != LUA_OK)
+	int status = luaL_loadbuffer(m_pLua, code.constData(), static_cast<size_t>(code.size()),
+	                             chunkName.constData());
+	if (status == LUA_OK)
+		status = lua_pcall(m_pLua, 0, LUA_MULTRET, 0);
+	if (status != LUA_OK)
 	{
-		const char* error_msg = lua_tostring(m_pLua, -1);
+		errorMsg = QString::fromUtf8(lua_tostring(m_pLua, -1));
 		lua_pop(m_pLua, 1); // 弹出错误信息
-		errorMsg = QString::fromUtf8(error_msg);
 		return false;
 	}
-
 	return true;
+}
+
+bool LuaEngine::RunLuaScript(const QString& strLuaFile,QString& errorMsg)
+{
+	QFile file(strLuaFile);  // QFile 原生支持中文路径,避开 fopen/ANSI
+	if (!file.open(QIODevice::ReadOnly))
+	{
+		errorMsg = QStringLiteral("无法打开脚本文件: %1").arg(strLuaFile);
+		return false;
+	}
+	QByteArray code = file.readAll();  // 磁盘按 UTF-8 保存(ScriptManager 约定)
+	if (code.startsWith("\xEF\xBB\xBF")) code.remove(0, 3);  // 剥离可能的 UTF-8 BOM
+	// chunk 名以 "@" 前缀标记为文件名 → 错误信息显示 "路径:行号"
+	return runChunk(code, "@" + strLuaFile.toUtf8(), errorMsg);
 }
 
 bool LuaEngine::RunLuaScriptWithEditor(const QString &strLuaContent,QString& errorMsg)
 {
-	QByteArray contentData = strLuaContent.toLocal8Bit();
-	if (luaL_dostring(m_pLua, contentData.constData()) != LUA_OK)
-	{
-		const char* error_msg = lua_tostring(m_pLua, -1);
-		lua_pop(m_pLua, 1); // 弹出错误信息
-
-		errorMsg = QString::fromUtf8(error_msg);
-		return false;
-	}
-
-    return true;
+	// 编辑器内容统一按 UTF-8(与文件保存/校验器/RegisterBinding::fromUtf8 一致)
+	return runChunk(strLuaContent.toUtf8(), QByteArrayLiteral("@[editor]"), errorMsg);
 }
 
 LuaEngine::~LuaEngine()
