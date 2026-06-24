@@ -10,7 +10,6 @@
 #include "LuaEngine.h"
 #include "LuaStaticCheck.h"
 #include "Core/RegisterStore.h"
-#include "RegisterBinding.h"
 
 #include <QSet>
 #include <QThreadPool>
@@ -26,16 +25,15 @@ ScriptEngineHost::ScriptEngineHost(RegisterStore* store, int engineCount, QObjec
     m_threadPool = new QThreadPool(this);
     m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
 
-    // 业务绑定:注册一次,install/文档三处自动跟随
-    auto reg = std::make_unique<RegisterBinding>(m_store);
-    m_modules.push_back(std::move(reg));
-
+    // 绑定由外部 installModule 注册,此处仅初始化引擎
     // 引擎:构造自注册内建;装入各模块
     m_engines.resize(m_engineCount);
     m_mutexes.resize(m_engineCount);
     for (int i = 0; i < m_engineCount; ++i) {
         m_engines[i] = std::unique_ptr<LuaEngine>(LuaEngine::InitialEngine());
         for (auto& m : m_modules) m_engines[i]->install(*m);
+        // 此刻 m_modules 恒为空(绑定均由构造后的 installModule 注入,会自行装入已建引擎);
+        // 此循环仅保留"若 m_modules 预先有料则一并装入"的通用语义。
         m_mutexes[i] = std::make_unique<QMutex>();
     }
 }

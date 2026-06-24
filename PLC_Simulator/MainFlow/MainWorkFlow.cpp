@@ -8,6 +8,7 @@
 
 #include "MainWorkFlow.h"
 #include "Comm/Socket/CommSocket.h"
+#include "RegisterBinding.h"
 
 //初始化静态实例
 MainWorkFlow* MainWorkFlow::s_pInstance = nullptr;
@@ -31,6 +32,7 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 
     m_registerStore = std::make_unique<RegisterStore>();
     m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerStore.get());
+    m_scriptHost->installModule(std::make_unique<RegisterBinding>(m_registerStore.get()));
 }
 
 // 析构函数：确保所有资源正确释放
