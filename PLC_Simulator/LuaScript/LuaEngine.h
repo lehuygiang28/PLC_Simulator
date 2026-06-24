@@ -15,6 +15,8 @@
 #include <QEventLoop>
 #include <QDebug>
 
+#include <atomic>
+
 struct lua_State;  // 前向声明，避免 Lua.hpp 泄漏到包含方
 
 #include "ILuaBinding.h"  // LuaFunctionDoc / QList(内含 lua_State 前向声明)
@@ -55,7 +57,7 @@ private:
 
 	lua_State* m_pLua;
 
-	bool m_bLoopValid;	//循环是否有效
+	std::atomic<bool> m_bLoopValid;	//循环是否有效(跨线程:GUI写/脚本线程读)
 
 	bool RegisterLuaFunc();
 
