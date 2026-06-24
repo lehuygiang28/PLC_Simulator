@@ -131,7 +131,6 @@ set(LUA_SOURCES
     LuaScript/LuaBindingUtil.cpp
     LuaScript/RegisterBinding.cpp
     LuaScript/PlatformBinding.cpp
-    LuaScript/LuaSyntaxChecker.cpp
     LuaScript/ScriptEngineHost.cpp
     LuaScript/LuaStaticCheck.cpp
 )
@@ -144,7 +143,6 @@ set(LUA_HEADERS
     LuaScript/LuaBindingUtil.h
     LuaScript/RegisterBinding.h
     LuaScript/PlatformBinding.h
-    LuaScript/LuaSyntaxChecker.h
     LuaScript/ScriptEngineHost.h
     LuaScript/LuaStaticCheck.h
 )
