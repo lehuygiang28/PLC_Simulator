@@ -318,12 +318,12 @@ target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/MainFlow
     ${CMAKE_CURRENT_SOURCE_DIR}/LuaScript/Engine
     ${CMAKE_CURRENT_SOURCE_DIR}/LuaScript/Modules
-    ${CMAKE_SOURCE_DIR}/Lua/Include
+    ${CMAKE_SOURCE_DIR}/thirdparty/Lua/Include
 )
 
 # 链接目录和库（Lua相关）
 target_link_directories(${TARGET_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/Lua/Lib
+    ${CMAKE_SOURCE_DIR}/thirdparty/Lua/Lib
 )
 
 target_link_libraries(${TARGET_NAME} PRIVATE ScriptRunner.lib)
@@ -389,10 +389,10 @@ else()
 endif()
 
 # 复制 ScriptRunner.dll（若存在）到发布目录
-if(EXISTS "${CMAKE_SOURCE_DIR}/Lua/Lib/ScriptRunner.dll")
+if(EXISTS "${CMAKE_SOURCE_DIR}/thirdparty/Lua/Lib/ScriptRunner.dll")
     add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/Lua/Lib/ScriptRunner.dll"
+            "${CMAKE_SOURCE_DIR}/thirdparty/Lua/Lib/ScriptRunner.dll"
             "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/"
         COMMENT "Copying ScriptRunner.dll to Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>"
     )
