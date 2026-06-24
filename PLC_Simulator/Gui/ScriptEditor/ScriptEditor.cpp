@@ -7,7 +7,6 @@
  */
 
 #include "ScriptEditor.h"
-#include "LuaSyntaxChecker.h"
 
 #include <QFileDialog>
 #include <QMessageBox>
@@ -22,11 +21,10 @@
 #include <QAbstractButton>
 #include <QFileInfo>
 
-ScriptEditor::ScriptEditor(QWidget *parent, IScriptRunner* pScriptRunner)
+ScriptEditor::ScriptEditor(QWidget *parent)
     : QMainWindow(parent)
     , editor(new CodeEditor(this))
     , highlighter(new LuaHighlighter(editor->document()))
-    , m_pScriptRunner(pScriptRunner)
     , m_isModified(false)
     , m_savedContent("")
 {
@@ -225,11 +223,11 @@ void ScriptEditor::compileScript()
 
     QString strError;
     QString scriptContent = editor->toPlainText();
-    if (!m_pSyntaxChecker) {
+    if (!m_checkFn) {
         QMessageBox::warning(this, tr("Compile"), tr("Syntax checker not available."));
         return;
     }
-    if (m_pSyntaxChecker->check(scriptContent, strError)) {
+    if (m_checkFn(scriptContent, strError)) {
         QMessageBox::information(this, tr("Compile"), tr("Script compiled successfully."));
     } else {
         QMessageBox::critical(this, tr("Compile Error"), strError);
@@ -238,7 +236,7 @@ void ScriptEditor::compileScript()
 
 void ScriptEditor::executeScript()
 {
-    if (!m_pScriptRunner) {
+    if (!m_runFn) {
         QMessageBox::warning(this, tr("Error"), tr("Script runner not configured."));
         return;
     }
@@ -255,7 +253,7 @@ void ScriptEditor::executeScript()
     // 先编译检查
     QString scriptContent = editor->toPlainText();
     QString strError;
-    if (m_pSyntaxChecker && !m_pSyntaxChecker->check(scriptContent, strError)) {
+    if (m_checkFn && !m_checkFn(scriptContent, strError)) {
         QMessageBox::critical(this, tr("Compile Error"), strError);
         return;
     }
@@ -266,7 +264,7 @@ void ScriptEditor::executeScript()
     showRunningDialog();
 
     // 异步执行脚本
-    m_pScriptRunner->RunScriptAsync(scriptContent,
+    m_runFn(scriptContent,
         [this](bool success, const QString& errorMsg) {
             // 回调在主线程执行
             QMetaObject::invokeMethod(this, [this, success, errorMsg]() {

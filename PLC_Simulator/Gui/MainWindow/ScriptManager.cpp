@@ -147,10 +147,19 @@ void ScriptManager::openScriptEditor(int scriptIndex)
         m_nCurrentScriptIndex = -1;
     }
 
-    // 创建新的编辑器窗口
-    ScriptEditor* pScriptEditor = new ScriptEditor(m_parentWidget,
-        m_host->scriptRunner(scriptIndex - 1));
-    pScriptEditor->setSyntaxChecker(m_host->syntaxChecker());
+    // 创建新的编辑器窗口，注入运行/检查 lambda
+    ScriptEditor* pScriptEditor = new ScriptEditor(m_parentWidget);
+    const int idx = scriptIndex - 1;
+    ScriptEngineHost* host = m_host;
+    pScriptEditor->setRunFn(
+        [host, idx](const QString& content,
+                    std::function<void(bool, const QString&)> onFinished) {
+            host->runScriptAsync(idx, content, std::move(onFinished));
+        });
+    pScriptEditor->setCheckFn(
+        [host](const QString& script, QString& err) {
+            return host->checkScript(script, err);
+        });
     pScriptEditor->setFunctionDocs(m_host->functionDocs());
     pScriptEditor->setAttribute(Qt::WA_DeleteOnClose);
     pScriptEditor->setWindowModality(Qt::ApplicationModal);
