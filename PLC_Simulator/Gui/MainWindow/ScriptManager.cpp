@@ -140,8 +140,8 @@ void ScriptManager::openScriptEditor(int scriptIndex)
             }
         }
 
-        // 关闭当前编辑器
-        m_pCurrentScriptEditor->close();
+        // 同步销毁当前编辑器:直接 delete(不调 close(),避免 WA_DeleteOnClose 的延迟删除与此处同步 delete 并存)。
+        // delete 会同步触发 destroyed 信号,使下方连接的清理槽在重新赋值前先把指针置空。
         delete m_pCurrentScriptEditor;
         m_pCurrentScriptEditor = nullptr;
         m_nCurrentScriptIndex = -1;

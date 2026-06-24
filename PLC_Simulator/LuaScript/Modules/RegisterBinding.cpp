@@ -12,6 +12,7 @@
 
 #include <QString>
 #include <cfloat>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 
@@ -100,9 +101,12 @@ int RegisterBinding::SetFloatWrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
-    float fValue = static_cast<float>(luaL_checknumber(L, 2));
-    if (fValue < -FLT_MAX || fValue > FLT_MAX) return luaL_error(L, "Value %f out of float range [-%f, %f]", fValue, -FLT_MAX, FLT_MAX);
-    b->m_store->SetFloat(nAddr, fValue);
+    // 在转 float 前以 double 域判定:拦截 inf/nan 与超出 float 表示范围的入参
+    double dValue = static_cast<double>(luaL_checknumber(L, 2));
+    if (!std::isfinite(dValue) || std::fabs(dValue) > static_cast<double>(FLT_MAX))
+        return luaL_error(L, "Value %f out of float range [-%f, %f]",
+                          dValue, static_cast<double>(FLT_MAX), static_cast<double>(FLT_MAX));
+    b->m_store->SetFloat(nAddr, static_cast<float>(dValue));
     return 0;
 }
 
@@ -110,8 +114,10 @@ int RegisterBinding::SetDoubleWrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
+    // lua_Number 即 double,有限值不可能越 double 界;此处只需拦截 inf/nan
     double dValue = static_cast<double>(luaL_checknumber(L, 2));
-    if (dValue < -DBL_MAX || dValue > DBL_MAX) return luaL_error(L, "Value %f out of double range [-%f, %f]", dValue, -DBL_MAX, DBL_MAX);
+    if (!std::isfinite(dValue))
+        return luaL_error(L, "Value %f is not a finite double (inf/nan)", dValue);
     b->m_store->SetDouble(nAddr, dValue);
     return 0;
 }

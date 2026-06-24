@@ -38,7 +38,9 @@ public:
 
     // 同步语法检查(GUI 线程):仅编译+字节码扫描,检测语法错与未定义全局
     bool checkScript(const QString& script, QString& errorMsg) const;
-    // 编辑器内容异步执行(带完成回调)
+    // 编辑器内容异步执行(带完成回调)。
+    // 线程约定:onFinished 在线程池工作线程回调,不在 GUI 线程;若回调内需访问 GUI,
+    // 调用方须自行编组(如 QMetaObject::invokeMethod 回 GUI 线程)。
     void runScriptAsync(int index, const QString& content,
                         std::function<void(bool, const QString&)> onFinished);
 
@@ -50,6 +52,7 @@ signals:
     void scriptLog(QString msg);
 
 private:
+    // exec 与 onFinished 均在线程池工作线程执行(见 runScriptAsync 的线程约定)。
     void runOnPool(int index,
                    std::function<bool(LuaEngine*, QString&)> exec,
                    std::function<void(bool, const QString&)> onFinished);

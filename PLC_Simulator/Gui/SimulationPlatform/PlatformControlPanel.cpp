@@ -295,7 +295,7 @@ void PlatformControlPanel::refreshFromScene()
     setTxt(m_liveYEdit, l.y);
     setTxt(m_liveAngleEdit, l.angleDeg);
 
-    // Mark 输入框 / 复选框也回填(blockSignals 防抖)
+    // Mark 输入框 / 复选框也回填(输入框经 setTxt 屏蔽信号;复选框见下方说明)
     const MarkItem& bm = m_scene->baseMark();
     const MarkItem& lm = m_scene->liveMark();
     const MarkItem& vm = m_scene->virtualMark();
@@ -303,20 +303,22 @@ void PlatformControlPanel::refreshFromScene()
     setTxt(m_baseMarkXEdit, bm.pose.x);
     setTxt(m_baseMarkYEdit, bm.pose.y);
     setTxt(m_baseMarkAngleEdit, bm.pose.angleDeg);
-    { QSignalBlocker blk(m_baseMarkFollowCheck); m_baseMarkFollowCheck->setChecked(bm.followsPlatform); }
-    { QSignalBlocker blk(m_showBaseMarkCheck);   m_showBaseMarkCheck->setChecked(bm.visible); }
+    // 复选框均以 clicked 连接(仅响应用户点击),程序化 setChecked 不发信号,故无需 QSignalBlocker。
+    // 注意:若日后改为 toggled/stateChanged,必须在此恢复信号屏蔽,否则会重现"跟随被即时回退"的反馈环。
+    m_baseMarkFollowCheck->setChecked(bm.followsPlatform);
+    m_showBaseMarkCheck->setChecked(bm.visible);
 
     setTxt(m_liveMarkXEdit, lm.pose.x);
     setTxt(m_liveMarkYEdit, lm.pose.y);
     setTxt(m_liveMarkAngleEdit, lm.pose.angleDeg);
-    { QSignalBlocker blk(m_liveMarkFollowCheck); m_liveMarkFollowCheck->setChecked(lm.followsPlatform); }
-    { QSignalBlocker blk(m_showLiveMarkCheck);   m_showLiveMarkCheck->setChecked(lm.visible); }
+    m_liveMarkFollowCheck->setChecked(lm.followsPlatform);
+    m_showLiveMarkCheck->setChecked(lm.visible);
 
     setTxt(m_virtualMarkXEdit, vm.pose.x);
     setTxt(m_virtualMarkYEdit, vm.pose.y);
-    { QSignalBlocker blk(m_showVirtualMarkCheck); m_showVirtualMarkCheck->setChecked(vm.visible); }
+    m_showVirtualMarkCheck->setChecked(vm.visible);
 
-    // 平台可见性复选框
-    { QSignalBlocker blk(m_showBaseCheck); m_showBaseCheck->setChecked(m_scene->platform(Platform::Base).visible); }
-    { QSignalBlocker blk(m_showLiveCheck); m_showLiveCheck->setChecked(m_scene->platform(Platform::Live).visible); }
+    // 平台可见性复选框(同上,clicked 连接,无需信号屏蔽)
+    m_showBaseCheck->setChecked(m_scene->platform(Platform::Base).visible);
+    m_showLiveCheck->setChecked(m_scene->platform(Platform::Live).visible);
 }

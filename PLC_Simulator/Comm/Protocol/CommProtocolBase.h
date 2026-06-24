@@ -9,7 +9,9 @@
 #ifndef COMM_PROTOCOL_BASE_H
 #define COMM_PROTOCOL_BASE_H
 #include <QObject>
-#include "Core/DataTypeConvert.h"
+#include <cstdint>   // int16_t
+#include <map>       // std::map
+#include <vector>    // std::vector
 //协议枚举
 enum class ProtocolType
 {

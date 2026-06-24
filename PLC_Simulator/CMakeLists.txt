@@ -8,6 +8,11 @@ set(SOURCE_FILES
     main.cpp
 )
 
+# 根目录工具头文件
+set(ROOT_HEADERS
+    MemoryLeakDetector.h
+)
+
 set(RESOURCE_FILES
     Resource_Files/resources.qrc
     Resource_Files/PLC_Simulator.ico
@@ -192,6 +197,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    ${ROOT_HEADERS}
     ${COMM_HEADERS}
     ${COMM_SOCKET_HEADERS}
     ${COMM_PROTOCOL_HEADERS}
@@ -241,6 +247,7 @@ source_group("LuaScript\\\\Engine" FILES ${LUA_ENGINE_SOURCES} ${LUA_ENGINE_HEAD
 source_group("LuaScript\\\\Modules" FILES ${LUA_MODULE_SOURCES} ${LUA_MODULE_HEADERS})
 source_group("Config" FILES ${CONFIG_SOURCES} ${CONFIG_HEADERS})
 source_group("Core" FILES ${CORE_SOURCES} ${CORE_HEADERS})
+source_group("Header Files" FILES ${ROOT_HEADERS})
 
 endif()
 

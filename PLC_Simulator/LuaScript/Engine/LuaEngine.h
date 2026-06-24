@@ -17,10 +17,9 @@
 
 #include <atomic>
 
-struct lua_State;  // 前向声明，避免 Lua.hpp 泄漏到包含方
+struct lua_State;  // m_pLua 成员直接使用;前向声明避免 Lua.hpp 泄漏到包含方
 
-#include "ILuaBinding.h"  // LuaFunctionDoc / QList(内含 lua_State 前向声明)
-class ILuaBinding;        // install(ILuaBinding&) 仍用引用,保留前向声明
+#include "ILuaBinding.h"  // ILuaBinding(install 形参) / LuaFunctionDoc(builtinFunctionDocs)
 
 class LuaEngine :public QObject
 {
