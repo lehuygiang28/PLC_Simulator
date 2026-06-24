@@ -9,6 +9,7 @@
 #ifndef COMM_PROTOCOL_BASE_H
 #define COMM_PROTOCOL_BASE_H
 #include <QObject>
+#include "Core/DataTypeConvert.h"
 //协议枚举
 enum class ProtocolType
 {
@@ -41,21 +42,6 @@ enum class RegisterDataType
 	eDataTypeDouble,
 	eDataTypeChar8,
 };
-
-typedef union tagDataTypeConvert //20250606	wm	数据转换的联合体,直接将相同内存中的数据按照需求转换成不同的数据格式
-{
-	uint8_t  u_chars[8];	//字符型，每个char对应8bit
-	int16_t	 u_Int16[4];	//16位整型，分别对应低高16位
-	int32_t  u_Int32[2];	//32位整型
-	float	 u_float[2];	//浮点型，32位
-	double   u_double;		//浮点型，64位
-
-	tagDataTypeConvert()
-	{
-		u_double = 0;
-	}
-
-}DataTypeConvert;
 
 enum class ProcessType
 {
