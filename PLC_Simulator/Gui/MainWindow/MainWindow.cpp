@@ -721,7 +721,7 @@ void MainWindow::CreateCurrentProtocol()
 
 void MainWindow::OnWriteAxisDoubleWord()
 {
-    if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr) return;
+    if (m_simulationPlatform == nullptr) return;
 
     bool ok = false;
     int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
@@ -735,7 +735,7 @@ void MainWindow::OnWriteAxisDoubleWord()
 
 void MainWindow::OnWriteAxisFloat()
 {
-    if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr) return;
+    if (m_simulationPlatform == nullptr) return;
 
     bool ok = false;
     int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
@@ -765,7 +765,7 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 {
     Q_UNUSED(pose);
     if (!ui->ChkBox_WritePosAutoEnable->isChecked()) return;
-    if (m_simulationPlatform == nullptr || m_pWorkFlow == nullptr) return;
+    if (m_simulationPlatform == nullptr) return;
 
     QLineEdit* addrEdit = (which == Platform::Live)
         ? ui->edit_AxisPosRegisterAddr

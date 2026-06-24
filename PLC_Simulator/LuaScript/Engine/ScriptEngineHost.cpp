@@ -19,6 +19,8 @@
 #include <QRunnable>
 #include <QMetaObject>
 #include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QDebug>
 
 ScriptEngineHost::ScriptEngineHost(RegisterStore* store, int engineCount, QObject* parent)
     : QObject(parent), m_store(store), m_engineCount(engineCount)
@@ -48,8 +50,15 @@ ScriptEngineHost::~ScriptEngineHost()
     // 边处理事件边等池任务结束:在途的 BlockingQueuedConnection 调用(如 Lua WriteCurrentPos
     // 编组回 GUI 线程)得以被派发执行并返回,从而解开"池线程阻塞 vs GUI 阻塞 waitForDone"的互等死锁。
     if (m_threadPool) {
-        while (!m_threadPool->waitForDone(50))
+        QElapsedTimer drainTimer; drainTimer.start();
+        bool warned = false;
+        while (!m_threadPool->waitForDone(50)) {
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            if (!warned && drainTimer.elapsed() > 3000) {
+                qWarning() << "ScriptEngineHost: 池任务 drain 超过 3s,可能有脚本未检查 IsLoopValid 而无法退出";
+                warned = true;
+            }
+        }
     }
 
     m_engines.clear();   // 引擎(持绑定闭包)先于绑定释放
