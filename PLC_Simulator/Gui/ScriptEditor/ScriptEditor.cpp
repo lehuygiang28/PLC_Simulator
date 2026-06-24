@@ -264,23 +264,21 @@ void ScriptEditor::executeScript()
     setEditorEnabled(false);
     showRunningDialog();
 
-    // 异步执行脚本
-    m_runFn(scriptContent,
-        [this](bool success, const QString& errorMsg) {
-            // 回调在主线程执行
-            QMetaObject::invokeMethod(this, [this, success, errorMsg]() {
-                // 隐藏运行提示并恢复界面
-                hideRunningDialog();
-                setEditorEnabled(true);
-                m_bExecuting = false;
+    // 异步执行;完成结果经 ScriptEngineHost::scriptFinished → ScriptManager → onRunFinished 回流
+    m_runFn(scriptContent);
+}
 
-                if (success) {
-                    QMessageBox::information(this, tr("Execute"), tr("Script executed successfully."));
-                } else {
-                    QMessageBox::critical(this, tr("Execution Error"), errorMsg);
-                }
-            }, Qt::QueuedConnection);
-        });
+void ScriptEditor::onRunFinished(bool ok, const QString& err)
+{
+    // 收尾运行态:隐藏提示、恢复界面、清执行标志(与启动时 showRunningDialog/setEditorEnabled 对应)
+    hideRunningDialog();
+    setEditorEnabled(true);
+    m_bExecuting = false;
+
+    if (ok)
+        QMessageBox::information(this, tr("Execute"), tr("Script executed successfully."));
+    else
+        QMessageBox::critical(this, tr("Execution Error"), err);
 }
 
 void ScriptEditor::showRunningDialog()

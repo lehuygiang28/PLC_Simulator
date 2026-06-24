@@ -21,6 +21,15 @@ void ScriptManager::initScriptExecution()
         if (m_host == nullptr) return;
         m_host->runScript(nLuaIndex, strLuaFile);
     });
+
+    // 脚本完成 → 若是当前编辑器对应索引,转交编辑器收尾并提示(GUI 线程)
+    if (m_host) {
+        connect(m_host, &ScriptEngineHost::scriptFinished, this,
+                [this](int index, bool ok, const QString& err) {
+                    if (m_pCurrentScriptEditor && index == m_nCurrentScriptIndex - 1)
+                        m_pCurrentScriptEditor->onRunFinished(ok, err);
+                });
+    }
 }
 
 void ScriptManager::executeScript(int index)
@@ -152,9 +161,8 @@ void ScriptManager::openScriptEditor(int scriptIndex)
     const int idx = scriptIndex - 1;
     ScriptEngineHost* host = m_host;
     pScriptEditor->setRunFn(
-        [host, idx](const QString& content,
-                    std::function<void(bool, const QString&)> onFinished) {
-            host->runScriptAsync(idx, content, std::move(onFinished));
+        [host, idx](const QString& content) {
+            host->runScriptAsync(idx, content);
         });
     pScriptEditor->setCheckFn(
         [host](const QString& script, QString& err) {

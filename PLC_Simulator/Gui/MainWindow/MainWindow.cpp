@@ -380,18 +380,9 @@ void MainWindow::InitialSignalConnect()
 			UpdateLogDisplay(QString("脚本不存在: %1").arg(strLuaPath));
             return;
         }
-        try {
-            if (!m_pWorkFlow->scriptHost()->runScript(idx-1, strLuaPath)) { // buttonId从1开始，索引从0开始
-                QMessageBox::critical(this, "Lua执行错误", QString("执行失败: %1").arg(strLuaPath));
-                UpdateLogDisplay(QString("执行Lua脚本失败: %1").arg(strLuaPath));
-            }
-        } catch (const std::exception& e) {
-            QMessageBox::critical(this, "Lua执行异常", QString("%1").arg(e.what()));
-            UpdateLogDisplay(QString("Lua执行异常: %1").arg(e.what()));
-        } catch (...) {
-            QMessageBox::critical(this, "Lua执行异常", "未知异常");
-            UpdateLogDisplay("Lua执行异常: 未知异常");
-        } });
+        // 异步投递执行;运行结果(成功/失败)经 scriptFinished → scriptLog 反馈到日志
+        m_pWorkFlow->scriptHost()->runScript(idx-1, strLuaPath); // buttonId从1开始，索引从0开始
+        });
 
 	// 连接显示/隐藏模拟平台窗口按钮
 	connect(ui->Btn_ShowPlatform, &QPushButton::clicked, this, [=]()

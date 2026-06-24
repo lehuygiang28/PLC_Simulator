@@ -17,7 +17,6 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QRunnable>
-#include <QMetaObject>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QDebug>
@@ -27,6 +26,11 @@ ScriptEngineHost::ScriptEngineHost(RegisterStore* store, int engineCount, QObjec
 {
     m_threadPool = new QThreadPool(this);
     m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
+
+    // 任一脚本完成后:失败统一转发到脚本日志(主窗口监听 scriptLog);编辑器结果另由其自身收尾。
+    connect(this, &ScriptEngineHost::scriptFinished, this, [this](int, bool ok, const QString& err){
+        if (!ok) emit scriptLog(QString("Lua执行失败:%1").arg(err));
+    });
 
     // 绑定一律由构造后的 installModule() 注入(其会装入所有已建引擎);此处仅创建引擎与各自的互斥锁。
     m_engines.resize(m_engineCount);
@@ -61,12 +65,10 @@ ScriptEngineHost::~ScriptEngineHost()
     m_modules.clear();
 }
 
-void ScriptEngineHost::runOnPool(int index,
-    std::function<bool(LuaEngine*, QString&)> exec,
-    std::function<void(bool, const QString&)> onFinished)
+void ScriptEngineHost::runOnPool(int index, std::function<bool(LuaEngine*, QString&)> exec)
 {
     if (index < 0 || index >= m_engineCount || !m_engines[index]) {
-        if (onFinished) onFinished(false, "LuaEngine instance not found");
+        emit scriptFinished(index, false, QString("LuaEngine instance not found"));
         return;
     }
     class Task : public QRunnable {
@@ -85,30 +87,22 @@ void ScriptEngineHost::runOnPool(int index,
     t->lua   = m_engines[index].get();
     t->mutex = m_mutexes[index].get();
     t->exec  = std::move(exec);
-    t->done  = std::move(onFinished);
+    // 完成回调在工作线程触发,只发 scriptFinished(跨线程自动排队);具体处理由各接收者在其线程进行。
+    t->done  = [this, index](bool ok, const QString& err){ emit scriptFinished(index, ok, err); };
     t->setAutoDelete(true);
     m_threadPool->start(t);
 }
 
-bool ScriptEngineHost::runScript(int index, const QString& luaFile)
+void ScriptEngineHost::runScript(int index, const QString& luaFile)
 {
-    if (index < 0 || index >= m_engineCount || !m_engines[index]) return false;
     runOnPool(index,
-        [luaFile](LuaEngine* e, QString& err){ return e->RunLuaScript(luaFile, err); },
-        [this](bool ok, const QString& err){
-            if (ok) { if (m_store) m_store->notifyChanged(); }
-            else QMetaObject::invokeMethod(this, "scriptLog", Qt::QueuedConnection,
-                     Q_ARG(QString, QString("Lua执行失败:%1").arg(err)));
-        });
-    return true;
+        [luaFile](LuaEngine* e, QString& err){ return e->RunLuaScript(luaFile, err); });
 }
 
-void ScriptEngineHost::runScriptAsync(int index, const QString& content,
-    std::function<void(bool, const QString&)> onFinished)
+void ScriptEngineHost::runScriptAsync(int index, const QString& content)
 {
     runOnPool(index,
-        [content](LuaEngine* e, QString& err){ return e->RunLuaScriptWithEditor(content, err); },
-        std::move(onFinished));
+        [content](LuaEngine* e, QString& err){ return e->RunLuaScriptWithEditor(content, err); });
 }
 
 bool ScriptEngineHost::checkScript(const QString& script, QString& errorMsg) const

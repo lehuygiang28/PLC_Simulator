@@ -29,9 +29,8 @@ public:
     explicit ScriptEditor(QWidget *parent = nullptr);
     ~ScriptEditor();
 
-    // 注入运行函数(std::function 形式，由 ScriptManager 通过 lambda 提供)
-    using RunFn   = std::function<void(const QString& content,
-                                       std::function<void(bool, const QString&)> onFinished)>;
+    // 注入运行函数(std::function 形式，由 ScriptManager 通过 lambda 提供);完成结果经 onRunFinished 回流
+    using RunFn   = std::function<void(const QString& content)>;
     using CheckFn = std::function<bool(const QString& script, QString& err)>;
     void setRunFn(RunFn fn)     { m_runFn = std::move(fn); }
     void setCheckFn(CheckFn fn) { m_checkFn = std::move(fn); }
@@ -43,6 +42,9 @@ public:
     void setScriptName(const QString &name);
     void loadScript(const QString &content);
     QString getScriptContent() const;
+
+    // 脚本运行完成时由 ScriptManager 在 GUI 线程调用:收尾运行态并提示结果
+    void onRunFinished(bool ok, const QString& err);
 
 private slots:
     void saveScript();
