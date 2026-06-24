@@ -73,12 +73,6 @@ public:
 
 	CommBase* GetCommBase();
 
-	//寄存器相关
-	long GetRegisterNum();
-	int16_t GetRegisterVal(int Addr);
-	bool SetRegisterVal(int Addr, const int16_t& nsetVal);
-	bool ResetAllRegisters(int16_t nsetVal);
-
     // 获取寄存器数据模型
     RegisterStore* registerStore() const { return m_registerStore.get(); }
 
@@ -129,7 +123,6 @@ signals:
 	void dataReceived(QString objectInfo,QByteArray recData);
 	void dataSend(QString objectInfo, QByteArray recData);
 
-	void RegisterDataUpdate();	//寄存器数据发生改变的信号
 };
 
 #endif //MAIN_WORK_FLOW_H

@@ -30,10 +30,6 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 	m_bDataChanged = false;
 
     m_registerStore = std::make_unique<RegisterStore>();
-    // 转发脚手架:旧 RegisterDataUpdate 信号继续可用(后续 task 把消费方迁到 store->dataChanged 后删除)
-    connect(m_registerStore.get(), &RegisterStore::dataChanged,
-            this, &MainWorkFlow::RegisterDataUpdate);
-
     m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerStore.get());
 }
 
@@ -359,23 +355,4 @@ CommBase* MainWorkFlow::GetCommBase()
 	return nullptr;
 }
 
-long MainWorkFlow::GetRegisterNum()
-{
-	return m_registerStore->size();
-}
-
-int16_t MainWorkFlow::GetRegisterVal(int Addr)
-{
-	return m_registerStore->cell(Addr);
-}
-
-bool MainWorkFlow::SetRegisterVal(int Addr, const int16_t& nsetVal)
-{
-	return m_registerStore->setCell(Addr, nsetVal);
-}
-
-bool MainWorkFlow::ResetAllRegisters(int16_t nsetVal)
-{
-	return m_registerStore->resetAll(nsetVal);
-}
 
