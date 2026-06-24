@@ -7,7 +7,7 @@
  */
 
 #include "ScriptEditor.h"
-#include "LuaScript.h"
+#include "LuaSyntaxChecker.h"
 
 #include <QFileDialog>
 #include <QMessageBox>
@@ -47,29 +47,7 @@ ScriptEditor::ScriptEditor(QWidget *parent, IScriptRunner* pScriptRunner)
     // 连接文本修改信号
     connect(editor->document(), &QTextDocument::contentsChanged, this, &ScriptEditor::onTextChanged);
 
-    // 设置初始函数模板
-    functionTemplates["SetInt16"] = "SetInt16(\"D100\", 123) -- 设置D100为123,单字";
-    functionTemplates["SetInt32"] = "SetInt32(\"D100\", 123)    -- 设置D100为123,双字";
-    functionTemplates["SetFloat"] = "SetFloat(\"D100\", 123.45) -- 设置D100为123.45,浮点数";
-    functionTemplates["SetDouble"] = "SetDouble(\"D100\", 123.45) -- 设置D100为123.45,双精度浮点数";
-    functionTemplates["SetString"] = "SetString(\"D100\", \"AB\") -- 设置D100为字符串AB";
-
-    functionTemplates["GetInt16"] = "GetInt16(\"D100\") -- 获取D100的值,单字";
-    functionTemplates["GetInt32"] = "GetInt32(\"D100\")   -- 获取D100的值,双字";
-    functionTemplates["GetFloat"] = "GetFloat(\"D100\") -- 获取D100的值,浮点数";
-    functionTemplates["GetDouble"] = "GetDouble(\"D100\") -- 获取D100的值,双精度浮点数";
-    functionTemplates["GetString"] = "GetString(\"D100\") -- 获取D100的值,字符串";
-
-    functionTemplates["MoveAbsInt32"] = "MoveAbsInt32(\"D100\", \"D102\", \"D104\") --根据指定寄存器绝对移动,双字";
-    functionTemplates["MoveAbsFloat"] = "MoveAbsFloat(\"D100\", \"D102\", \"D104\") --根据指定寄存器绝对移动,浮点数";
-    functionTemplates["MoveRelativeInt32"] = "MoveRelativeInt32(\"D100\", \"D102\", \"D104\") --根据指定寄存器相对移动,双字";
-    functionTemplates["MoveRelativeFloat"] = "MoveRelativeFloat(\"D100\", \"D102\", \"D104\") --根据指定寄存器相对移动,浮点数";
-    functionTemplates["WriteCurrentPosInt32"] = "WriteCurrentPosInt32(\"D100\", \"D102\", \"D104\") --写入当前位置,双字";
-    functionTemplates["WriteCurrentPosFloat"] = "WriteCurrentPosFloat(\"D100\", \"D102\", \"D104\") --写入当前位置,浮点数";
-
-    functionTemplates["IsLoopValid"] = "IsLoopValid() -- 获取循环是否有效";
-    functionTemplates["sleep"] = "sleep(500) -- 睡眠500毫秒";
-    //lua判定语法
+    // 语言结构模板（保留硬编码，与绑定函数模板分离）
     functionTemplates["if"] = "if (condition1) then\n    -- 条件condition1为真时执行的代码\nend";
     functionTemplates["while"] = "while (condition1) do\n    -- 条件condition1为真时执行的代码\nend";
     functionTemplates["for"] = "for i = 1, 10 do\n    -- 循环体代码\nend";
@@ -155,9 +133,24 @@ void ScriptEditor::createMenus()
 
 void ScriptEditor::setupHighlighter()
 {
-    // 设置自定义函数列表
-    QStringList customFunctions = LuaScript::getRegisteredFunctions();
-    highlighter->setCustomFunctions(customFunctions);
+    // 高亮自定义函数名由 m_functionDocs 提供（注入后通过 setFunctionDocs 刷新）
+    // 此处初始化为空，待 setFunctionDocs 调用后更新
+    highlighter->setCustomFunctions(QStringList());
+}
+
+void ScriptEditor::setFunctionDocs(const QList<LuaFunctionDoc>& docs)
+{
+    m_functionDocs = docs;
+
+    // 更新函数菜单
+    updateFunctionMenu();
+
+    // 更新高亮器：将绑定函数名提取为自定义函数列表
+    QStringList names;
+    for (const LuaFunctionDoc& doc : m_functionDocs) {
+        names.append(doc.name);
+    }
+    highlighter->setCustomFunctions(names);
 }
 
 void ScriptEditor::updateFunctionMenu()
@@ -165,19 +158,27 @@ void ScriptEditor::updateFunctionMenu()
     // 清除现有动作
     functionsMenu->clear();
 
-    // 获取注册的函数并添加到菜单
-    QStringList functions;
-    for (auto it = functionTemplates.begin(); it != functionTemplates.end(); ++it) {
-        functions.append(it.key());
+    // 先添加绑定函数（来自 m_functionDocs）
+    for (const LuaFunctionDoc& doc : m_functionDocs) {
+        QAction *action = new QAction(doc.name, this);
+        connect(action, &QAction::triggered, this, [this, name = doc.name] {
+            insertFunction(name);
+        });
+        functionsMenu->addAction(action);
     }
 
-    for (const QString &function : functions) {
-        QAction *action = new QAction(function, this);
+    // 若绑定函数与语言结构模板都有内容，加分隔线
+    if (!m_functionDocs.isEmpty() && !functionTemplates.isEmpty()) {
+        functionsMenu->addSeparator();
+    }
 
-        connect(action, &QAction::triggered, this, [=] {
-            insertFunction(function);
+    // 再添加语言结构模板（来自 functionTemplates）
+    for (auto it = functionTemplates.begin(); it != functionTemplates.end(); ++it) {
+        const QString& name = it.key();
+        QAction *action = new QAction(name, this);
+        connect(action, &QAction::triggered, this, [this, name] {
+            insertFunction(name);
         });
-
         functionsMenu->addAction(action);
     }
 }
@@ -224,7 +225,11 @@ void ScriptEditor::compileScript()
 
     QString strError;
     QString scriptContent = editor->toPlainText();
-    if (LuaScript::CheckLuaScript(scriptContent, strError)) {
+    if (!m_pSyntaxChecker) {
+        QMessageBox::warning(this, tr("Compile"), tr("Syntax checker not available."));
+        return;
+    }
+    if (m_pSyntaxChecker->check(scriptContent, strError)) {
         QMessageBox::information(this, tr("Compile"), tr("Script compiled successfully."));
     } else {
         QMessageBox::critical(this, tr("Compile Error"), strError);
@@ -250,7 +255,7 @@ void ScriptEditor::executeScript()
     // 先编译检查
     QString scriptContent = editor->toPlainText();
     QString strError;
-    if (!LuaScript::CheckLuaScript(scriptContent, strError)) {
+    if (m_pSyntaxChecker && !m_pSyntaxChecker->check(scriptContent, strError)) {
         QMessageBox::critical(this, tr("Compile Error"), strError);
         return;
     }
@@ -343,9 +348,20 @@ void ScriptEditor::setEditorEnabled(bool enabled)
 
 void ScriptEditor::insertFunction(const QString &function)
 {
-    QString templateStr = functionTemplates[function];
+    // 先在语言结构模板中查找
+    QString templateStr = functionTemplates.value(function);
 
-    if (templateStr == "") return;
+    // 若语言结构模板中未找到，则在绑定函数文档中查找 snippet
+    if (templateStr.isEmpty()) {
+        for (const LuaFunctionDoc& doc : m_functionDocs) {
+            if (doc.name == function) {
+                templateStr = doc.snippet;
+                break;
+            }
+        }
+    }
+
+    if (templateStr.isEmpty()) return;
 
     QTextCursor cursor = editor->textCursor();
 

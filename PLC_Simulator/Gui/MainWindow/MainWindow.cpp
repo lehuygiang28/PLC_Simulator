@@ -48,7 +48,7 @@ MainWindow::MainWindow(QWidget *parent)
 	ui->table_RegisterData->installEventFilter(this);
 
 	// 初始化脚本管理器
-	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow, this);
+	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
 	m_scriptManager->initScriptExecution();
 
 	// 连接脚本执行和编辑按钮
@@ -88,7 +88,7 @@ MainWindow::MainWindow(QWidget *parent)
 	// 更新表格显示
 	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
 
-	struct SimulationPlatformController : public MainWorkFlow::IBaseController
+	struct SimulationPlatformController : public IPlatformController
 	{
 		MainWindow *m_pParent;
 		explicit SimulationPlatformController(MainWindow *parent) : m_pParent(parent) {}
@@ -170,7 +170,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	if (m_pWorkFlow == nullptr)
 		return;
-	m_pWorkFlow->SetBaseController(m_PlatformController.get());
+	m_pWorkFlow->scriptHost()->setPlatformController(m_PlatformController.get());
 
 	// 平台位姿变化信号 → 自动写入寄存器
 	connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
@@ -452,7 +452,7 @@ void MainWindow::InitialSignalConnect()
             return;
         }
         try {
-            if (!m_pWorkFlow->RunLuaScript(idx-1, strLuaPath)) { // buttonId从1开始，索引从0开始
+            if (!m_pWorkFlow->scriptHost()->runScript(idx-1, strLuaPath)) { // buttonId从1开始，索引从0开始
                 QMessageBox::critical(this, "Lua执行错误", QString("执行失败: %1").arg(strLuaPath));
                 UpdateLogDisplay(QString("执行Lua脚本失败: %1").arg(strLuaPath));
             }
@@ -686,6 +686,10 @@ void MainWindow::InitialSignalConnect()
 		// 通信日志记录
 		connect(m_pWorkFlow, &MainWorkFlow::commLogRecord, this, [=](QString strLogInfo)
 				{ UpdateLogDisplay(strLogInfo); });
+
+		// Lua 脚本日志转发
+		connect(m_pWorkFlow->scriptHost(), &ScriptEngineHost::scriptLog, this,
+				[=](QString strLogInfo){ UpdateLogDisplay(strLogInfo); });
 
 		// 接收数据
 		connect(m_pWorkFlow, &MainWorkFlow::dataReceived, this, [=](QString objectInfo, QByteArray recData)

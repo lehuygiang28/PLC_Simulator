@@ -20,7 +20,8 @@
 #include <QCoreApplication>
 
 #include "ScriptEditor/ScriptEditor.h"
-#include "MainWorkFlow.h"
+
+class ScriptEngineHost;
 
 /**
  * 20251225 wm 从MainWindow.cpp拆分
@@ -44,10 +45,10 @@ signals:
 public:
     /**
      * @brief 构造函数
-     * @param workFlow 工作流指针
+     * @param host 脚本引擎宿主指针
      * @param parent 父窗口
      */
-    explicit ScriptManager(MainWorkFlow* workFlow, QWidget* parent = nullptr);
+    explicit ScriptManager(ScriptEngineHost* host, QWidget* parent = nullptr);
 
     ~ScriptManager() override;
 
@@ -110,7 +111,7 @@ private:
     void setLoopEnable(int index, bool enable);
 
 private:
-    MainWorkFlow* m_workFlow;              ///< 工作流指针
+    ScriptEngineHost* m_host;              ///< 脚本引擎宿主指针
     QWidget* m_parentWidget;               ///< 父窗口
     ScriptEditor* m_pCurrentScriptEditor;  ///< 当前脚本编辑器
     int m_nCurrentScriptIndex;             ///< 当前编辑的脚本索引

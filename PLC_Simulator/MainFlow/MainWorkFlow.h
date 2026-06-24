@@ -11,7 +11,6 @@
 
 #include <QObject>
 #include <QMutex>
-#include <QThreadPool>
 #include <memory>
 #include <QVariant>
 
@@ -20,8 +19,8 @@
 #include "Comm/Protocol/CommProtocolBase.h"
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
-#include "LuaScript/LuaScript.h"
-
+#include "LuaScript/IRegisterAccess.h"
+#include "LuaScript/ScriptEngineHost.h"
 
 
 #ifdef _WIN32
@@ -35,11 +34,6 @@
 #include <vector>
 #include <functional>
 
-#include "Gui/ScriptEditor/ScriptEditor.h"  // for IScriptRunner
-
-//lua脚本数量
-#define LUA_SCRIPT_NUM 6
-
 #define REGISTER_VAL_NUM 100000
 
 struct CommConfig {
@@ -48,12 +42,9 @@ struct CommConfig {
 	CommConfig() : type(CommBase::CommType::eSocket) {}
 };
 
-class ScriptRunnerImpl;  // 前向声明
-
 class MainWorkFlow :public QObject
 {
 	Q_OBJECT
-    friend class ScriptRunnerImpl;  // 友元声明，允许访问私有成员
 
 public:
 	MainWorkFlow(const MainWorkFlow& WorkFlow) = delete;				//禁用拷贝构造
@@ -76,10 +67,10 @@ public:
 	bool CreateCommProtocol(ProtocolType ProType);
 
 	//主要工作函数.当接收到数据时,通过该函数进行流程处理
-	void	WorkProcess(QByteArray& RecInfo);	
+	void	WorkProcess(QByteArray& RecInfo);
 	bool	ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply);
 
-	
+
 	CommBase* GetCommBase();
 
 	//寄存器相关
@@ -88,21 +79,14 @@ public:
 	bool SetRegisterVal(int Addr, const int16_t& nsetVal);
 	bool ResetAllRegisters(int16_t nsetVal);
 
-	//执行lua脚本
-	bool RunLuaScript(int nLuaIndex,const QString& strLuaFile);
-	bool RunLuaScriptAsync(int nLuaIndex,const QString& strLuaFile);
-
-    LuaScript* GetLuaScript(int nIndex);
-
-    // 获取指定索引的脚本执行器（实现 IScriptRunner 接口）
-    IScriptRunner* GetScriptRunner(int nIndex);
+    // 获取 Lua 脚本引擎宿主
+    ScriptEngineHost* scriptHost() const { return m_scriptHost.get(); }
 
     bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
-    
 
 //解析指令的详细信息
-private:	
+private:
 	bool	WorkProcess_AnalyzeReceiveInfo(QByteArray& strRecevie,CmdType& CurCmdType);
 
 	bool	WorkProcess_WriteReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum);
@@ -110,24 +94,14 @@ private:
 
 	bool	WorkProcess_SendCommInfo(const QByteArray& strSend);
 //MainWorkFlow初始化相关
-private:	
+private:
 	explicit MainWorkFlow(QObject* pParent = nullptr);	//构造函数私有化,全局只能有一个MainWorkFlow实例
 
 	static MainWorkFlow* s_pInstance;	// 唯一实例
 	static QMutex s_mutex;				//互斥锁保证线程安全
 
-//Lua脚本相关
+//通信&寄存器相关
 private:
-	std::vector<std::unique_ptr<LuaScript>> m_vpLuaScript;
-    std::vector<std::unique_ptr<QMutex>> m_vLuaMutex;
-	QThreadPool* m_luaThreadPool;
-    std::vector<std::unique_ptr<IScriptRunner>> m_vScriptRunners;  // 脚本执行器
-
-	//链接lua信号槽
-	void ConnectLuaSignalSlot(std::unique_ptr<LuaScript> &pLuaScript);
-
-//通信&寄存器相关	
-private:	
 	std::vector<std::atomic_int16_t> m_RegisterVal;		//寄存器数据
 	QString m_strSendObjInfo;						//发送数据的对象信息
 	QByteArray m_strSendData;							//发送的数据
@@ -139,11 +113,15 @@ private:
 	CommBase::CommInfoBase* m_pCommInfo;//通信信息实例（智能指针管理）
 	std::unique_ptr<CommBase::CommInfoBase> m_ownedCommInfo; // 业务层自持有的通信信息
 	bool	m_bValidComm;								//通信实例是否有效标志
-	//CommStatus						m_CommStatus;		// 通信状态
 
 	CommProtocolBase* m_pComProBase;					//通信协议实例
     QMutex m_protocolMutex;
-    std::unique_ptr<LuaScript::IDataProvider> m_dataProvider;
+
+	// 寄存器访问接口（RegisterProvider 在 cpp 内联定义）
+	std::unique_ptr<IRegisterAccess>  m_registerAccess;
+	// Lua 脚本引擎宿主（声明在 m_registerAccess 之后，确保先于后者析构）
+	std::unique_ptr<ScriptEngineHost> m_scriptHost;
+
 signals:
 	//通信实例的信号转发
 	void commLogRecord(QString strLogInfo);
@@ -151,27 +129,6 @@ signals:
 	void dataSend(QString objectInfo, QByteArray recData);
 
 	void RegisterDataUpdate();	//寄存器数据发生改变的信号
-
-public:
-
-	//平台控制器
-	class IBaseController
-	{
-	public:
-		virtual ~IBaseController() = default;
-		virtual void MovePlatformAbsFloat(double dX, double dY, double dAngle) = 0;
-		virtual void MovePlatformRelativeFloat(double dX, double dY, double dAngle) = 0;
-		virtual void MovePlatformAbsInt32(int32_t nX, int32_t nY, int32_t nAngle) = 0;
-		virtual void MovePlatformRelativeInt32(int32_t nX, int32_t nY, int32_t nAngle) = 0;
-		virtual void GetCurrentPosInt32(int32_t& nX, int32_t& nY, int32_t& nAngle) = 0;
-		virtual void GetCurrentPosFloat(double& dX, double& dY, double& dAngle) = 0;
-	};
-	void SetBaseController(IBaseController* provider) { m_pController = provider; }
-
-private:
-	IBaseController* m_pController = nullptr;
-
-	
 };
 
 #endif //MAIN_WORK_FLOW_H
