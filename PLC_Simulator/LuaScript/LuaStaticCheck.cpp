@@ -36,11 +36,13 @@ bool constIsString(const Proto* p, int idx)
 }
 
 // 取字符串常量。
-// 注：lobject.h 中没有独立的 svalue 宏（5.4 改为 getstr(tsvalue(o))），
-// 此处直接展开以避免未定义标识符。
+// 注：必须先把 tsvalue 结果存入局部，并用显式长度构造 QString。
+// 否则内联 getstr(tsvalue(...)) 的静态类型是 char[1](TString::contents 柔性数组),
+// 会绑定 Qt6 的 QByteArrayView/数组重载 fromUtf8,按数组声明长度(=1)截断成首字符。
 QString constStr(const Proto* p, int idx)
 {
-    return QString::fromUtf8(getstr(tsvalue(&p->k[idx])));
+    const TString* ts = tsvalue(&p->k[idx]);
+    return QString::fromUtf8(getstr(ts), static_cast<qsizetype>(tsslen(ts)));
 }
 
 // 递归扫描:GETTABUP _ENV K[name] → referenced;SETTABUP _ENV K[name] → defined。
