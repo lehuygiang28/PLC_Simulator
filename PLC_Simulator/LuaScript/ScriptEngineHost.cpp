@@ -9,7 +9,7 @@
 
 #include "LuaEngine.h"
 #include "LuaStaticCheck.h"
-#include "IRegisterAccess.h"
+#include "Core/RegisterStore.h"
 #include "IPlatformController.h"
 #include "RegisterBinding.h"
 #include "PlatformBinding.h"
@@ -22,15 +22,15 @@
 #include <QRunnable>
 #include <QMetaObject>
 
-ScriptEngineHost::ScriptEngineHost(IRegisterAccess* registerAccess, int engineCount, QObject* parent)
-    : QObject(parent), m_registerAccess(registerAccess), m_engineCount(engineCount)
+ScriptEngineHost::ScriptEngineHost(RegisterStore* store, int engineCount, QObject* parent)
+    : QObject(parent), m_store(store), m_engineCount(engineCount)
 {
     m_threadPool = new QThreadPool(this);
     m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
 
     // 业务绑定:注册一次,install/文档三处自动跟随
-    auto reg  = std::make_unique<RegisterBinding>(m_registerAccess);
-    auto plat = std::make_unique<PlatformBinding>(m_registerAccess, nullptr); // controller 延迟设置
+    auto reg  = std::make_unique<RegisterBinding>(m_store);
+    auto plat = std::make_unique<PlatformBinding>(m_store, nullptr); // controller 延迟设置
     m_platformBinding = plat.get();
     m_modules.push_back(std::move(reg));
     m_modules.push_back(std::move(plat));
@@ -92,7 +92,7 @@ bool ScriptEngineHost::runScript(int index, const QString& luaFile)
     runOnPool(index,
         [luaFile](LuaEngine* e, QString& err){ return e->RunLuaScript(luaFile, err); },
         [this](bool ok, const QString& err){
-            if (ok) { if (m_registerAccess) m_registerAccess->notifyChanged(); }
+            if (ok) { if (m_store) m_store->notifyChanged(); }
             else QMetaObject::invokeMethod(this, "scriptLog", Qt::QueuedConnection,
                      Q_ARG(QString, QString("Lua执行失败:%1").arg(err)));
         });

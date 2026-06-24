@@ -20,7 +20,20 @@
 #include <vector>
 #include <cfloat>
 
-#include "MainWorkFlow.h"
+#include "Core/DataTypeConvert.h"
+
+//数据类型枚举类
+enum class RegisterDataType
+{
+    eDataTypeUnkown = -1,
+    eDataTypeInt16,
+    eDataTypeInt32,
+    eDataTypeFloat,
+    eDataTypeDouble,
+    eDataTypeChar8,
+};
+
+class RegisterStore;
 
 // 表格常量定义
 #define REGISTER_TABLE_COLUMN_COUNT 10
@@ -50,7 +63,7 @@ public:
         QTableWidget* tableWidget,
         QComboBox* dataTypeCombo,
         QLineEdit* addrEdit,
-        MainWorkFlow* workFlow,
+        RegisterStore* store,
         QWidget* parent = nullptr
     );
 
@@ -160,7 +173,7 @@ private:
     QTableWidget* m_tableWidget;      ///< 寄存器表格控件
     QComboBox* m_dataTypeCombo;       ///< 数据类型选择下拉框
     QLineEdit* m_addrEdit;            ///< 起始地址输入框
-    MainWorkFlow* m_workFlow;         ///< 工作流指针
+    RegisterStore* m_store;           ///< 寄存器数据存储
     QWidget* m_parentWidget;          ///< 父窗口（用于显示消息框）
 
     std::vector<DataTypeConvert> m_vecRegisterVal;  ///< 寄存器数据缓存

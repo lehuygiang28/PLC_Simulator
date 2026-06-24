@@ -19,7 +19,7 @@
 #include "Comm/Protocol/CommProtocolBase.h"
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
-#include "LuaScript/IRegisterAccess.h"
+#include "Core/RegisterStore.h"
 #include "LuaScript/ScriptEngineHost.h"
 
 
@@ -34,7 +34,7 @@
 #include <vector>
 #include <functional>
 
-#define REGISTER_VAL_NUM 100000
+#define REGISTER_VAL_NUM (RegisterStore::kRegisterCount)
 
 struct CommConfig {
 	CommBase::CommType type;
@@ -73,11 +73,8 @@ public:
 
 	CommBase* GetCommBase();
 
-	//寄存器相关
-	long GetRegisterNum();
-	int16_t GetRegisterVal(int Addr);
-	bool SetRegisterVal(int Addr, const int16_t& nsetVal);
-	bool ResetAllRegisters(int16_t nsetVal);
+    // 获取寄存器数据模型
+    RegisterStore* registerStore() const { return m_registerStore.get(); }
 
     // 获取 Lua 脚本引擎宿主
     ScriptEngineHost* scriptHost() const { return m_scriptHost.get(); }
@@ -102,7 +99,6 @@ private:
 
 //通信&寄存器相关
 private:
-	std::vector<std::atomic_int16_t> m_RegisterVal;		//寄存器数据
 	QString m_strSendObjInfo;						//发送数据的对象信息
 	QByteArray m_strSendData;							//发送的数据
 	QString m_strRecObjInfo;						//接收数据的对象信息
@@ -117,9 +113,8 @@ private:
 	CommProtocolBase* m_pComProBase;					//通信协议实例
     QMutex m_protocolMutex;
 
-	// 寄存器访问接口（RegisterProvider 在 cpp 内联定义）
-	std::unique_ptr<IRegisterAccess>  m_registerAccess;
-	// Lua 脚本引擎宿主（声明在 m_registerAccess 之后，确保先于后者析构）
+	std::unique_ptr<RegisterStore> m_registerStore;   // 寄存器数据唯一所有者
+	// Lua 脚本引擎宿主（声明在 m_registerStore 之后，确保先于后者析构）
 	std::unique_ptr<ScriptEngineHost> m_scriptHost;
 
 signals:
@@ -128,7 +123,6 @@ signals:
 	void dataReceived(QString objectInfo,QByteArray recData);
 	void dataSend(QString objectInfo, QByteArray recData);
 
-	void RegisterDataUpdate();	//寄存器数据发生改变的信号
 };
 
 #endif //MAIN_WORK_FLOW_H

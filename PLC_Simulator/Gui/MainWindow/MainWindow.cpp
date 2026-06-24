@@ -8,6 +8,7 @@
 
 #include "MainWindow.h"
 #include "Theme/ThemeManager.h"
+#include "Core/RegisterStore.h"
 #include "version.h"
 #include <QDir>
 #include <QFile>
@@ -42,7 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
 		ui->table_RegisterData,
 		ui->cmbBox_DataType,
 		ui->edit_RegisterAddr,
-		m_pWorkFlow,
+		m_pWorkFlow->registerStore(),
 		this);
 	m_registerTableManager->initTable();
 	ui->table_RegisterData->installEventFilter(this);
@@ -642,7 +643,7 @@ void MainWindow::InitialSignalConnect()
 			{
 		if (m_pWorkFlow == nullptr)	return;
 		m_registerTableManager->setShouldFlash(false);
-		m_pWorkFlow->ResetAllRegisters(0);
+		m_pWorkFlow->registerStore()->resetAll(0);
 		m_registerTableManager->setShouldFlash(true); });
 
 	// 点击清除日志
@@ -718,7 +719,7 @@ void MainWindow::InitialSignalConnect()
 				});
 
 		// 寄存器数据改变
-		connect(m_pWorkFlow, &MainWorkFlow::RegisterDataUpdate, this, [=]
+		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
 				{ m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt()); });
 	}
 
@@ -851,24 +852,16 @@ void MainWindow::OnWriteAxisDoubleWord()
 		return;
 	}
 
-	DataTypeConvert data;
-	data.u_Int32[0] = xInt32;
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-	data.u_Int32[0] = yInt32;
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-	data.u_Int32[0] = angleInt32;
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+	RegisterStore* store = m_pWorkFlow->registerStore();
+	store->SetInt32(startAddr,     xInt32);
+	store->SetInt32(startAddr + 2, yInt32);
+	store->SetInt32(startAddr + 4, angleInt32);
 
 	UpdateLogDisplay(QString("轴位置双字写入成功: X=%1, Y=%2, Angle=%3 (地址:%4)")
 						 .arg(xInt32)
 						 .arg(yInt32)
 						 .arg(angleInt32)
 						 .arg(startAddr));
-
-	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
 }
 
 void MainWindow::OnWriteAxisFloat()
@@ -901,24 +894,16 @@ void MainWindow::OnWriteAxisFloat()
 		return;
 	}
 
-	DataTypeConvert data;
-	data.u_float[0] = xFloat;
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-	data.u_float[0] = yFloat;
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-	data.u_float[0] = angleFloat;
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-	m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+	RegisterStore* store = m_pWorkFlow->registerStore();
+	store->SetFloat(startAddr,     xFloat);
+	store->SetFloat(startAddr + 2, yFloat);
+	store->SetFloat(startAddr + 4, angleFloat);
 
 	UpdateLogDisplay(QString("轴位置浮点写入成功: X=%1, Y=%2, Angle=%3 (地址:%4)")
 						 .arg(xFloat)
 						 .arg(yFloat)
 						 .arg(angleFloat)
 						 .arg(startAddr));
-
-	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
 }
 
 // ====================自动写入相关槽函数实现====================
@@ -960,24 +945,19 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 		return;
 	}
 
+	RegisterStore* store = m_pWorkFlow->registerStore();
+
 	// 根据Radio选择写入方式
 	if (ui->Radio_AxisPos_Float->isChecked())
 	{
 		// 使用Float方式写入
-		float xFloat    = static_cast<float>(pose.x);
-		float yFloat    = static_cast<float>(pose.y);
+		float xFloat     = static_cast<float>(pose.x);
+		float yFloat     = static_cast<float>(pose.y);
 		float angleFloat = static_cast<float>(pose.angleDeg);
 
-		DataTypeConvert data;
-		data.u_float[0] = xFloat;
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-		data.u_float[0] = yFloat;
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-		data.u_float[0] = angleFloat;
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+		store->SetFloat(startAddr,     xFloat);
+		store->SetFloat(startAddr + 2, yFloat);
+		store->SetFloat(startAddr + 4, angleFloat);
 	}
 	else if (ui->Radio_AxisPos_Int32->isChecked())
 	{
@@ -985,24 +965,14 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 		double multiplierXY = GetDivisorFromPowerEdit(ui->edit_Unit_XY);
 		double multiplierD  = GetDivisorFromPowerEdit(ui->edit_Unit_D);
 
-		int32_t xInt32    = static_cast<int32_t>(pose.x        * multiplierXY);
-		int32_t yInt32    = static_cast<int32_t>(pose.y        * multiplierXY);
+		int32_t xInt32     = static_cast<int32_t>(pose.x        * multiplierXY);
+		int32_t yInt32     = static_cast<int32_t>(pose.y        * multiplierXY);
 		int32_t angleInt32 = static_cast<int32_t>(pose.angleDeg * multiplierD);
 
-		DataTypeConvert data;
-		data.u_Int32[0] = xInt32;
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-		data.u_Int32[0] = yInt32;
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
-		data.u_Int32[0] = angleInt32;
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[0]);
-		m_pWorkFlow->SetRegisterVal(startAddr++, data.u_Int16[1]);
+		store->SetInt32(startAddr,     xInt32);
+		store->SetInt32(startAddr + 2, yInt32);
+		store->SetInt32(startAddr + 4, angleInt32);
 	}
-
-	// 更新寄存器表格显示
-	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
 }
 
 // ====================菜单栏相关槽函数实现====================

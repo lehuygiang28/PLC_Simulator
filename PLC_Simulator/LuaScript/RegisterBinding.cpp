@@ -6,7 +6,7 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 #include "RegisterBinding.h"
-#include "IRegisterAccess.h"
+#include "Core/RegisterStore.h"
 #include "LuaBindingUtil.h"
 #include "Lua.hpp"
 
@@ -15,8 +15,8 @@
 #include <cstdint>
 #include <cstdio>
 
-RegisterBinding::RegisterBinding(IRegisterAccess* access)
-    : m_access(access)
+RegisterBinding::RegisterBinding(RegisterStore* store)
+    : m_store(store)
 {
 }
 
@@ -77,7 +77,7 @@ int RegisterBinding::SetInt16Wrapper(lua_State* L)
                       static_cast<long long>(value), INT16_MIN, INT16_MAX);
         return luaL_error(L, "%s", msg);
     }
-    b->m_access->SetInt16(nAddr, static_cast<int16_t>(value));
+    b->m_store->SetInt16(nAddr, static_cast<int16_t>(value));
     return 0;
 }
 
@@ -92,7 +92,7 @@ int RegisterBinding::SetInt32Wrapper(lua_State* L)
                       static_cast<long long>(value), INT32_MIN, INT32_MAX);
         return luaL_error(L, "%s", msg);
     }
-    b->m_access->SetInt32(nAddr, static_cast<int32_t>(value));
+    b->m_store->SetInt32(nAddr, static_cast<int32_t>(value));
     return 0;
 }
 
@@ -102,7 +102,7 @@ int RegisterBinding::SetFloatWrapper(lua_State* L)
     RegisterBinding* b = prologue(L, nAddr);
     float fValue = static_cast<float>(luaL_checknumber(L, 2));
     if (fValue < -FLT_MAX || fValue > FLT_MAX) return luaL_error(L, "Value %f out of float range [-%f, %f]", fValue, -FLT_MAX, FLT_MAX);
-    b->m_access->SetFloat(nAddr, fValue);
+    b->m_store->SetFloat(nAddr, fValue);
     return 0;
 }
 
@@ -112,7 +112,7 @@ int RegisterBinding::SetDoubleWrapper(lua_State* L)
     RegisterBinding* b = prologue(L, nAddr);
     double dValue = static_cast<double>(luaL_checknumber(L, 2));
     if (dValue < -DBL_MAX || dValue > DBL_MAX) return luaL_error(L, "Value %f out of double range [-%f, %f]", dValue, -DBL_MAX, DBL_MAX);
-    b->m_access->SetDouble(nAddr, dValue);
+    b->m_store->SetDouble(nAddr, dValue);
     return 0;
 }
 
@@ -124,7 +124,7 @@ int RegisterBinding::SetStringWrapper(lua_State* L)
     const char* strValue = lua_tostring(L, 2);
     QString strVal = QString::fromUtf8(strValue);
     if (strVal.length() > 2) strVal = strVal.left(2);
-    b->m_access->SetString(nAddr, strVal);
+    b->m_store->SetString(nAddr, strVal);
     return 0;
 }
 
@@ -132,7 +132,7 @@ int RegisterBinding::GetInt16Wrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
-    lua_pushinteger(L, b->m_access->GetInt16(nAddr));
+    lua_pushinteger(L, b->m_store->GetInt16(nAddr));
     return 1;
 }
 
@@ -140,7 +140,7 @@ int RegisterBinding::GetInt32Wrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
-    lua_pushinteger(L, b->m_access->GetInt32(nAddr));
+    lua_pushinteger(L, b->m_store->GetInt32(nAddr));
     return 1;
 }
 
@@ -148,7 +148,7 @@ int RegisterBinding::GetFloatWrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
-    lua_pushnumber(L, b->m_access->GetFloat(nAddr));
+    lua_pushnumber(L, b->m_store->GetFloat(nAddr));
     return 1;
 }
 
@@ -156,7 +156,7 @@ int RegisterBinding::GetDoubleWrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
-    lua_pushnumber(L, b->m_access->GetDouble(nAddr));
+    lua_pushnumber(L, b->m_store->GetDouble(nAddr));
     return 1;
 }
 
@@ -164,7 +164,7 @@ int RegisterBinding::GetStringWrapper(lua_State* L)
 {
     int nAddr = 0;
     RegisterBinding* b = prologue(L, nAddr);
-    QString value = b->m_access->GetString(nAddr);
+    QString value = b->m_store->GetString(nAddr);
     QByteArray utf8 = value.toUtf8();
     lua_pushstring(L, utf8.constData());
     return 1;

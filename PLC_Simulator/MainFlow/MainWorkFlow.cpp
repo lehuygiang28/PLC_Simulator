@@ -14,7 +14,7 @@ MainWorkFlow* MainWorkFlow::s_pInstance = nullptr;
 QMutex MainWorkFlow::s_mutex;
 
 MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
-    : QObject(pParent), m_RegisterVal(REGISTER_VAL_NUM)
+    : QObject(pParent)
 {
 	m_pComm = nullptr;
 	m_pCommInfo = nullptr;
@@ -27,91 +27,16 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     m_strRecObjInfo = "";
     m_strRecData.clear();
 
-	for (int i = 0 ; i < REGISTER_VAL_NUM;i++)
-	{
-		m_RegisterVal[i].store(0, std::memory_order_relaxed);
-	}
-
 	m_bDataChanged = false;
 
-    // 仅实现寄存器读写，不含平台控制（平台控制由 PlatformBinding 负责）
-    struct RegisterProvider : public IRegisterAccess {
-        MainWorkFlow* self;
-        explicit RegisterProvider(MainWorkFlow* s) : self(s) {}
-        int16_t GetInt16(int index) override { return self->GetRegisterVal(index); }
-        int32_t GetInt32(int index) override {
-            DataTypeConvert dt;
-            dt.u_Int16[0] = self->GetRegisterVal(index);
-            dt.u_Int16[1] = self->GetRegisterVal(index + 1);
-            return dt.u_Int32[0];
-        }
-        float GetFloat(int index) override {
-            DataTypeConvert dt;
-            dt.u_Int16[0] = self->GetRegisterVal(index);
-            dt.u_Int16[1] = self->GetRegisterVal(index + 1);
-            return dt.u_float[0];
-        }
-        double GetDouble(int index) override {
-            DataTypeConvert dt;
-            dt.u_Int16[0] = self->GetRegisterVal(index);
-            dt.u_Int16[1] = self->GetRegisterVal(index + 1);
-            dt.u_Int16[2] = self->GetRegisterVal(index + 2);
-            dt.u_Int16[3] = self->GetRegisterVal(index + 3);
-            return dt.u_double;
-        }
-        QString GetString(int index) override {
-            DataTypeConvert dt;
-            dt.u_Int16[0] = self->GetRegisterVal(index);
-            return QString("%1%2").arg(QChar(dt.u_chars[0])).arg(QChar(dt.u_chars[1]));
-        }
-        void SetInt16(int index, int16_t value) override {
-            self->SetRegisterVal(index, value);
-            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-        }
-        void SetInt32(int index, int32_t value) override {
-            DataTypeConvert dt;
-            dt.u_Int32[0] = value;
-            self->SetRegisterVal(index, dt.u_Int16[0]);
-            self->SetRegisterVal(index + 1, dt.u_Int16[1]);
-            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-        }
-        void SetFloat(int index, float value) override {
-            DataTypeConvert dt;
-            dt.u_float[0] = value;
-            self->SetRegisterVal(index, dt.u_Int16[0]);
-            self->SetRegisterVal(index + 1, dt.u_Int16[1]);
-            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-        }
-        void SetDouble(int index, double value) override {
-            DataTypeConvert dt;
-            dt.u_double = value;
-            self->SetRegisterVal(index, dt.u_Int16[0]);
-            self->SetRegisterVal(index + 1, dt.u_Int16[1]);
-            self->SetRegisterVal(index + 2, dt.u_Int16[2]);
-            self->SetRegisterVal(index + 3, dt.u_Int16[3]);
-            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-        }
-        void SetString(int index, const QString& value) override {
-            DataTypeConvert dt;
-            for (int i = 0; i < value.length() && i < 2; ++i) {
-                dt.u_chars[i] = value[i].toLatin1();
-            }
-            self->SetRegisterVal(index, dt.u_Int16[0]);
-            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-        }
-        void notifyChanged() override {
-            QMetaObject::invokeMethod(self, "RegisterDataUpdate", Qt::QueuedConnection);
-        }
-    };
-
-    m_registerAccess = std::make_unique<RegisterProvider>(this);
-    m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerAccess.get());
+    m_registerStore = std::make_unique<RegisterStore>();
+    m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerStore.get());
 }
 
 // 析构函数：确保所有资源正确释放
 MainWorkFlow::~MainWorkFlow()
 {
-	// m_scriptHost 先于 m_registerAccess 析构（声明顺序保证），此处显式 reset 以明示意图
+	// m_scriptHost 先于 m_registerStore 析构（声明顺序保证），此处显式 reset 以明示意图
 	m_scriptHost.reset();
 
 	// 关闭通信
@@ -382,20 +307,8 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         }
         nCurAddr = nCmdRegAddr;
         nDataNum = nCmdRedNum;
-        for (int i = 0; i < nCmdRedNum; i++)
-        {
-            int nPLCAddr = nCmdRegAddr + i;
-            if (nPLCAddr > m_RegisterVal.size())
-            {
-                break;
-            }
-            int nPreData = m_RegisterVal.at(nPLCAddr).load();
-            m_RegisterVal.at(nPLCAddr).store(vnCmdWriteData.at(i));
-            if (nPreData != vnCmdWriteData.at(i))
-            {
-                m_bDataChanged = true;
-            }
-        }
+        if (m_registerStore->setCells(nCmdRegAddr, vnCmdWriteData))
+            m_bDataChanged = true;
         QByteArray strSend;
         if (!pro->PackReportWriteRegInfo(strSend))
         {
@@ -414,17 +327,7 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         }
         nCurAddr = nCmdRegAddr;
         nDataNum = nCmdRedNum;
-        std::vector<int16_t> vnCmdData;
-        vnCmdData.resize(nCmdRedNum);
-        for (int i = 0; i < nCmdRedNum; i++)
-        {
-            int nPLCAddr = nCmdRegAddr + i;
-            if (nPLCAddr > m_RegisterVal.size())
-            {
-                break;
-            }
-            vnCmdData.at(i) = m_RegisterVal.at(nPLCAddr).load();
-        }
+        std::vector<int16_t> vnCmdData = m_registerStore->cells(nCmdRegAddr, nCmdRedNum);
         QByteArray strSend;
         if (!pro->PackReportReadRegInfo(strSend, nCmdRegAddr, nCmdRedNum, vnCmdData))
         {
@@ -437,11 +340,7 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         return false;
     }
 
-    if (m_bDataChanged)
-    {
-        emit RegisterDataUpdate();
-        m_bDataChanged = false;
-    }
+    if (m_bDataChanged) { m_registerStore->notifyChanged(); m_bDataChanged = false; }
 
     return true;
 }
@@ -456,36 +355,4 @@ CommBase* MainWorkFlow::GetCommBase()
 	return nullptr;
 }
 
-long MainWorkFlow::GetRegisterNum()
-{
-	return m_RegisterVal.size();
-}
-
-int16_t MainWorkFlow::GetRegisterVal(int Addr)
-{
-	if (Addr >= m_RegisterVal.size()) return 0;
-
-	return m_RegisterVal.at(Addr).load();
-}
-
-bool MainWorkFlow::SetRegisterVal(int Addr, const int16_t& nsetVal)
-{
-	if (Addr >= m_RegisterVal.size())	return false;
-
-	m_RegisterVal.at(Addr).store(nsetVal);
-
-	return true;
-}
-
-bool MainWorkFlow::ResetAllRegisters(int16_t nsetVal)
-{
-	for (auto& i : m_RegisterVal)
-	{
-		i.store(nsetVal);
-	}
-
-	emit RegisterDataUpdate();
-
-	return true;
-}
 

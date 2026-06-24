@@ -10,20 +10,20 @@
 
 #include "ILuaBinding.h"
 
-class IRegisterAccess;
+class RegisterStore;
 struct lua_State;
 
 // 寄存器读写绑定：注册 SetInt16/GetInt16/... 等 10 个 Lua 函数。
-// 无状态(仅持 access 指针)，可被多个 lua_State 共享安装。
+// 无状态(仅持 store 指针)，可被多个 lua_State 共享安装。
 class RegisterBinding : public ILuaBinding {
 public:
-    explicit RegisterBinding(IRegisterAccess* access);
+    explicit RegisterBinding(RegisterStore* store);
 
     void install(lua_State* L) override;
     QList<LuaFunctionDoc> functions() const override;
 
 private:
-    IRegisterAccess* m_access;
+    RegisterStore* m_store;
 
     // 单一来源:install(取 fn)/functions(取 name/snippet/description) 均由此表派生
     struct Fn { const char* name; int (*fn)(lua_State*); const char* snippet; const char* description; };

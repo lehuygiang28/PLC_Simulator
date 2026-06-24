@@ -138,7 +138,6 @@ set(LUA_SOURCES
 set(LUA_HEADERS
     LuaScript/LuaEngine.h
     LuaScript/ILuaBinding.h
-    LuaScript/IRegisterAccess.h
     LuaScript/IPlatformController.h
     LuaScript/LuaBindingUtil.h
     LuaScript/RegisterBinding.h
@@ -154,6 +153,17 @@ set(CONFIG_SOURCES
 set(CONFIG_HEADERS
     Config/ConfigManager.h
 )
+
+# Core 模块
+set(CORE_SOURCES
+    Core/RegisterStore.cpp
+)
+
+set(CORE_HEADERS
+    Core/DataTypeConvert.h
+    Core/RegisterStore.h
+)
+
 # 合并所有文件
 set(SOURCES
     ${SOURCE_FILES}
@@ -168,6 +178,7 @@ set(SOURCES
     ${MAINFLOW_SOURCES}
     ${LUA_SOURCES}
     ${CONFIG_SOURCES}
+    ${CORE_SOURCES}
 )
 
 set(HEADERS
@@ -182,6 +193,7 @@ set(HEADERS
     ${MAINFLOW_HEADERS}
     ${LUA_HEADERS}
     ${CONFIG_HEADERS}
+    ${CORE_HEADERS}
 )
 
 # 创建可执行目标
@@ -217,6 +229,7 @@ source_group("Gui\\\\SimulationPlatform" FILES ${GUI_SIMULATIONPLATFORM_SOURCES}
 source_group("MainFlow" FILES ${MAINFLOW_SOURCES} ${MAINFLOW_HEADERS})
 source_group("LuaScript" FILES ${LUA_SOURCES} ${LUA_HEADERS})
 source_group("Config" FILES ${CONFIG_SOURCES} ${CONFIG_HEADERS})
+source_group("Core" FILES ${CORE_SOURCES} ${CORE_HEADERS})
 
 endif()
 

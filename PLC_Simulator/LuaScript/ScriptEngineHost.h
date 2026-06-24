@@ -17,7 +17,7 @@
 
 #include "ILuaBinding.h"                     // LuaFunctionDoc / ILuaBinding
 
-class IRegisterAccess;
+class RegisterStore;
 class IPlatformController;
 class LuaEngine;
 class PlatformBinding;
@@ -25,12 +25,12 @@ class QMutex;
 class QThreadPool;
 
 // Lua 子系统拥有者:引擎 + 业务绑定 + 线程池/锁 + 执行。
-// 对外仅注入 IRegisterAccess* 与 IPlatformController*。
+// 对外仅注入 RegisterStore* 与 IPlatformController*。
 class ScriptEngineHost : public QObject
 {
     Q_OBJECT
 public:
-    explicit ScriptEngineHost(IRegisterAccess* registerAccess, int engineCount = 6, QObject* parent = nullptr);
+    explicit ScriptEngineHost(RegisterStore* store, int engineCount = 6, QObject* parent = nullptr);
     ~ScriptEngineHost() override;
 
     void setPlatformController(IPlatformController* controller);
@@ -56,7 +56,7 @@ private:
                    std::function<bool(LuaEngine*, QString&)> exec,
                    std::function<void(bool, const QString&)> onFinished);
 
-    IRegisterAccess* m_registerAccess;
+    RegisterStore* m_store;
     int m_engineCount;
     std::vector<std::unique_ptr<LuaEngine>> m_engines;
     std::vector<std::unique_ptr<QMutex>> m_mutexes;
