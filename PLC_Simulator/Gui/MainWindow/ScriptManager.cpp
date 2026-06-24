@@ -1,5 +1,5 @@
 #include "ScriptManager.h"
-#include "LuaScript/ScriptEngineHost.h"
+#include "ScriptEngineHost.h"
 
 ScriptManager::ScriptManager(ScriptEngineHost* host, QWidget* parent)
     : QObject(parent)

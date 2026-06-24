@@ -126,25 +126,34 @@ set(MAINFLOW_HEADERS
 )
 
 # LuaScript 模块
-set(LUA_SOURCES
-    LuaScript/LuaEngine.cpp
-    LuaScript/LuaBindingUtil.cpp
-    LuaScript/RegisterBinding.cpp
-    LuaScript/PlatformBinding.cpp
-    LuaScript/ScriptEngineHost.cpp
-    LuaScript/LuaStaticCheck.cpp
+set(LUA_ENGINE_SOURCES
+    LuaScript/Engine/LuaEngine.cpp
+    LuaScript/Engine/ScriptEngineHost.cpp
+    LuaScript/Engine/LuaStaticCheck.cpp
 )
 
-set(LUA_HEADERS
-    LuaScript/LuaEngine.h
-    LuaScript/ILuaBinding.h
-    LuaScript/IPlatformController.h
-    LuaScript/LuaBindingUtil.h
-    LuaScript/RegisterBinding.h
-    LuaScript/PlatformBinding.h
-    LuaScript/ScriptEngineHost.h
-    LuaScript/LuaStaticCheck.h
+set(LUA_ENGINE_HEADERS
+    LuaScript/Engine/LuaEngine.h
+    LuaScript/Engine/ILuaBinding.h
+    LuaScript/Engine/ScriptEngineHost.h
+    LuaScript/Engine/LuaStaticCheck.h
 )
+
+set(LUA_MODULE_SOURCES
+    LuaScript/Modules/LuaBindingUtil.cpp
+    LuaScript/Modules/RegisterBinding.cpp
+    LuaScript/Modules/PlatformBinding.cpp
+)
+
+set(LUA_MODULE_HEADERS
+    LuaScript/Modules/IPlatformController.h
+    LuaScript/Modules/LuaBindingUtil.h
+    LuaScript/Modules/RegisterBinding.h
+    LuaScript/Modules/PlatformBinding.h
+)
+
+set(LUA_SOURCES ${LUA_ENGINE_SOURCES} ${LUA_MODULE_SOURCES})
+set(LUA_HEADERS ${LUA_ENGINE_HEADERS} ${LUA_MODULE_HEADERS})
 # Config 模块
 set(CONFIG_SOURCES
     Config/ConfigManager.cpp
@@ -227,7 +236,8 @@ source_group("Gui\\\\Widgets" FILES ${GUI_WIDGETS_SOURCES} ${GUI_WIDGETS_HEADERS
 source_group("Gui\\\\ScriptEditor" FILES ${GUI_SCRIPTEDITOR_SOURCES} ${GUI_SCRIPTEDITOR_HEADERS})
 source_group("Gui\\\\SimulationPlatform" FILES ${GUI_SIMULATIONPLATFORM_SOURCES} ${GUI_SIMULATIONPLATFORM_HEADERS})
 source_group("MainFlow" FILES ${MAINFLOW_SOURCES} ${MAINFLOW_HEADERS})
-source_group("LuaScript" FILES ${LUA_SOURCES} ${LUA_HEADERS})
+source_group("LuaScript\\\\Engine" FILES ${LUA_ENGINE_SOURCES} ${LUA_ENGINE_HEADERS})
+source_group("LuaScript\\\\Modules" FILES ${LUA_MODULE_SOURCES} ${LUA_MODULE_HEADERS})
 source_group("Config" FILES ${CONFIG_SOURCES} ${CONFIG_HEADERS})
 source_group("Core" FILES ${CORE_SOURCES} ${CORE_HEADERS})
 
@@ -305,7 +315,8 @@ target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Comm/Socket
     ${CMAKE_CURRENT_SOURCE_DIR}/Comm/Protocol
     ${CMAKE_CURRENT_SOURCE_DIR}/MainFlow
-    ${CMAKE_CURRENT_SOURCE_DIR}/LuaScript
+    ${CMAKE_CURRENT_SOURCE_DIR}/LuaScript/Engine
+    ${CMAKE_CURRENT_SOURCE_DIR}/LuaScript/Modules
     ${CMAKE_SOURCE_DIR}/Lua/Include
 )
 

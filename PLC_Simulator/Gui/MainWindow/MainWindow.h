@@ -16,7 +16,7 @@
 #include "ScriptManager.h"
 #include "Config/ConfigManager.h"
 #include "MainWorkFlow.h"
-#include "LuaScript/IPlatformController.h"
+#include "IPlatformController.h"
 #include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>

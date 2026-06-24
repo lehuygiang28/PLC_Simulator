@@ -20,7 +20,7 @@
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
 #include "Core/RegisterStore.h"
-#include "LuaScript/ScriptEngineHost.h"
+#include "ScriptEngineHost.h"
 
 
 #ifdef _WIN32
