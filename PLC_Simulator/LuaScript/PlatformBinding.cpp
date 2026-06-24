@@ -35,34 +35,30 @@ bool PlatformBinding::parseThreeAddr(lua_State* L, int& nX, int& nY, int& nA)
     return true;
 }
 
+const PlatformBinding::Fn PlatformBinding::kFns[] = {
+    {"MoveAbsInt32",         &PlatformBinding::MoveAbsInt32Wrapper,         "MoveAbsInt32(\"D100\", \"D102\", \"D104\")",         "平台绝对移动,双字"},
+    {"MoveAbsFloat",         &PlatformBinding::MoveAbsFloatWrapper,         "MoveAbsFloat(\"D100\", \"D102\", \"D104\")",         "平台绝对移动,浮点数"},
+    {"MoveRelativeInt32",    &PlatformBinding::MoveRelativeInt32Wrapper,    "MoveRelativeInt32(\"D100\", \"D102\", \"D104\")",    "平台相对移动,双字"},
+    {"MoveRelativeFloat",    &PlatformBinding::MoveRelativeFloatWrapper,    "MoveRelativeFloat(\"D100\", \"D102\", \"D104\")",    "平台相对移动,浮点数"},
+    {"WriteCurrentPosInt32", &PlatformBinding::WriteCurrentPosInt32Wrapper, "WriteCurrentPosInt32(\"D100\", \"D102\", \"D104\")", "写入当前位置,双字"},
+    {"WriteCurrentPosFloat", &PlatformBinding::WriteCurrentPosFloatWrapper, "WriteCurrentPosFloat(\"D100\", \"D102\", \"D104\")", "写入当前位置,浮点数"},
+};
+
 void PlatformBinding::install(lua_State* L)
 {
-    struct Entry { const char* name; lua_CFunction fn; };
-    const Entry entries[] = {
-        {"MoveAbsInt32", MoveAbsInt32Wrapper},
-        {"MoveAbsFloat", MoveAbsFloatWrapper},
-        {"MoveRelativeInt32", MoveRelativeInt32Wrapper},
-        {"MoveRelativeFloat", MoveRelativeFloatWrapper},
-        {"WriteCurrentPosInt32", WriteCurrentPosInt32Wrapper},
-        {"WriteCurrentPosFloat", WriteCurrentPosFloatWrapper},
-    };
-    for (const Entry& e : entries) {
+    for (const Fn& f : kFns) {
         lua_pushlightuserdata(L, this);
-        lua_pushcclosure(L, e.fn, 1);
-        lua_setglobal(L, e.name);
+        lua_pushcclosure(L, f.fn, 1);
+        lua_setglobal(L, f.name);
     }
 }
 
 QList<LuaFunctionDoc> PlatformBinding::functions() const
 {
-    return {
-        {"MoveAbsInt32",  "MoveAbsInt32(\"D100\", \"D102\", \"D104\") --根据指定寄存器绝对移动,双字"},
-        {"MoveAbsFloat",  "MoveAbsFloat(\"D100\", \"D102\", \"D104\") --根据指定寄存器绝对移动,浮点数"},
-        {"MoveRelativeInt32", "MoveRelativeInt32(\"D100\", \"D102\", \"D104\") --根据指定寄存器相对移动,双字"},
-        {"MoveRelativeFloat", "MoveRelativeFloat(\"D100\", \"D102\", \"D104\") --根据指定寄存器相对移动,浮点数"},
-        {"WriteCurrentPosInt32", "WriteCurrentPosInt32(\"D100\", \"D102\", \"D104\") --写入当前位置,双字"},
-        {"WriteCurrentPosFloat", "WriteCurrentPosFloat(\"D100\", \"D102\", \"D104\") --写入当前位置,浮点数"},
-    };
+    QList<LuaFunctionDoc> docs;
+    for (const Fn& f : kFns)
+        docs.append({QString::fromUtf8(f.name), QString::fromUtf8(f.snippet), QString::fromUtf8(f.description)});
+    return docs;
 }
 
 int PlatformBinding::MoveAbsInt32Wrapper(lua_State* L)

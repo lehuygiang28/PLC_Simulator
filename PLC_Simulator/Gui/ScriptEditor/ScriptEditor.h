@@ -60,12 +60,13 @@ private:
     void createMenus();
     void setupHighlighter();
     void updateFunctionMenu();
+    void addFunctionMenuGroup(const QList<LuaFunctionDoc>& docs);  // 向函数菜单添加一组(绑定/语言结构)
     void updateWindowTitle();  // 更新窗口标题(添加/移除星号)
 
     CodeEditor *editor;
     LuaHighlighter *highlighter;
     QString scriptFileName;
-    QMap<QString, QString> functionTemplates;
+    QList<LuaFunctionDoc> m_langTemplates;  // 语言结构模板(if/while/for/...),与绑定函数同构
 
     // 文件修改状态跟踪
     bool m_isModified;       // 文件是否被修改

@@ -45,13 +45,15 @@ ScriptEditor::ScriptEditor(QWidget *parent)
     // 连接文本修改信号
     connect(editor->document(), &QTextDocument::contentsChanged, this, &ScriptEditor::onTextChanged);
 
-    // 语言结构模板（保留硬编码，与绑定函数模板分离）
-    functionTemplates["if"] = "if (condition1) then\n    -- 条件condition1为真时执行的代码\nend";
-    functionTemplates["while"] = "while (condition1) do\n    -- 条件condition1为真时执行的代码\nend";
-    functionTemplates["for"] = "for i = 1, 10 do\n    -- 循环体代码\nend";
-    functionTemplates["if-elseif-else"] = "if (condition1) then\n    -- 条件condition1为真时执行的代码\n" \
-                                        "elseif (condition2) then\n    -- 条件condition2为真时执行的代码\n" \
-                                        "else\n    -- 所有条件均不为真时执行的代码\nend";
+    // 语言结构模板（与绑定函数同构,统一为 LuaFunctionDoc：name / snippet / description）
+    m_langTemplates = {
+        {"if",             "if (condition1) then\n    \nend", "if 条件分支"},
+        {"while",          "while (condition1) do\n    \nend", "while 循环"},
+        {"for",            "for i = 1, 10 do\n    \nend", "for 循环"},
+        {"if-elseif-else", "if (condition1) then\n    \n"
+                           "elseif (condition2) then\n    \n"
+                           "else\n    \nend", "if-elseif-else 多分支"},
+    };
 
     updateFunctionMenu();
 
@@ -155,26 +157,25 @@ void ScriptEditor::updateFunctionMenu()
 {
     // 清除现有动作
     functionsMenu->clear();
+    functionsMenu->setToolTipsVisible(true);  // 让菜单项 tooltip 可见(展示功能描述)
 
-    // 先添加绑定函数（来自 m_functionDocs）
-    for (const LuaFunctionDoc& doc : m_functionDocs) {
-        QAction *action = new QAction(doc.name, this);
-        connect(action, &QAction::triggered, this, [this, name = doc.name] {
-            insertFunction(name);
-        });
-        functionsMenu->addAction(action);
-    }
+    addFunctionMenuGroup(m_langTemplates);    // 条件控制(语言结构 if/while/for/...) 置顶
 
-    // 若绑定函数与语言结构模板都有内容，加分隔线
-    if (!m_functionDocs.isEmpty() && !functionTemplates.isEmpty()) {
+    // 若两组都有内容，加分隔线
+    if (!m_langTemplates.isEmpty() && !m_functionDocs.isEmpty()) {
         functionsMenu->addSeparator();
     }
 
-    // 再添加语言结构模板（来自 functionTemplates）
-    for (auto it = functionTemplates.begin(); it != functionTemplates.end(); ++it) {
-        const QString& name = it.key();
-        QAction *action = new QAction(name, this);
-        connect(action, &QAction::triggered, this, [this, name] {
+    addFunctionMenuGroup(m_functionDocs);     // 绑定+内建函数(sleep/IsLoopValid/寄存器/平台)
+}
+
+void ScriptEditor::addFunctionMenuGroup(const QList<LuaFunctionDoc>& docs)
+{
+    for (const LuaFunctionDoc& doc : docs) {
+        QAction *action = new QAction(doc.name, this);
+        action->setToolTip(doc.description);    // 悬停显示功能描述,不插入
+        action->setStatusTip(doc.description);
+        connect(action, &QAction::triggered, this, [this, name = doc.name] {
             insertFunction(name);
         });
         functionsMenu->addAction(action);
@@ -346,16 +347,14 @@ void ScriptEditor::setEditorEnabled(bool enabled)
 
 void ScriptEditor::insertFunction(const QString &function)
 {
-    // 先在语言结构模板中查找
-    QString templateStr = functionTemplates.value(function);
-
-    // 若语言结构模板中未找到，则在绑定函数文档中查找 snippet
+    // 按名查 snippet：先绑定函数,再语言结构模板(同构,统一查找)
+    QString templateStr;
+    for (const LuaFunctionDoc& doc : m_functionDocs) {
+        if (doc.name == function) { templateStr = doc.snippet; break; }
+    }
     if (templateStr.isEmpty()) {
-        for (const LuaFunctionDoc& doc : m_functionDocs) {
-            if (doc.name == function) {
-                templateStr = doc.snippet;
-                break;
-            }
+        for (const LuaFunctionDoc& doc : m_langTemplates) {
+            if (doc.name == function) { templateStr = doc.snippet; break; }
         }
     }
 

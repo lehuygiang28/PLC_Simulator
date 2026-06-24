@@ -15,8 +15,9 @@ struct lua_State;  // 前向声明，避免 Lua.hpp 泄漏到头文件
 
 // 编辑器函数文档：用于补全/插入模板/高亮/语法检查函数名聚合
 struct LuaFunctionDoc {
-    QString name;     // Lua 全局函数名
-    QString snippet;  // 编辑器插入模板
+    QString name;         // Lua 全局函数名
+    QString snippet;      // 编辑器插入的调用样板(干净代码,无注释)
+    QString description;  // 功能描述(菜单 tooltip/状态提示,不插入)
 };
 
 // Lua 绑定接口：一组功能函数(寄存器/平台/...)以此插入脚本引擎

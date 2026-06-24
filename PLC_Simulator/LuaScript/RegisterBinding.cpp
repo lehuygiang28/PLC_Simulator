@@ -36,38 +36,34 @@ static RegisterBinding* prologue(lua_State* L, int& nAddr)
     return b;
 }
 
+const RegisterBinding::Fn RegisterBinding::kFns[] = {
+    {"SetInt16",  &RegisterBinding::SetInt16Wrapper,  "SetInt16(\"D100\", 123)",      "设置寄存器值,单字"},
+    {"SetInt32",  &RegisterBinding::SetInt32Wrapper,  "SetInt32(\"D100\", 123)",      "设置寄存器值,双字"},
+    {"SetFloat",  &RegisterBinding::SetFloatWrapper,  "SetFloat(\"D100\", 123.45)",   "设置寄存器值,浮点数"},
+    {"SetDouble", &RegisterBinding::SetDoubleWrapper, "SetDouble(\"D100\", 123.45)",  "设置寄存器值,双精度浮点数"},
+    {"SetString", &RegisterBinding::SetStringWrapper, "SetString(\"D100\", \"AB\")",  "设置寄存器字符串"},
+    {"GetInt16",  &RegisterBinding::GetInt16Wrapper,  "GetInt16(\"D100\")",           "读取寄存器值,单字"},
+    {"GetInt32",  &RegisterBinding::GetInt32Wrapper,  "GetInt32(\"D100\")",           "读取寄存器值,双字"},
+    {"GetFloat",  &RegisterBinding::GetFloatWrapper,  "GetFloat(\"D100\")",           "读取寄存器值,浮点数"},
+    {"GetDouble", &RegisterBinding::GetDoubleWrapper, "GetDouble(\"D100\")",          "读取寄存器值,双精度浮点数"},
+    {"GetString", &RegisterBinding::GetStringWrapper, "GetString(\"D100\")",          "读取寄存器字符串"},
+};
+
 void RegisterBinding::install(lua_State* L)
 {
-    struct Entry { const char* name; lua_CFunction fn; };
-    const Entry entries[] = {
-        {"SetInt16", SetInt16Wrapper}, {"SetInt32", SetInt32Wrapper},
-        {"SetFloat", SetFloatWrapper}, {"SetDouble", SetDoubleWrapper},
-        {"SetString", SetStringWrapper},
-        {"GetInt16", GetInt16Wrapper}, {"GetInt32", GetInt32Wrapper},
-        {"GetFloat", GetFloatWrapper}, {"GetDouble", GetDoubleWrapper},
-        {"GetString", GetStringWrapper},
-    };
-    for (const Entry& e : entries) {
+    for (const Fn& f : kFns) {
         lua_pushlightuserdata(L, this);
-        lua_pushcclosure(L, e.fn, 1);
-        lua_setglobal(L, e.name);
+        lua_pushcclosure(L, f.fn, 1);
+        lua_setglobal(L, f.name);
     }
 }
 
 QList<LuaFunctionDoc> RegisterBinding::functions() const
 {
-    return {
-        {"SetInt16",  "SetInt16(\"D100\", 123) -- 设置D100为123,单字"},
-        {"SetInt32",  "SetInt32(\"D100\", 123)    -- 设置D100为123,双字"},
-        {"SetFloat",  "SetFloat(\"D100\", 123.45) -- 设置D100为123.45,浮点数"},
-        {"SetDouble", "SetDouble(\"D100\", 123.45) -- 设置D100为123.45,双精度浮点数"},
-        {"SetString", "SetString(\"D100\", \"AB\") -- 设置D100为字符串AB"},
-        {"GetInt16",  "GetInt16(\"D100\") -- 获取D100的值,单字"},
-        {"GetInt32",  "GetInt32(\"D100\")   -- 获取D100的值,双字"},
-        {"GetFloat",  "GetFloat(\"D100\") -- 获取D100的值,浮点数"},
-        {"GetDouble", "GetDouble(\"D100\") -- 获取D100的值,双精度浮点数"},
-        {"GetString", "GetString(\"D100\") -- 获取D100的值,字符串"},
-    };
+    QList<LuaFunctionDoc> docs;
+    for (const Fn& f : kFns)
+        docs.append({QString::fromUtf8(f.name), QString::fromUtf8(f.snippet), QString::fromUtf8(f.description)});
+    return docs;
 }
 
 int RegisterBinding::SetInt16Wrapper(lua_State* L)
