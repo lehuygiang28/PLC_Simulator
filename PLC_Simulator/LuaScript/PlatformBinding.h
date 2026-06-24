@@ -10,7 +10,7 @@
 
 #include "ILuaBinding.h"
 
-class IRegisterAccess;
+class RegisterStore;
 class IPlatformController;
 struct lua_State;
 
@@ -18,14 +18,14 @@ struct lua_State;
 // WriteCurrentPosInt32/WriteCurrentPosFloat 共 6 个 Lua 函数。
 class PlatformBinding : public ILuaBinding {
 public:
-    PlatformBinding(IRegisterAccess* access, IPlatformController* controller);
+    PlatformBinding(RegisterStore* store, IPlatformController* controller);
     void setController(IPlatformController* controller) { m_controller = controller; }
 
     void install(lua_State* L) override;
     QList<LuaFunctionDoc> functions() const override;
 
 private:
-    IRegisterAccess* m_access;
+    RegisterStore* m_store;
     IPlatformController* m_controller;
 
     // 单一来源:install(取 fn)/functions(取 name/snippet/description) 均由此表派生

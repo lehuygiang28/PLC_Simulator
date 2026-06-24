@@ -138,7 +138,6 @@ set(LUA_SOURCES
 set(LUA_HEADERS
     LuaScript/LuaEngine.h
     LuaScript/ILuaBinding.h
-    LuaScript/IRegisterAccess.h
     LuaScript/IPlatformController.h
     LuaScript/LuaBindingUtil.h
     LuaScript/RegisterBinding.h

@@ -20,7 +20,6 @@
 #include "Comm/Protocol/CommProMitsubishiQBinary.h"
 #include "Comm/Protocol/CommProKeyencePCLink.h"
 #include "Core/RegisterStore.h"
-#include "LuaScript/IRegisterAccess.h"
 #include "LuaScript/ScriptEngineHost.h"
 
 
@@ -121,9 +120,7 @@ private:
     QMutex m_protocolMutex;
 
 	std::unique_ptr<RegisterStore> m_registerStore;   // 寄存器数据唯一所有者
-	// 寄存器访问接口（RegisterProvider 在 cpp 内联定义）
-	std::unique_ptr<IRegisterAccess>  m_registerAccess;
-	// Lua 脚本引擎宿主（声明在 m_registerAccess 之后，确保先于后者析构）
+	// Lua 脚本引擎宿主（声明在 m_registerStore 之后，确保先于后者析构）
 	std::unique_ptr<ScriptEngineHost> m_scriptHost;
 
 signals:
