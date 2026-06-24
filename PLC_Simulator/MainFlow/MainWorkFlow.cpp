@@ -14,7 +14,7 @@ MainWorkFlow* MainWorkFlow::s_pInstance = nullptr;
 QMutex MainWorkFlow::s_mutex;
 
 MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
-    : QObject(pParent), m_RegisterVal(REGISTER_VAL_NUM)
+    : QObject(pParent)
 {
 	m_pComm = nullptr;
 	m_pCommInfo = nullptr;
@@ -27,12 +27,12 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     m_strRecObjInfo = "";
     m_strRecData.clear();
 
-	for (int i = 0 ; i < REGISTER_VAL_NUM;i++)
-	{
-		m_RegisterVal[i].store(0, std::memory_order_relaxed);
-	}
-
 	m_bDataChanged = false;
+
+    m_registerStore = std::make_unique<RegisterStore>();
+    // 转发脚手架:旧 RegisterDataUpdate 信号继续可用(后续 task 把消费方迁到 store->dataChanged 后删除)
+    connect(m_registerStore.get(), &RegisterStore::dataChanged,
+            this, &MainWorkFlow::RegisterDataUpdate);
 
     // 仅实现寄存器读写，不含平台控制（平台控制由 PlatformBinding 负责）
     struct RegisterProvider : public IRegisterAccess {
@@ -382,20 +382,8 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         }
         nCurAddr = nCmdRegAddr;
         nDataNum = nCmdRedNum;
-        for (int i = 0; i < nCmdRedNum; i++)
-        {
-            int nPLCAddr = nCmdRegAddr + i;
-            if (nPLCAddr > m_RegisterVal.size())
-            {
-                break;
-            }
-            int nPreData = m_RegisterVal.at(nPLCAddr).load();
-            m_RegisterVal.at(nPLCAddr).store(vnCmdWriteData.at(i));
-            if (nPreData != vnCmdWriteData.at(i))
-            {
-                m_bDataChanged = true;
-            }
-        }
+        if (m_registerStore->setCells(nCmdRegAddr, vnCmdWriteData))
+            m_bDataChanged = true;
         QByteArray strSend;
         if (!pro->PackReportWriteRegInfo(strSend))
         {
@@ -414,17 +402,7 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         }
         nCurAddr = nCmdRegAddr;
         nDataNum = nCmdRedNum;
-        std::vector<int16_t> vnCmdData;
-        vnCmdData.resize(nCmdRedNum);
-        for (int i = 0; i < nCmdRedNum; i++)
-        {
-            int nPLCAddr = nCmdRegAddr + i;
-            if (nPLCAddr > m_RegisterVal.size())
-            {
-                break;
-            }
-            vnCmdData.at(i) = m_RegisterVal.at(nPLCAddr).load();
-        }
+        std::vector<int16_t> vnCmdData = m_registerStore->cells(nCmdRegAddr, nCmdRedNum);
         QByteArray strSend;
         if (!pro->PackReportReadRegInfo(strSend, nCmdRegAddr, nCmdRedNum, vnCmdData))
         {
@@ -437,11 +415,7 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         return false;
     }
 
-    if (m_bDataChanged)
-    {
-        emit RegisterDataUpdate();
-        m_bDataChanged = false;
-    }
+    if (m_bDataChanged) { m_registerStore->notifyChanged(); m_bDataChanged = false; }
 
     return true;
 }
@@ -458,34 +432,21 @@ CommBase* MainWorkFlow::GetCommBase()
 
 long MainWorkFlow::GetRegisterNum()
 {
-	return m_RegisterVal.size();
+	return m_registerStore->size();
 }
 
 int16_t MainWorkFlow::GetRegisterVal(int Addr)
 {
-	if (Addr >= m_RegisterVal.size()) return 0;
-
-	return m_RegisterVal.at(Addr).load();
+	return m_registerStore->cell(Addr);
 }
 
 bool MainWorkFlow::SetRegisterVal(int Addr, const int16_t& nsetVal)
 {
-	if (Addr >= m_RegisterVal.size())	return false;
-
-	m_RegisterVal.at(Addr).store(nsetVal);
-
-	return true;
+	return m_registerStore->setCell(Addr, nsetVal);
 }
 
 bool MainWorkFlow::ResetAllRegisters(int16_t nsetVal)
 {
-	for (auto& i : m_RegisterVal)
-	{
-		i.store(nsetVal);
-	}
-
-	emit RegisterDataUpdate();
-
-	return true;
+	return m_registerStore->resetAll(nsetVal);
 }
 
