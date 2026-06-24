@@ -133,6 +133,7 @@ set(LUA_SOURCES
     LuaScript/PlatformBinding.cpp
     LuaScript/LuaSyntaxChecker.cpp
     LuaScript/ScriptEngineHost.cpp
+    LuaScript/LuaStaticCheck.cpp
 )
 
 set(LUA_HEADERS
@@ -145,6 +146,7 @@ set(LUA_HEADERS
     LuaScript/PlatformBinding.h
     LuaScript/LuaSyntaxChecker.h
     LuaScript/ScriptEngineHost.h
+    LuaScript/LuaStaticCheck.h
 )
 # Config 模块
 set(CONFIG_SOURCES
