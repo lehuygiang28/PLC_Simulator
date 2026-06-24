@@ -148,7 +148,6 @@ set(LUA_MODULE_SOURCES
 )
 
 set(LUA_MODULE_HEADERS
-    LuaScript/Modules/IPlatformController.h
     LuaScript/Modules/LuaBindingUtil.h
     LuaScript/Modules/RegisterBinding.h
     LuaScript/Modules/PlatformBinding.h
