@@ -119,16 +119,18 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-	// 先关闭并释放模拟平台
+	// 先释放 MainWorkFlow(内部 ~ScriptEngineHost 会 drain 线程池):
+	// drain 期间在途的 WriteCurrentPos 仍会经 PlatformController 读取 m_simulationPlatform 的位姿,
+	// 故平台必须在脚本宿主完全停下之后再销毁。
+	MainWorkFlow::ReleaseWorkFlow();
+
+	// 再关闭并释放模拟平台
 	if (m_simulationPlatform != nullptr)
 	{
 		m_simulationPlatform->close();
 		delete m_simulationPlatform;
 		m_simulationPlatform = nullptr;
 	}
-
-	// 释放MainWorkFlow单例
-	MainWorkFlow::ReleaseWorkFlow();
 
 	delete ui;
 }
