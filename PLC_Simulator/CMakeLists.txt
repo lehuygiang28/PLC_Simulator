@@ -56,6 +56,7 @@ set(GUI_MAINWINDOW_SOURCES
     Gui/MainWindow/QuickPanel.cpp
     Gui/MainWindow/RegisterTableManager.cpp
     Gui/MainWindow/ScriptManager.cpp
+    Gui/MainWindow/PlatformController.cpp
 )
 
 set(GUI_MAINWINDOW_HEADERS
@@ -63,6 +64,7 @@ set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/QuickPanel.h
     Gui/MainWindow/RegisterTableManager.h
     Gui/MainWindow/ScriptManager.h
+    Gui/MainWindow/PlatformController.h
 )
 
 # Gui\Theme 模块
@@ -146,7 +148,6 @@ set(LUA_MODULE_SOURCES
 )
 
 set(LUA_MODULE_HEADERS
-    LuaScript/Modules/IPlatformController.h
     LuaScript/Modules/LuaBindingUtil.h
     LuaScript/Modules/RegisterBinding.h
     LuaScript/Modules/PlatformBinding.h
