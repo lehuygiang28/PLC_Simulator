@@ -57,6 +57,8 @@ public:
 // 		SocketCommInfo& operator=(const SocketCommInfo&) = default;
 
 		virtual CommType GetCommType() override { return CommType::eSocket; }
+		virtual QVariantMap toVariantMap() const override;
+		virtual void fromVariantMap(const QVariantMap& m) override;
 		virtual ~SocketCommInfo() {}
 	};
 

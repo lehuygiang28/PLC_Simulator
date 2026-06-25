@@ -24,11 +24,13 @@ set(RESOURCE_FILES
 # Comm 模块
 set(COMM_SOURCES
     Comm/CommBase.cpp
+    Comm/CommInfoFactory.cpp
 )
 
 set(COMM_HEADERS
     Comm/CommBase.h
     Comm/CommEvent.h
+    Comm/CommInfoFactory.h
 )
 
 # Comm\Socket 模块

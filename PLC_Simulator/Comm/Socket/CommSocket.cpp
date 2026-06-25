@@ -228,3 +228,22 @@ bool CommSocket::SendDataToEndpoint(const QString& clientId, const QByteArray& s
 	return true;
 }
 
+QVariantMap CommSocket::SocketCommInfo::toVariantMap() const
+{
+	QVariantMap m;
+	m["socketType"] = static_cast<int>(m_SocketType); // eSTServer=0 / eSTClient=1
+	m["ip"]         = m_strSocketIPAddress;
+	m["port"]       = m_nSocketPort;
+	m["listenNum"]  = m_nSocketListenNum;
+	return m;
+}
+
+void CommSocket::SocketCommInfo::fromVariantMap(const QVariantMap& m)
+{
+	int st = m.value("socketType", 0).toInt();
+	m_SocketType         = (st == 0) ? SocketType::eSTServer : SocketType::eSTClient;
+	m_strSocketIPAddress = m.value("ip", "0.0.0.0").toString();
+	m_nSocketPort        = m.value("port", 2000).toUInt();
+	m_nSocketListenNum   = m.value("listenNum", 10).toUInt();
+}
+
