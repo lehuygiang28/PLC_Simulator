@@ -14,11 +14,9 @@
 #include <memory>
 #include <QVariant>
 
-#include "Comm/CommDefine.h"
+
 #include "Comm/CommBase.h"
-#include "Comm/Protocol/CommProtocolBase.h"
-#include "Comm/Protocol/CommProMitsubishiQBinary.h"
-#include "Comm/Protocol/CommProKeyencePCLink.h"
+#include "Comm/Protocol/ProtocolFactory.h"
 #include "Core/RegisterStore.h"
 #include "ScriptEngineHost.h"
 
@@ -56,7 +54,6 @@ public:
 
 	//通信信息相关
 	bool SetCommInfo(CommBase::CommInfoBase* commInfo);
-	CommBase::CommInfoBase* GetCommInfo();
 
 	//通信实例相关
 	bool OpenComm();
@@ -67,11 +64,8 @@ public:
 	bool CreateCommProtocol(ProtocolType ProType);
 
 	//主要工作函数.当接收到数据时,通过该函数进行流程处理
-	void	WorkProcess(QByteArray& RecInfo);
 	bool	ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply);
 
-
-	CommBase* GetCommBase();
 
     // 获取寄存器数据模型
     RegisterStore* registerStore() const { return m_registerStore.get(); }
@@ -82,14 +76,6 @@ public:
     bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
 
-//解析指令的详细信息
-private:
-	bool	WorkProcess_AnalyzeReceiveInfo(QByteArray& strRecevie,CmdType& CurCmdType);
-
-	bool	WorkProcess_WriteReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum);
-	bool	WorkProcess_ReadReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum);
-
-	bool	WorkProcess_SendCommInfo(const QByteArray& strSend);
 //MainWorkFlow初始化相关
 private:
 	explicit MainWorkFlow(QObject* pParent = nullptr);	//构造函数私有化,全局只能有一个MainWorkFlow实例
@@ -99,12 +85,6 @@ private:
 
 //通信&寄存器相关
 private:
-	QString m_strSendObjInfo;						//发送数据的对象信息
-	QByteArray m_strSendData;							//发送的数据
-	QString m_strRecObjInfo;						//接收数据的对象信息
-	QByteArray m_strRecData;							//接收的数据
-	std::atomic_bool m_bDataChanged;
-
 	CommBase* m_pComm;									//通信实例
 	CommBase::CommInfoBase* m_pCommInfo;//通信信息实例（智能指针管理）
 	std::unique_ptr<CommBase::CommInfoBase> m_ownedCommInfo; // 业务层自持有的通信信息
@@ -118,9 +98,8 @@ private:
 
 signals:
 	//通信实例的信号转发
-	void commLogRecord(QString strLogInfo);
-	void dataReceived(QString objectInfo,QByteArray recData);
-	void dataSend(QString objectInfo, QByteArray recData);
+	void logRecord(QString text);
+	void commEvent(const CommEvent& ev);
 
 };
 

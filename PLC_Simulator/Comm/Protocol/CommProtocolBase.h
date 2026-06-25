@@ -1,4 +1,4 @@
-﻿/*
+/*
  * PLC Simulator - Industrial Communication Protocol Testing Tool
  * Copyright (c) 2025-2026 Wang Mao
  *
@@ -12,19 +12,6 @@
 #include <cstdint>   // int16_t
 #include <map>       // std::map
 #include <vector>    // std::vector
-//协议枚举
-enum class ProtocolType
-{
-	eProUnknown = -1,										// 未知的通信协议
-	eProCmdFast = 0,										// 无协议
-
-	eProRegMitsubishiQAscii = 10,							// 三菱MC 3E帧ASCII通信协议
-	eProRegMitsubishiQBinary = 11,							// 三菱MC 3E帧二进制通信协议
-
-	eProRegKeyencePCLink = 20,								// 基恩士KV系列上位链路协议
-	eProRegKeyenceWithMitsubishiQAscii = 21,				// 基恩士KV系列使用三菱Q系列PLC的寄存器网口MC（3E）ASCII协议   (QnA兼容3E)
-	eProRegKeyenceWithMitsubishiQBinary = 22,				// 基恩士KV系列使用三菱Q系列PLC的寄存器网口MC（3E）二进制协议  (QnA兼容3E)
-};
 
 enum class CmdType //指令类型
 {
@@ -52,16 +39,6 @@ public:
 	virtual ~CommProtocolBase() = default;
 
 public:
-
-// 	//template <typename T>
-// 	virtual bool PackWriteRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, std::vector<uint16_t> vWriteData) = 0;	//打包写寄存器信息字符串
-// 	virtual bool AnalyzeAswWriteReg(QByteArray strAsw) = 0;	//解析写寄存器回复信息(是否写成功)
-// 
-// 	virtual bool PackReadRegInfo(QByteArray& strInfo, long nRegAddr, int nReadNum, bool bDWORD) = 0;	//打包读寄存器信息字符串
-// 	//template <typename T>
-// 	virtual bool AnalyzeAswReadReg(QByteArray strAsw, int nReadNum, std::vector<uint16_t>& vReceiveData) = 0; //解析读寄存器回复信息(解析寄存器中的详细数值)
-
-	
 
 	virtual bool AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmdType) = 0;
 

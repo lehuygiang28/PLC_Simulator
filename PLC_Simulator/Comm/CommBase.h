@@ -22,14 +22,14 @@
 #include <functional>
 #include <QRunnable>
 #include <QThread>
+#include "CommEvent.h"
 class CommBase : public QObject
 {
 	Q_OBJECT
 
 signals:
-	void CommLogRecord(const QString& data);	//日志信号
-	void dataReceived(const QString& objectInfo,const QByteArray& data); //接收到数据的信号
-	void dataSend(const QString& objectInfo, const QByteArray& data);	 //发送数据信号
+	void logRecord(const QString& text);        // 日志信号
+	void commEvent(const CommEvent& ev);        // 结构化通信事件(收/发统一)
 
 	void dataSendRequest(const QString& endpointId, const QByteArray& data);	//发送请求信号
 public:

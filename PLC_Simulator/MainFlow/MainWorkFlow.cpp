@@ -9,6 +9,7 @@
 #include "MainWorkFlow.h"
 #include "Comm/Socket/CommSocket.h"
 #include "RegisterBinding.h"
+#include "Comm/Protocol/ProtocolFactory.h"
 
 //初始化静态实例
 MainWorkFlow* MainWorkFlow::s_pInstance = nullptr;
@@ -17,18 +18,13 @@ QMutex MainWorkFlow::s_mutex;
 MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     : QObject(pParent)
 {
+	qRegisterMetaType<CommEvent>("CommEvent");
+
 	m_pComm = nullptr;
 	m_pCommInfo = nullptr;
 
 	m_bValidComm = false;
 	m_eProtocolType = ProtocolType::eProUnknown;
-
-    m_strSendObjInfo = "";
-    m_strSendData.clear();
-    m_strRecObjInfo = "";
-    m_strRecData.clear();
-
-	m_bDataChanged = false;
 
     m_registerStore = std::make_unique<RegisterStore>();
     m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerStore.get());
@@ -114,13 +110,6 @@ void MainWorkFlow::SetRequestProcessor(std::function<bool(const QByteArray&, QBy
     }
 }
 
-CommBase::CommInfoBase* MainWorkFlow::GetCommInfo()
-{
-	if (nullptr == m_pCommInfo) return nullptr;
-
-	return m_pCommInfo;
-}
-
 bool MainWorkFlow::OpenComm()
 {
 	if (m_pCommInfo->GetCommType() == CommBase::CommType::eSocket)
@@ -152,32 +141,12 @@ bool MainWorkFlow::OpenComm()
 
 		//新建信号槽连接
 		{
-			connect(m_pComm, &CommBase::CommLogRecord, this, [this](QString strLog) {
-				emit commLogRecord(strLog);
+			connect(m_pComm, &CommBase::logRecord, this, [this](const QString& text) {
+				emit logRecord(text);
 			});
-
-			connect(m_pComm, &CommBase::dataReceived, this, [this](QString objectInfo,QByteArray strData) {
-
-                if (this->m_strRecObjInfo != objectInfo || this->m_strRecData != strData)
-                {
-                    this->m_strRecObjInfo = objectInfo;
-                    this->m_strRecData = strData;
-
-                    emit dataReceived(objectInfo,strData);
-                }
-
-
+			connect(m_pComm, &CommBase::commEvent, this, [this](const CommEvent& ev) {
+				emit commEvent(ev);
 			});
-
-			connect(m_pComm, &CommBase::dataSend, this, [this](QString objectInfo, QByteArray strData) {
-
-                if( this->m_strSendObjInfo != objectInfo || this->m_strSendData != strData)
-                {
-                    this->m_strSendObjInfo = objectInfo;
-                    this->m_strSendData = strData;
-                    emit dataSend(objectInfo, strData);
-                }
-				});
 		}
 
 		m_bValidComm = m_pComm->Open(m_pCommInfo);
@@ -224,16 +193,13 @@ bool MainWorkFlow::IsCommOpen()
 bool MainWorkFlow::CreateCommProtocol(ProtocolType ProType)
 {
 	// 仅记录当前协议类型；实际解析时按类型创建局部协议实例，避免跨线程共享同一对象
-	switch (ProType)
+	if (ProtocolFactory::IsSupported(ProType))
 	{
-	case ProtocolType::eProRegMitsubishiQBinary:
-	case ProtocolType::eProRegKeyencePCLink:
 		m_eProtocolType = ProType;
 		return true;
-	default:
-		m_eProtocolType = ProtocolType::eProUnknown;
-		return false;
 	}
+	m_eProtocolType = ProtocolType::eProUnknown;
+	return false;
 }
 
 bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
@@ -241,18 +207,8 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
     if (RecInfo == "") return false;
 
 	// 按当前协议类型创建局部实例；m_eProtocolType 为原子量，可被 GUI 线程并发更新
-	std::unique_ptr<CommProtocolBase> pro;
-	switch (m_eProtocolType.load())
-	{
-	case ProtocolType::eProRegMitsubishiQBinary:
-		pro = std::make_unique<CommProMitsubishiQBinary>(nullptr);
-		break;
-	case ProtocolType::eProRegKeyencePCLink:
-		pro = std::make_unique<CommProKeyencePCLink>(nullptr);
-		break;
-	default:
-		return false;
-	}
+	std::unique_ptr<CommProtocolBase> pro = ProtocolFactory::Create(m_eProtocolType.load());
+	if (!pro) return false;
 
     CmdType CurrentCmd = CmdType::eCmdUnkown;
     if (!pro->AnalyzeCmdInfo(RecInfo, CurrentCmd))
@@ -262,6 +218,7 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
 
     int nCurAddr = 0;
     int nDataNum = 0;
+    bool dataChanged = false;   // 本次请求是否产生寄存器变化(仅本函数内有效)
 
     switch (CurrentCmd)
     {
@@ -277,7 +234,7 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         nCurAddr = nCmdRegAddr;
         nDataNum = nCmdRedNum;
         if (m_registerStore->setCells(nCmdRegAddr, vnCmdWriteData))
-            m_bDataChanged = true;
+            dataChanged = true;
         QByteArray strSend;
         if (!pro->PackReportWriteRegInfo(strSend))
         {
@@ -309,19 +266,8 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         return false;
     }
 
-    if (m_bDataChanged) { m_registerStore->notifyChanged(); m_bDataChanged = false; }
+    if (dataChanged) m_registerStore->notifyChanged();
 
     return true;
 }
-
-CommBase* MainWorkFlow::GetCommBase()
-{
-	if (m_pComm != nullptr)
-	{
-		return m_pComm;
-	}
-
-	return nullptr;
-}
-
 

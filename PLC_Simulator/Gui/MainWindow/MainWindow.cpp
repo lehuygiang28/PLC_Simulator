@@ -595,37 +595,32 @@ void MainWindow::InitialSignalConnect()
 	if (m_pWorkFlow != nullptr)
 	{
 		// 通信日志记录
-		connect(m_pWorkFlow, &MainWorkFlow::commLogRecord, this, [=](QString strLogInfo)
+		connect(m_pWorkFlow, &MainWorkFlow::logRecord, this, [=](QString strLogInfo)
 				{ UpdateLogDisplay(strLogInfo); });
 
 		// Lua 脚本日志转发
 		connect(m_pWorkFlow->scriptHost(), &ScriptEngineHost::scriptLog, this,
 				[=](QString strLogInfo){ UpdateLogDisplay(strLogInfo); });
 
-		// 接收数据
-		connect(m_pWorkFlow, &MainWorkFlow::dataReceived, this, [=](QString objectInfo, QByteArray recData)
+		// 通信事件(收/发统一) — 单点接收,含前缀拼接与重复帧过滤
+		connect(m_pWorkFlow, &MainWorkFlow::commEvent, this, [=](CommEvent ev)
 				{
-					QString strdata(recData);
-
-					if (1 == m_nLogStat)
-					{
-						strdata = QString(recData.toHex().toUpper());
+					// 重复帧过滤:与上一帧(端点+数据)完全相同则跳过,避免轮询刷屏;收/发各自独立
+					if (ev.direction == CommDirection::eReceive) {
+						if (m_lastRecEndpoint == ev.endpointId && m_lastRecData == ev.bytes) return;
+						m_lastRecEndpoint = ev.endpointId;
+						m_lastRecData     = ev.bytes;
+					} else {
+						if (m_lastSendEndpoint == ev.endpointId && m_lastSendData == ev.bytes) return;
+						m_lastSendEndpoint = ev.endpointId;
+						m_lastSendData     = ev.bytes;
 					}
 
-					UpdateLogDisplay(objectInfo + strdata);
-				});
+					QString body(ev.bytes);
+					if (1 == m_nLogStat) body = QString(ev.bytes.toHex().toUpper());
 
-		// 发送数据
-		connect(m_pWorkFlow, &MainWorkFlow::dataSend, this, [=](QString objectInfo, QByteArray sendData)
-				{
-					QString strdata(sendData);
-
-					if (1 == m_nLogStat)
-					{
-						strdata = QString(sendData.toHex().toUpper());
-					}
-
-					UpdateLogDisplay(objectInfo + strdata);
+					const QString pfx = (ev.direction == CommDirection::eReceive) ? "Rece" : "Send";
+					UpdateLogDisplay(QString("%1:[%2]:").arg(pfx, ev.endpointId) + body);
 				});
 
 		// 寄存器数据改变

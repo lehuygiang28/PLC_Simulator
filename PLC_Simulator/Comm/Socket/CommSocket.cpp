@@ -16,9 +16,6 @@ CommSocket::CommSocket(QObject* pParent) : CommBase(pParent)
 	m_Server = nullptr;
 	m_Client = nullptr;
 	m_ClientMap.clear();
-	m_requestTimeout = 1000;
-	m_threadPool = new QThreadPool(this);
-	m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
 
 	auto SendDataTask = [this](const QString& clientId, const QByteArray& data) {
 		if (!m_bConnected) return false;
@@ -33,7 +30,12 @@ CommSocket::CommSocket(QObject* pParent) : CommBase(pParent)
 			return false;
 		}
 
-		emit dataSend(QString("Send:[%1]:").arg(clientId), data);
+		CommEvent ev;
+		ev.direction  = CommDirection::eSend;
+		ev.endpointId = clientId;
+		ev.bytes      = data;
+		ev.timestamp  = QDateTime::currentDateTime();
+		emit commEvent(ev);
 		return true;
 	};
 	connect(this, &CommSocket::dataSendRequest, this, SendDataTask, Qt::QueuedConnection);
@@ -63,7 +65,7 @@ bool CommSocket::initializeServer()
 	}
 
 	//记录日志
-	emit CommLogRecord(QString("[%1:%2] 服务器创建成功,开始监听客户端链接...")
+	emit logRecord(QString("[%1:%2] 服务器创建成功,开始监听客户端链接...")
 		.arg(m_Server->serverAddress().toString())
 		.arg(m_Server->serverPort()));
 
@@ -82,7 +84,7 @@ bool CommSocket::initializeServer()
 			/*m_clientList.append(Cursocket);*/
 
 			//激活信号,将新建立连接的客户端信息发送出去
-			emit CommLogRecord(QString("[%1:%2] 新客户端链接")
+			emit logRecord(QString("[%1:%2] 新客户端链接")
 				.arg(Cursocket->peerAddress().toString())
 				.arg(Cursocket->peerPort()));
 
@@ -100,7 +102,7 @@ bool CommSocket::initializeServer()
 			connect(Cursocket, &QAbstractSocket::errorOccurred, [this, Cursocket](QAbstractSocket::SocketError) {
 
 				//发送错误信息
-				emit CommLogRecord(QString("[%1:%2] 客户端错误:%3")
+				emit logRecord(QString("[%1:%2] 客户端错误:%3")
 					.arg(Cursocket->peerAddress().toString())
 					.arg(Cursocket->peerPort())
 					.arg(Cursocket->errorString()));
@@ -112,7 +114,7 @@ bool CommSocket::initializeServer()
 				Cursocket->deleteLater();
 
 				//发送断开连接信息
-				emit CommLogRecord(QString("[%1]:客户端断开链接").arg(GetClientId(Cursocket)));
+				emit logRecord(QString("[%1]:客户端断开链接").arg(GetClientId(Cursocket)));
 
 				m_ClientMap.remove(GetClientId(Cursocket));
 
@@ -125,7 +127,7 @@ bool CommSocket::initializeServer()
 	//server的错误信息
 	connect(m_Server, &QTcpServer::acceptError, [this](QAbstractSocket::SocketError) {
 
-		emit CommLogRecord(QString("服务器错误:%1").arg(m_Server->errorString()));
+		emit logRecord(QString("服务器错误:%1").arg(m_Server->errorString()));
 		});
 
 	return true;
@@ -139,12 +141,10 @@ bool CommSocket::initializeClient()
 void CommSocket::Cleanup()
 {
 
-	emit CommLogRecord(QString("即将断开所有客户端链接,当前链接客户端数量[%1]").arg(m_ClientMap.size()));
+	emit logRecord(QString("即将断开所有客户端链接,当前链接客户端数量[%1]").arg(m_ClientMap.size()));
 	// 清理客户端连接
 	for (QTcpSocket* client : m_ClientMap.values()) {
-// 		client->close();
-// 		client->deleteLater();
-		emit CommLogRecord(QString("[%1:%2] 客户端即将断开").arg(client->peerAddress().toString())
+		emit logRecord(QString("[%1:%2] 客户端即将断开").arg(client->peerAddress().toString())
 			.arg(client->peerPort()));
 
 		client->disconnectFromHost();
@@ -152,7 +152,7 @@ void CommSocket::Cleanup()
 	}
 
 	if (m_Server) {
-		emit CommLogRecord(QString("[%1:%2] 即将关闭服务器...")
+		emit logRecord(QString("[%1:%2] 即将关闭服务器...")
 			.arg(m_Server->serverAddress().toString())
 			.arg(m_Server->serverPort()));
 
@@ -165,7 +165,7 @@ void CommSocket::Cleanup()
 
 	// 清理客户端socket
 	if (m_Client) {
-		emit CommLogRecord(QString("[%1:%2] 即将关闭网络连接...").arg(GetClientId(m_Client)));
+		emit logRecord(QString("[%1:%2] 即将关闭网络连接...").arg(GetClientId(m_Client)));
 
 		m_Client->close();
 		m_Client->deleteLater();
@@ -224,30 +224,7 @@ bool CommSocket::SendData(const QByteArray& strData)
 bool CommSocket::SendDataToEndpoint(const QString& clientId, const QByteArray& strData)
 {
 	if (!m_bConnected) return false;
-//     QTcpSocket* targetClient = m_ClientMap.value(clientId, nullptr);
-//     if (!targetClient || targetClient->state() != QAbstractSocket::ConnectedState)
-//     {
-//         return false;
-//     }
-//     qint64 bytesWritten = targetClient->write(strData);
-//     if (bytesWritten == -1)
-//     {
-//         return false;
-//     }
-// 	if (!targetClient->flush()) {
-// 		qDebug() << "Flush failed for client:" << clientId;
-// 	}
-// 	qDebug() << "Sent" << bytesWritten << "bytes to client:" << clientId
-// 		<< "Data:" << strData; 
-//	emit dataSend(QString("Send:[%1]:").arg(clientId), strData);
-
 	emit dataSendRequest(clientId, strData);
-    return true;
+	return true;
 }
-
-
-// CommBase::CommStatus CommSocket::RecieveData(QString& strData)
-// {
-// 	return CommStatus();
-// }
 

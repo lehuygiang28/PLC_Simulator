@@ -28,7 +28,7 @@ set(COMM_SOURCES
 
 set(COMM_HEADERS
     Comm/CommBase.h
-    Comm/CommDefine.h
+    Comm/CommEvent.h
 )
 
 # Comm\Socket 模块
@@ -46,12 +46,14 @@ set(COMM_SOCKET_HEADERS
 set(COMM_PROTOCOL_SOURCES
     Comm/Protocol/CommProKeyencePCLink.cpp
     Comm/Protocol/CommProMitsubishiQBinary.cpp
+    Comm/Protocol/ProtocolFactory.cpp
 )
 
 set(COMM_PROTOCOL_HEADERS
     Comm/Protocol/CommProtocolBase.h
     Comm/Protocol/CommProMitsubishiQBinary.h
     Comm/Protocol/CommProKeyencePCLink.h
+    Comm/Protocol/ProtocolFactory.h
 )
 
 # Gui\MainWindow 模块(主窗口及其管理器)
