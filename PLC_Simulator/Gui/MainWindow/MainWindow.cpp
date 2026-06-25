@@ -283,12 +283,7 @@ void MainWindow::InitializeMember()
 				{
 					m_registerTableManager->setIntDisplayStat(1);
 				}
-				m_registerTableManager->setShouldFlash(false);
-				const QSignalBlocker blocker(ui->table_RegisterData);
-
-				m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
-
-				m_registerTableManager->setShouldFlash(true);
+				silentRefreshTable(ui->edit_RegisterAddr->text().toUInt());
 			} });
 
 		connect(group2, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
@@ -570,21 +565,13 @@ void MainWindow::InitialRegisterTableConnect()
 				// 从工作流获取寄存器数据
 				m_registerTableManager->getRegisterVals(nAddr);
 
-				m_registerTableManager->setShouldFlash(false);
-				const QSignalBlocker blocker(ui->table_RegisterData);
-
-				m_registerTableManager->updateTableInfo(nAddr);
-
-				m_registerTableManager->setShouldFlash(true);
+				silentRefreshTable(nAddr);
 			});
 
 	// 修改显示寄存器数据类型
 	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
 			{
-				m_registerTableManager->setShouldFlash(false);
-				const QSignalBlocker blocker(ui->table_RegisterData);
-				m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
-				m_registerTableManager->setShouldFlash(true);
+				silentRefreshTable(ui->edit_RegisterAddr->text().toUInt());
 			});
 
 	// 寄存器数据改变
@@ -827,6 +814,14 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		m_subWindow->activateWindow();
 	}
 	return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::silentRefreshTable(int addr)
+{
+	m_registerTableManager->setShouldFlash(false);
+	const QSignalBlocker blocker(ui->table_RegisterData);
+	m_registerTableManager->updateTableInfo(addr);
+	m_registerTableManager->setShouldFlash(true);
 }
 
 void MainWindow::UpdateLogDisplay(QString strNewLog)

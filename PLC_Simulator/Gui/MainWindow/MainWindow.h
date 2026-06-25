@@ -72,6 +72,9 @@ private:
     // 日志显示
     void UpdateLogDisplay(QString strNewLog);
 
+    // 寄存器表相关
+    void silentRefreshTable(int addr);
+
 private:
     Ui::MainWindow* ui;
     QAction* m_actLightTheme = nullptr;
