@@ -14,11 +14,9 @@
 #include <memory>
 #include <QVariant>
 
-#include "Comm/CommDefine.h"
+
 #include "Comm/CommBase.h"
-#include "Comm/Protocol/CommProtocolBase.h"
-#include "Comm/Protocol/CommProMitsubishiQBinary.h"
-#include "Comm/Protocol/CommProKeyencePCLink.h"
+#include "Comm/Protocol/ProtocolFactory.h"
 #include "Core/RegisterStore.h"
 #include "ScriptEngineHost.h"
 
@@ -87,8 +85,6 @@ private:
 
 //通信&寄存器相关
 private:
-	std::atomic_bool m_bDataChanged;
-
 	CommBase* m_pComm;									//通信实例
 	CommBase::CommInfoBase* m_pCommInfo;//通信信息实例（智能指针管理）
 	std::unique_ptr<CommBase::CommInfoBase> m_ownedCommInfo; // 业务层自持有的通信信息

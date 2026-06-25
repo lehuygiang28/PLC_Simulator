@@ -144,8 +144,6 @@ void CommSocket::Cleanup()
 	emit logRecord(QString("即将断开所有客户端链接,当前链接客户端数量[%1]").arg(m_ClientMap.size()));
 	// 清理客户端连接
 	for (QTcpSocket* client : m_ClientMap.values()) {
-// 		client->close();
-// 		client->deleteLater();
 		emit logRecord(QString("[%1:%2] 客户端即将断开").arg(client->peerAddress().toString())
 			.arg(client->peerPort()));
 
@@ -229,10 +227,4 @@ bool CommSocket::SendDataToEndpoint(const QString& clientId, const QByteArray& s
 	emit dataSendRequest(clientId, strData);
 	return true;
 }
-
-
-// CommBase::CommStatus CommSocket::RecieveData(QString& strData)
-// {
-// 	return CommStatus();
-// }
 
