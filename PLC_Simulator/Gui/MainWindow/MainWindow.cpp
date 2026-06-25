@@ -134,10 +134,11 @@ void MainWindow::InitialAllConfigs()
 		// 应用加载的配置到UI
 		// 加载脚本名称
 		QStringList scriptNames;
-		if (m_configStore->LoadScriptNames(scriptNames) && scriptNames.size() == 6)
+		if (m_configStore->LoadScriptNames(scriptNames))
 		{
 			auto nameEdits = scriptNameEdits();
-			for (int i = 0; i < 6; ++i) nameEdits[i]->setText(scriptNames[i]);
+			for (int i = 0; i < nameEdits.size() && i < scriptNames.size(); ++i)
+				nameEdits[i]->setText(scriptNames[i]);
 		}
 
 		// 加载协议类型
@@ -468,7 +469,7 @@ void MainWindow::InitialScriptConnect()
 	}
 }
 
-std::array<QLineEdit*, 6> MainWindow::scriptNameEdits() const
+QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 {
 	return { ui->edit_ScriptName_1, ui->edit_ScriptName_2, ui->edit_ScriptName_3,
 	         ui->edit_ScriptName_4, ui->edit_ScriptName_5, ui->edit_ScriptName_6 };

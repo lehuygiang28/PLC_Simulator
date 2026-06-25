@@ -52,10 +52,10 @@ public:
 
     // ==================== 脚本名称相关接口 ====================
 
-    // 保存所有脚本名称(ScriptName_1至ScriptName_6)
+    // 保存脚本名称列表(按给定数量与顺序持久化)
     bool SaveScriptNames(const QStringList& scriptNames);
 
-    // 加载脚本名称配置,返回的列表大小为6
+    // 加载脚本名称列表(数量由配置决定;无该键返回 false)
     bool LoadScriptNames(QStringList& scriptNames) const;
 
     // ==================== 模拟平台参数相关接口 ====================

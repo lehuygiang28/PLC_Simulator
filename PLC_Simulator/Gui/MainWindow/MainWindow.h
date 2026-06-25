@@ -22,7 +22,7 @@
 
 #include <QtWidgets/QMainWindow>
 #include <QMap>
-#include <array>
+#include <QVector>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; };
@@ -87,7 +87,7 @@ private:
     void silentRefreshTable(int addr);
 
     // 脚本名称编辑框辅助
-    std::array<QLineEdit*, 6> scriptNameEdits() const;
+    QVector<QLineEdit*> scriptNameEdits() const;
 
 private:
     Ui::MainWindow* ui;
