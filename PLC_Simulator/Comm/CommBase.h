@@ -19,6 +19,7 @@
 #include <QMap>
 #include <QByteArray>
 #include <QString>
+#include <QVariantMap>
 #include <functional>
 #include <QRunnable>
 #include <QThread>
@@ -63,7 +64,9 @@ public:
 			m_strCmdStop = "";
 		}
 
-		virtual CommType GetCommType() = 0;	  // 获取通讯类型
+		virtual CommType GetCommType() const = 0;	  // 获取通讯类型
+		virtual QVariantMap toVariantMap() const = 0;        // 序列化自身字段(中立容器,Comm 层不依赖 JSON)
+		virtual void fromVariantMap(const QVariantMap& m) = 0; // 从字典恢复自身字段
 		virtual ~CommInfoBase() = default;
 	};
 

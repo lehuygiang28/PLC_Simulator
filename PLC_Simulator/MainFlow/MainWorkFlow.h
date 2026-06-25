@@ -12,8 +12,6 @@
 #include <QObject>
 #include <QMutex>
 #include <memory>
-#include <QVariant>
-
 
 #include "Comm/CommBase.h"
 #include "Comm/Protocol/ProtocolFactory.h"
@@ -34,12 +32,6 @@
 
 #define REGISTER_VAL_NUM (RegisterStore::kRegisterCount)
 
-struct CommConfig {
-	CommBase::CommType type;
-	QVariantMap params; // 通用参数字典，支持不同通信方式扩展
-	CommConfig() : type(CommBase::CommType::eSocket) {}
-};
-
 class MainWorkFlow :public QObject
 {
 	Q_OBJECT
@@ -52,8 +44,8 @@ public:
 	static MainWorkFlow* InitialWorkFlow(QObject* pParent = nullptr);	//初始化唯一MainWorkFlow
 	static void ReleaseWorkFlow();										//释放单例实例
 
-	//通信信息相关
-	bool SetCommInfo(CommBase::CommInfoBase* commInfo);
+	// 通信信息相关(取得所有权)
+	bool SetCommInfo(std::unique_ptr<CommBase::CommInfoBase> info);
 
 	//通信实例相关
 	bool OpenComm();
@@ -73,7 +65,6 @@ public:
     // 获取 Lua 脚本引擎宿主
     ScriptEngineHost* scriptHost() const { return m_scriptHost.get(); }
 
-    bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
 
 //MainWorkFlow初始化相关
@@ -86,8 +77,7 @@ private:
 //通信&寄存器相关
 private:
 	CommBase* m_pComm;									//通信实例
-	CommBase::CommInfoBase* m_pCommInfo;//通信信息实例（智能指针管理）
-	std::unique_ptr<CommBase::CommInfoBase> m_ownedCommInfo; // 业务层自持有的通信信息
+	std::unique_ptr<CommBase::CommInfoBase> m_pCommInfo;	//通信信息(业务层自持有)
 	bool	m_bValidComm;								//通信实例是否有效标志
 
 	std::atomic<ProtocolType> m_eProtocolType;			//当前通信协议类型（仅作类型标签，按类型在解析时创建局部实例）

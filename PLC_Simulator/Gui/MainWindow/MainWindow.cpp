@@ -9,14 +9,17 @@
 #include "MainWindow.h"
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
+#include "Comm/Socket/CommSocket.h"
+#include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
 #include "version.h"
 #include <QDir>
 #include <QFile>
 #include <QWindow>
+#include <QVariantMap>
 
 MainWindow::MainWindow(QWidget *parent)
-	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configManager(nullptr), m_nLogStat(0)
+	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr), m_nLogStat(0)
 {
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(APP_NAME).arg(APP_VERSION));
@@ -33,7 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
 	// 初始化界面主题(读取持久化偏好,默认深色)
 	{
 		int themeId = static_cast<int>(Theme::Dark);
-		m_configManager->LoadThemePref(themeId);
+		m_configStore->LoadThemePref(themeId);
 		ThemeManager::instance().applyTheme(static_cast<Theme>(themeId));
 	}
 	ui->text_CommLog->setReadOnly(true);
@@ -127,19 +130,19 @@ MainWindow::~MainWindow()
 void MainWindow::InitialAllConfigs()
 {
 	// 加载之前保存的配置
-	if (m_configManager)
+	if (m_configStore)
 	{
-		m_configManager->LoadAllConfigs();
-
 		// 加载通信信息
 		{
-			std::unique_ptr<CommConfig> commInfo;
-			if (m_configManager->LoadCommInfo(commInfo))
+			QVariantMap commRec;
+			if (m_configStore->LoadCommInfo(commRec))
 			{
-				if (commInfo != nullptr && commInfo->type == CommBase::CommType::eSocket)
+				auto commInfo = CommInfoFactory::Deserialize(commRec);
+				if (commInfo && commInfo->GetCommType() == CommBase::CommType::eSocket)
 				{
-					ui->edit_IP->setText(commInfo->params["ip"].toString());
-					ui->edit_Port->setText(commInfo->params["port"].toString());
+					auto* sock = static_cast<CommSocket::SocketCommInfo*>(commInfo.get());
+					ui->edit_IP->setText(sock->m_strSocketIPAddress);
+					ui->edit_Port->setText(QString::number(sock->m_nSocketPort));
 				}
 			}
 		}
@@ -147,7 +150,7 @@ void MainWindow::InitialAllConfigs()
 		// 应用加载的配置到UI
 		// 加载脚本名称
 		QStringList scriptNames;
-		if (m_configManager->LoadScriptNames(scriptNames) && scriptNames.size() == 6)
+		if (m_configStore->LoadScriptNames(scriptNames) && scriptNames.size() == 6)
 		{
 			ui->edit_ScriptName_1->setText(scriptNames[0]);
 			ui->edit_ScriptName_2->setText(scriptNames[1]);
@@ -159,7 +162,7 @@ void MainWindow::InitialAllConfigs()
 
 		// 加载协议类型
 		int protocolType = -1;
-		if (m_configManager->LoadProtocolType(protocolType) && protocolType >= 0)
+		if (m_configStore->LoadProtocolType(protocolType) && protocolType >= 0)
 		{
 			// 根据protocolType遍历ui->cmbBox_ProtocolType查找对应索引并设置
 			for (int i = 0; i < ui->cmbBox_ProtocolType->count(); ++i)
@@ -179,18 +182,17 @@ void MainWindow::InitialAllConfigs()
 		}
 
 		// 加载模拟平台参数
-		double markCenterDistance = 0.0, screenRatio = 0.0;
-		if (m_configManager->LoadSimulationPlatformParams(markCenterDistance, screenRatio))
+		QVariantMap platformParams;
+		if (m_configStore->LoadSimulationPlatformParams(platformParams) && m_simulationPlatform != nullptr)
 		{
-			if (m_simulationPlatform != nullptr)
-				m_simulationPlatform->setSceneParams(markCenterDistance, screenRatio);
+			m_simulationPlatform->setSceneParamsFromMap(platformParams);
 		}
 	}
 }
 
 void MainWindow::InitializeMember()
 {
-	m_configManager = new ConfigManager(this);
+	m_configStore = new ConfigStore(this);
 
 	if (m_pWorkFlow == nullptr)
 	{
@@ -493,9 +495,9 @@ void MainWindow::InitialSignalConnect()
 			{
 		// 创建协议并保存协议类型
 		CreateCurrentProtocol();
-		if (m_configManager && index >= 0) {
+		if (m_configStore && index >= 0) {
 			ProtocolType selectedType = ui->cmbBox_ProtocolType->currentData().value<ProtocolType>();
-			m_configManager->SaveProtocolType(static_cast<int>(selectedType));
+			m_configStore->SaveProtocolType(static_cast<int>(selectedType));
 		} });
 
 	// 点击打开连接按钮
@@ -519,22 +521,26 @@ void MainWindow::InitialSignalConnect()
 		}
 		else
 		{
-			CommConfig cfg;
-			cfg.type = CommBase::CommType::eSocket;
-			cfg.params.insert("ip", ui->edit_IP->text());
-			cfg.params.insert("port", ui->edit_Port->text().toUShort());
-			cfg.params.insert("listenNum", 10);
-			cfg.params.insert("socketType", 0);
-			m_pWorkFlow->ConfigureComm(cfg);
+			auto info = std::make_unique<CommSocket::SocketCommInfo>();
+			info->m_SocketType         = CommSocket::SocketType::eSTServer;
+			info->m_strSocketIPAddress = ui->edit_IP->text();
+			info->m_nSocketPort        = ui->edit_Port->text().toUShort();
+			info->m_nSocketListenNum   = 10;
+
+			// 非拥有视图,连接成功后落盘用;所有权随即转交工作流(对象仍由其持有,指针有效)
+			CommBase::CommInfoBase* infoView = info.get();
+			m_pWorkFlow->SetCommInfo(std::move(info));
 
 			if (!m_pWorkFlow->OpenComm())
 			{
 				UpdateLogDisplay("打开连接失败!");
 				return;
 			}
-			if (m_configManager)
+
+			// 仅在连接成功后持久化,避免保存打不开的通信参数
+			if (m_configStore)
 			{
-				m_configManager->SaveCommInfo(&cfg);
+				m_configStore->SaveCommInfo(CommInfoFactory::Serialize(*infoView));
 			}
 			auto ExecuteRequest = [this](const QByteArray& in, QByteArray& out) {
 				if (!m_pWorkFlow) return false;
@@ -629,7 +635,7 @@ void MainWindow::InitialSignalConnect()
 	}
 
 	// 脚本名称编辑框自动保存事件
-	if (m_configManager)
+	if (m_configStore)
 	{
 		auto saveScriptNames = [this]()
 		{
@@ -640,23 +646,25 @@ void MainWindow::InitialSignalConnect()
 				  << ui->edit_ScriptName_4->text()
 				  << ui->edit_ScriptName_5->text()
 				  << ui->edit_ScriptName_6->text();
-			m_configManager->SaveScriptNames(names);
+			m_configStore->SaveScriptNames(names);
 		};
 
-		connect(ui->edit_ScriptName_1, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_2, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_3, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_4, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_5, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_6, &QLineEdit::textChanged, this, saveScriptNames);
+		// 用 editingFinished(失焦/回车)触发保存,避免 textChanged 每字符全量写配置
+		connect(ui->edit_ScriptName_1, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_2, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_3, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_4, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_5, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_6, &QLineEdit::editingFinished, this, saveScriptNames);
 	}
 
 	// 初始化SimulationPlatform自动保存参数
-	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [=](double markCenterDistance, double screenRatio)
+	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [this](double, double)
 			{
-		if (m_configManager)
+		if (m_configStore)
 		{
-			m_configManager->SaveSimulationPlatformParams(markCenterDistance, screenRatio);
+			// 字段由 PlatformScene 自描述,MainWindow 不再拼字段名
+			m_configStore->SaveSimulationPlatformParams(m_simulationPlatform->sceneParamsToMap());
 		} });
 }
 
@@ -934,9 +942,9 @@ void MainWindow::OnShowChangeLog()
 void MainWindow::OnThemeSelected(Theme theme)
 {
 	ThemeManager::instance().applyTheme(theme);
-	if (m_configManager != nullptr)
+	if (m_configStore != nullptr)
 	{
-		m_configManager->SaveThemePref(static_cast<int>(theme));
+		m_configStore->SaveThemePref(static_cast<int>(theme));
 	}
 }
 

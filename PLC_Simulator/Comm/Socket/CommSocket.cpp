@@ -228,3 +228,32 @@ bool CommSocket::SendDataToEndpoint(const QString& clientId, const QByteArray& s
 	return true;
 }
 
+namespace {
+// 序列化键(单一来源,to/from 共用,避免字面量两处漂移)
+constexpr auto kSocketType = "socketType";
+constexpr auto kIp         = "ip";
+constexpr auto kPort       = "port";
+constexpr auto kListenNum  = "listenNum";
+} // namespace
+
+QVariantMap CommSocket::SocketCommInfo::toVariantMap() const
+{
+	QVariantMap m;
+	m[kSocketType] = static_cast<int>(m_SocketType); // eSTServer=0 / eSTClient=1
+	m[kIp]         = m_strSocketIPAddress;
+	m[kPort]       = m_nSocketPort;
+	m[kListenNum]  = m_nSocketListenNum;
+	return m;
+}
+
+void CommSocket::SocketCommInfo::fromVariantMap(const QVariantMap& m)
+{
+	const int st = m.value(kSocketType, 0).toInt();
+	// 按值精确还原;脏值(含 eSTUnknown=-1)回退到可用的 Server
+	m_SocketType         = (st == 1) ? SocketType::eSTClient : SocketType::eSTServer;
+	m_strSocketIPAddress = m.value(kIp, "0.0.0.0").toString();
+	// 旧配置 port 以字符串持久化(旧版 toUShort 落入 toString 分支);toUInt 兼容数字字符串,保存一次即归一为数字
+	m_nSocketPort        = m.value(kPort, 2000).toUInt();
+	m_nSocketListenNum   = m.value(kListenNum, 10).toUInt();
+}
+

@@ -9,6 +9,7 @@
 #define PLATFORMSCENE_H
 
 #include <QObject>
+#include <QVariantMap>
 #include "PlatformTypes.h"
 
 /**
@@ -44,6 +45,10 @@ public:
     double markCenterDistance() const { return m_markCenterDistance; }
     double screenRatio() const { return m_screenRatio; }
     double pixelsPerMm() const { return m_pixelsPerMm; }
+
+    // ---- 持久化(自描述字段;后续新增可落盘参数在此扩展) ----
+    QVariantMap toVariantMap() const;
+    void fromVariantMap(const QVariantMap& m);
 
     // ---- 只读访问(供画布渲染) ----
     const PlatformItem& platform(Platform which) const;

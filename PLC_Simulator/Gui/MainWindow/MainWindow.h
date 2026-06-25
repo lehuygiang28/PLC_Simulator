@@ -15,7 +15,7 @@
 #include "RegisterTableManager.h"
 #include "ScriptManager.h"
 #include "PlatformController.h"
-#include "Config/ConfigManager.h"
+#include "Config/ConfigStore.h"
 #include "MainWorkFlow.h"
 #include "Theme/ThemeManager.h"
 
@@ -86,10 +86,9 @@ private:
     // 工作流
     MainWorkFlow* m_pWorkFlow;
     std::unique_ptr<PlatformController> m_platformController;
-    std::unique_ptr<CommBase::CommInfoBase> m_CurInfo;
 
     // 配置管理
-    ConfigManager* m_configManager;
+    ConfigStore* m_configStore;
 
     // 寄存器表格管理器
     std::unique_ptr<RegisterTableManager> m_registerTableManager;

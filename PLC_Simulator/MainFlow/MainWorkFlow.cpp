@@ -21,7 +21,6 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 	qRegisterMetaType<CommEvent>("CommEvent");
 
 	m_pComm = nullptr;
-	m_pCommInfo = nullptr;
 
 	m_bValidComm = false;
 	m_eProtocolType = ProtocolType::eProUnknown;
@@ -44,10 +43,6 @@ MainWorkFlow::~MainWorkFlow()
 		delete m_pComm;
 		m_pComm = nullptr;
 	}
-
-	// 协议类型为值类型成员，无需释放
-
-	// m_pCommInfo 会自动释放（unique_ptr）
 }
 
 //初始化静态实例
@@ -77,30 +72,11 @@ void MainWorkFlow::ReleaseWorkFlow()
 	}
 }
 
-bool MainWorkFlow::SetCommInfo(CommBase::CommInfoBase* commInfo)
+bool MainWorkFlow::SetCommInfo(std::unique_ptr<CommBase::CommInfoBase> info)
 {
-	if (commInfo == nullptr) return false;
-
-	// 使用unique_ptr管理内存
-	m_pCommInfo = commInfo;
-	return true;
-}
-
-bool MainWorkFlow::ConfigureComm(const CommConfig& cfg)
-{
-    if (cfg.type == CommBase::CommType::eSocket)
-    {
-        auto info = std::make_unique<CommSocket::SocketCommInfo>();
-        int socketType = cfg.params.value("socketType", 0).toInt();
-        info->m_SocketType = socketType == 0 ? CommSocket::SocketType::eSTServer : CommSocket::SocketType::eSTClient;
-        info->m_strSocketIPAddress = cfg.params.value("ip", "0.0.0.0").toString();
-        info->m_nSocketPort = static_cast<uint16_t>(cfg.params.value("port", 2000).toUInt());
-        info->m_nSocketListenNum = cfg.params.value("listenNum", 10).toInt();
-        m_ownedCommInfo = std::move(info);
-        return SetCommInfo(m_ownedCommInfo.get());
-    }
-    // TODO: 支持串口等其他通信方式
-    return false;
+    if (info == nullptr) return false;
+    m_pCommInfo = std::move(info);
+    return true;
 }
 
 void MainWorkFlow::SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn)
@@ -112,6 +88,8 @@ void MainWorkFlow::SetRequestProcessor(std::function<bool(const QByteArray&, QBy
 
 bool MainWorkFlow::OpenComm()
 {
+	if (m_pCommInfo == nullptr) return false;
+
 	if (m_pCommInfo->GetCommType() == CommBase::CommType::eSocket)
 	{
 		//删除原本的通信实例
@@ -149,7 +127,7 @@ bool MainWorkFlow::OpenComm()
 			});
 		}
 
-		m_bValidComm = m_pComm->Open(m_pCommInfo);
+		m_bValidComm = m_pComm->Open(m_pCommInfo.get());
 
 
 		return m_bValidComm;

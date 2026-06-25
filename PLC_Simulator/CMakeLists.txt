@@ -24,11 +24,13 @@ set(RESOURCE_FILES
 # Comm 模块
 set(COMM_SOURCES
     Comm/CommBase.cpp
+    Comm/CommInfoFactory.cpp
 )
 
 set(COMM_HEADERS
     Comm/CommBase.h
     Comm/CommEvent.h
+    Comm/CommInfoFactory.h
 )
 
 # Comm\Socket 模块
@@ -164,11 +166,11 @@ set(LUA_SOURCES ${LUA_ENGINE_SOURCES} ${LUA_MODULE_SOURCES})
 set(LUA_HEADERS ${LUA_ENGINE_HEADERS} ${LUA_MODULE_HEADERS})
 # Config 模块
 set(CONFIG_SOURCES
-    Config/ConfigManager.cpp
+    Config/ConfigStore.cpp
 )
 
 set(CONFIG_HEADERS
-    Config/ConfigManager.h
+    Config/ConfigStore.h
 )
 
 # Core 模块
