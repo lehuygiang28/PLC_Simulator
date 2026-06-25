@@ -53,16 +53,6 @@ public:
 
 public:
 
-// 	//template <typename T>
-// 	virtual bool PackWriteRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, std::vector<uint16_t> vWriteData) = 0;	//打包写寄存器信息字符串
-// 	virtual bool AnalyzeAswWriteReg(QByteArray strAsw) = 0;	//解析写寄存器回复信息(是否写成功)
-// 
-// 	virtual bool PackReadRegInfo(QByteArray& strInfo, long nRegAddr, int nReadNum, bool bDWORD) = 0;	//打包读寄存器信息字符串
-// 	//template <typename T>
-// 	virtual bool AnalyzeAswReadReg(QByteArray strAsw, int nReadNum, std::vector<uint16_t>& vReceiveData) = 0; //解析读寄存器回复信息(解析寄存器中的详细数值)
-
-	
-
 	virtual bool AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmdType) = 0;
 
 	//20251101	wm	解析读寄存器指令
