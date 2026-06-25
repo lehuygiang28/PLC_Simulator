@@ -22,7 +22,7 @@ void CommBase::AddToRequestQueue(const QString& endpointId,QByteArray&& data)
 	{
 		QMutexLocker locker(&m_queueMutex);
 		if (m_endpointQueues[endpointId].size() >= m_maxQueueSizePerEndpoint) {
-			emit CommLogRecord(QString("队列溢出，丢弃请求: %1").arg(endpointId));
+			emit logRecord(QString("队列溢出，丢弃请求: %1").arg(endpointId));
 			return;
 		}
 		PendingRequest request;
@@ -54,11 +54,16 @@ void CommBase::ProcessNextForEndpoint(const QString& endpointId)
 	}
 	// 超时检查
 	if (request.timestamp.msecsTo(QDateTime::currentDateTime()) > request.timeoutMs) {
-		emit CommLogRecord(QString("请求超时，跳过: %1").arg(endpointId));
+		emit logRecord(QString("请求超时，跳过: %1").arg(endpointId));
 		QMetaObject::invokeMethod(this, "OnTaskFinished", Qt::QueuedConnection, Q_ARG(QString, endpointId));
 		return;
 	}
-	emit dataReceived(QString("Rece:[%1]:").arg(endpointId), request.requestData);
+	CommEvent ev;
+	ev.direction  = CommDirection::eReceive;
+	ev.endpointId = endpointId;
+	ev.bytes      = request.requestData;   // 复制:request 随后仍被移动入 Task
+	ev.timestamp  = QDateTime::currentDateTime();
+	emit commEvent(ev);
 
 	class Task : public QRunnable {
 	public:

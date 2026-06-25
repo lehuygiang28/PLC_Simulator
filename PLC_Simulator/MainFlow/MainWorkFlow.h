@@ -87,10 +87,6 @@ private:
 
 //通信&寄存器相关
 private:
-	QString m_strSendObjInfo;						//发送数据的对象信息
-	QByteArray m_strSendData;							//发送的数据
-	QString m_strRecObjInfo;						//接收数据的对象信息
-	QByteArray m_strRecData;							//接收的数据
 	std::atomic_bool m_bDataChanged;
 
 	CommBase* m_pComm;									//通信实例
@@ -106,9 +102,8 @@ private:
 
 signals:
 	//通信实例的信号转发
-	void commLogRecord(QString strLogInfo);
-	void dataReceived(QString objectInfo,QByteArray recData);
-	void dataSend(QString objectInfo, QByteArray recData);
+	void logRecord(QString text);
+	void commEvent(const CommEvent& ev);
 
 };
 

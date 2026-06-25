@@ -17,16 +17,13 @@ QMutex MainWorkFlow::s_mutex;
 MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
     : QObject(pParent)
 {
+	qRegisterMetaType<CommEvent>("CommEvent");
+
 	m_pComm = nullptr;
 	m_pCommInfo = nullptr;
 
 	m_bValidComm = false;
 	m_eProtocolType = ProtocolType::eProUnknown;
-
-    m_strSendObjInfo = "";
-    m_strSendData.clear();
-    m_strRecObjInfo = "";
-    m_strRecData.clear();
 
 	m_bDataChanged = false;
 
@@ -145,32 +142,12 @@ bool MainWorkFlow::OpenComm()
 
 		//新建信号槽连接
 		{
-			connect(m_pComm, &CommBase::CommLogRecord, this, [this](QString strLog) {
-				emit commLogRecord(strLog);
+			connect(m_pComm, &CommBase::logRecord, this, [this](const QString& text) {
+				emit logRecord(text);
 			});
-
-			connect(m_pComm, &CommBase::dataReceived, this, [this](QString objectInfo,QByteArray strData) {
-
-                if (this->m_strRecObjInfo != objectInfo || this->m_strRecData != strData)
-                {
-                    this->m_strRecObjInfo = objectInfo;
-                    this->m_strRecData = strData;
-
-                    emit dataReceived(objectInfo,strData);
-                }
-
-
+			connect(m_pComm, &CommBase::commEvent, this, [this](const CommEvent& ev) {
+				emit commEvent(ev);
 			});
-
-			connect(m_pComm, &CommBase::dataSend, this, [this](QString objectInfo, QByteArray strData) {
-
-                if( this->m_strSendObjInfo != objectInfo || this->m_strSendData != strData)
-                {
-                    this->m_strSendObjInfo = objectInfo;
-                    this->m_strSendData = strData;
-                    emit dataSend(objectInfo, strData);
-                }
-				});
 		}
 
 		m_bValidComm = m_pComm->Open(m_pCommInfo);

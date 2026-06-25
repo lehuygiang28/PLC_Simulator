@@ -103,6 +103,12 @@ private:
 
     // 日志显示状态
     int m_nLogStat;
+
+    // 通信日志重复帧过滤状态(与上一帧方向+端点+数据相同则不刷屏;收/发各自独立)
+    QString    m_lastRecEndpoint;
+    QByteArray m_lastRecData;
+    QString    m_lastSendEndpoint;
+    QByteArray m_lastSendData;
 };
 
 #endif // MAINWINDOW_H

@@ -29,6 +29,7 @@ set(COMM_SOURCES
 set(COMM_HEADERS
     Comm/CommBase.h
     Comm/CommDefine.h
+    Comm/CommEvent.h
 )
 
 # Comm\Socket 模块
