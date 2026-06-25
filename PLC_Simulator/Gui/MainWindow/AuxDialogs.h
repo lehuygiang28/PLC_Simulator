@@ -6,8 +6,8 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef HELPDIALOGS_H
-#define HELPDIALOGS_H
+#ifndef AUXDIALOGS_H
+#define AUXDIALOGS_H
 
 #include <QString>
 #include <QSize>
@@ -15,18 +15,29 @@
 class QWidget;
 
 /**
- * @brief 帮助类对话框(关于 / 更新日志)
+ * @brief 主界面辅助对话框(关于 / 更新日志 / 平台参数)
  *
  * 无状态,纯 UI 构造。20260626 从 MainWindow.cpp 抽出。
  */
-class HelpDialogs
+class AuxDialogs
 {
 public:
+    /// 平台参数包:单位幂次与轴写入起始地址
+    struct PlatformParams {
+        int unitXY;   ///< XY轴单位幂(10^n)
+        int unitD;    ///< D轴单位幂(10^n)
+        int objAddr;  ///< 对象平台轴位置起始寄存器地址
+        int tgtAddr;  ///< 目标平台轴位置起始寄存器地址
+    };
+
     /// 关于对话框(图标/版本/作者/描述 + 第三方许可子弹窗)
     static void showAbout(QWidget* parent);
 
     /// 更新日志对话框
     static void showChangeLog(QWidget* parent);
+
+    /// 平台参数设置对话框(事务式):用 params 做初值;确定写回 params 返 true,取消返 false(params 不变)
+    static bool editPlatformParams(QWidget* parent, PlatformParams& params);
 
 private:
     /// 读取文本文件 → 只读 QTextEdit 弹窗;读失败时显示 fallbackText
@@ -35,4 +46,4 @@ private:
                                    const QSize& size);
 };
 
-#endif // HELPDIALOGS_H
+#endif // AUXDIALOGS_H

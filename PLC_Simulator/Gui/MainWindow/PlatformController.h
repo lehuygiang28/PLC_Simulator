@@ -13,7 +13,6 @@
 
 class RegisterStore;
 class SimulationPlatform;
-class QLineEdit;
 
 // 平台控制服务(GUI 层):换算(×/÷幂次) + 寄存器拆/拼读写 + 线程编组 + 调 SimulationPlatform。
 // 三入口(Lua 绑定/手动按钮/自动写入)共享此唯一一份逻辑。
@@ -26,9 +25,12 @@ public:
 
     PlatformController(RegisterStore* store,
                        SimulationPlatform* platform,
-                       QLineEdit* powerXY,
-                       QLineEdit* powerD,
+                       int powerXY,
+                       int powerD,
                        QObject* parent = nullptr);
+
+    // 动态更新单位幂次(平台参数对话框确定后调用)
+    void setUnitPowers(int powerXY, int powerD);
 
     // 寄存器 → 平台:读三地址→(Int32 则 ÷幂次)→移动。异步编组。
     void moveAbsolute(int xAddr, int yAddr, int aAddr, NumFormat fmt);
@@ -44,13 +46,13 @@ private:
     void doMoveRelative(int xAddr, int yAddr, int aAddr, NumFormat fmt);
     void doWriteCurrentPos(int xAddr, int yAddr, int aAddr, NumFormat fmt, Platform which);
 
-    double divisorXY() const;   // 10^powerXY(无效则 10^0=1)
-    double divisorD()  const;
+    double divisorXY() const;   // 10^m_powerXY
+    double divisorD()  const;   // 10^m_powerD
 
     RegisterStore*      m_store;
     SimulationPlatform* m_platform;
-    QLineEdit*          m_powerXY;
-    QLineEdit*          m_powerD;
+    int                 m_powerXY;
+    int                 m_powerD;
 };
 
 #endif // PLATFORMCONTROLLER_H

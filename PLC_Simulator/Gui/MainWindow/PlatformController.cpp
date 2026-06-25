@@ -9,35 +9,34 @@
 
 #include "Core/RegisterStore.h"
 #include "SimulationPlatform.h"
-#include <QLineEdit>
 #include <QThread>
 #include <QMetaObject>
 #include <cmath>
 
 PlatformController::PlatformController(RegisterStore* store,
                                       SimulationPlatform* platform,
-                                      QLineEdit* powerXY,
-                                      QLineEdit* powerD,
+                                      int powerXY,
+                                      int powerD,
                                       QObject* parent)
     : QObject(parent), m_store(store), m_platform(platform),
       m_powerXY(powerXY), m_powerD(powerD)
 {
 }
 
+void PlatformController::setUnitPowers(int powerXY, int powerD)
+{
+    m_powerXY = powerXY;
+    m_powerD  = powerD;
+}
+
 double PlatformController::divisorXY() const
 {
-    bool ok = false;
-    double power = m_powerXY ? m_powerXY->text().toDouble(&ok) : 0.0;
-    if (!ok) power = 0.0;
-    return std::pow(10.0, power);
+    return std::pow(10.0, m_powerXY);
 }
 
 double PlatformController::divisorD() const
 {
-    bool ok = false;
-    double power = m_powerD ? m_powerD->text().toDouble(&ok) : 0.0;
-    if (!ok) power = 0.0;
-    return std::pow(10.0, power);
+    return std::pow(10.0, m_powerD);
 }
 
 void PlatformController::moveAbsolute(int xAddr, int yAddr, int aAddr, NumFormat fmt)

@@ -6,13 +6,18 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#include "HelpDialogs.h"
+#include "AuxDialogs.h"
+#include "Core/RegisterStore.h"
 #include "version.h"
 
 #include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QFormLayout>
+#include <QDialogButtonBox>
 #include <QLabel>
+#include <QLineEdit>
+#include <QIntValidator>
 #include <QPixmap>
 #include <QPushButton>
 #include <QTextEdit>
@@ -22,7 +27,7 @@
 #include <QStringConverter>
 #include <QCoreApplication>
 
-void HelpDialogs::showAbout(QWidget* parent)
+void AuxDialogs::showAbout(QWidget* parent)
 {
     QDialog aboutDialog(parent);
     aboutDialog.setWindowTitle(QString("关于 %1").arg(APP_NAME));
@@ -107,14 +112,63 @@ void HelpDialogs::showAbout(QWidget* parent)
     aboutDialog.exec();
 }
 
-void HelpDialogs::showChangeLog(QWidget* parent)
+void AuxDialogs::showChangeLog(QWidget* parent)
 {
     showTextFileDialog(parent, "更新日志",
                        QCoreApplication::applicationDirPath() + "/ChangeLog.txt",
                        "There is no changeog.", QSize(520, 500));
 }
 
-void HelpDialogs::showTextFileDialog(QWidget* parent, const QString& title,
+bool AuxDialogs::editPlatformParams(QWidget* parent, PlatformParams& params)
+{
+    QDialog dlg(parent);
+    dlg.setWindowTitle("平台参数设置");
+    dlg.setWindowFlags(dlg.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+    QFormLayout* form = new QFormLayout(&dlg);
+
+    QLineEdit* editUnitXY  = new QLineEdit(QString::number(params.unitXY),  &dlg);
+    QLineEdit* editUnitD   = new QLineEdit(QString::number(params.unitD),   &dlg);
+    QLineEdit* editObjAddr = new QLineEdit(QString::number(params.objAddr), &dlg);
+    QLineEdit* editTgtAddr = new QLineEdit(QString::number(params.tgtAddr), &dlg);
+
+    editUnitXY->setAlignment(Qt::AlignCenter);
+    editUnitD->setAlignment(Qt::AlignCenter);
+    editObjAddr->setAlignment(Qt::AlignCenter);
+    editTgtAddr->setAlignment(Qt::AlignCenter);
+
+    editUnitXY->setValidator(new QIntValidator(1, 20, &dlg));
+    editUnitD->setValidator(new QIntValidator(1, 20, &dlg));
+
+    const int addrMax = RegisterStore::kRegisterCount - 1 - 6;
+    editObjAddr->setValidator(new QIntValidator(0, addrMax, &dlg));
+    editTgtAddr->setValidator(new QIntValidator(0, addrMax, &dlg));
+
+    form->addRow("XY单位幂:", editUnitXY);
+    form->addRow("D单位幂:", editUnitD);
+    form->addRow("对象平台轴位置地址:", editObjAddr);
+    form->addRow("目标平台轴位置地址:", editTgtAddr);
+
+    QDialogButtonBox* box = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    box->button(QDialogButtonBox::Ok)->setText("确定");
+    box->button(QDialogButtonBox::Cancel)->setText("取消");
+    form->addRow(box);
+    QObject::connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    QObject::connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted)
+        return false;
+
+    // 确定:解析写回 params
+    params.unitXY  = editUnitXY->text().toInt();
+    params.unitD   = editUnitD->text().toInt();
+    params.objAddr = editObjAddr->text().toInt();
+    params.tgtAddr = editTgtAddr->text().toInt();
+    return true;
+}
+
+void AuxDialogs::showTextFileDialog(QWidget* parent, const QString& title,
                                      const QString& filePath, const QString& fallbackText,
                                      const QSize& size)
 {

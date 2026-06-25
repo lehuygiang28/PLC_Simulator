@@ -7,7 +7,7 @@
  */
 
 #include "MainWindow.h"
-#include "HelpDialogs.h"
+#include "AuxDialogs.h"
 #include "SimulationPlatform/SimulationPlatform.h"
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
@@ -25,6 +25,18 @@
 #include <QMenu>
 #include <QAction>
 #include <QActionGroup>
+#include <QToolBar>
+#include <QPushButton>
+#include <QLabel>
+#include <QLineEdit>
+
+void MainWindow::refreshAxisAddrStatus()
+{
+	m_statusAddrLabel->setText(
+		QString("对象轴写入:D%1;目标轴写入:D%2")
+			.arg(m_platformParams.objAddr)
+			.arg(m_platformParams.tgtAddr));
+}
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr), m_nLogStat(0)
@@ -68,14 +80,10 @@ MainWindow::MainWindow(QWidget *parent)
 	// 初始化输入限制
 	InitialLineEditValidator();
 
-	// 在状态栏添加作者和版本信息
-	const QString datetime = QStringLiteral("%1 %2").arg(APP_COMPILE_DATE).arg(APP_COMPILE_TIME);
-
-	QLabel *label = new QLabel(this);
-	label->setText(QStringLiteral("Version:%1 Compile Time: %2")
-					   .arg(APP_VERSION)
-					   .arg(datetime));
-	ui->statusBar->addPermanentWidget(label);
+	// 状态栏:常显轴写入目标地址
+	m_statusAddrLabel = new QLabel(this);
+	ui->statusBar->addPermanentWidget(m_statusAddrLabel);
+	refreshAxisAddrStatus();
 
 	// 更新表格显示
 	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
@@ -83,7 +91,7 @@ MainWindow::MainWindow(QWidget *parent)
 	m_platformController = std::make_unique<PlatformController>(
 		m_pWorkFlow ? m_pWorkFlow->registerStore() : nullptr,
 		m_simulationPlatform,
-		ui->edit_Unit_XY, ui->edit_Unit_D, nullptr);
+		m_platformParams.unitXY, m_platformParams.unitD, nullptr);
 
 	if (m_pWorkFlow == nullptr)
 		return;
@@ -94,15 +102,6 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
 		[this](Platform which, const Pose& p) { OnPlatformPoseChanged(which, p); });
 
-	// 初始化自动写入相关控件的启用/禁用状态
-	// 根据ChkBox_WritePosAutoEnable的初始状态设置其他控件
-	bool isAutoEnabled = ui->ChkBox_WritePosAutoEnable->isChecked();
-
-	QButtonGroup *group1 = new QButtonGroup(this);
-	group1->addButton(ui->Radio_AxisPos_Float);
-	group1->addButton(ui->Radio_AxisPos_Int32);
-	ui->Radio_AxisPos_Int32->setChecked(true);
-	setAutoWriteControlsEnabled(isAutoEnabled);
 }
 
 MainWindow::~MainWindow()
@@ -210,6 +209,8 @@ void MainWindow::InitializeMember()
 	// 监听子窗口状态变化:用事件过滤器捕获 QEvent::WindowStateChange
 	// (QWidget 级事件,不依赖原生句柄,无需提前 createWinId;状态联动逻辑见 eventFilter)
 	m_subWindow->installEventFilter(this);
+	// 监听平台窗口显隐变化:用事件过滤器同步菜单勾选状态
+	m_simulationPlatform->installEventFilter(this);
 
 	// 协议设置相关
 	{
@@ -317,8 +318,8 @@ void MainWindow::InitialMenuConnect()
 	QMenu *helpMenu = ui->menuBar->addMenu("帮助(&H)");
 	QAction *aboutAction = helpMenu->addAction("关于(&A)");
 	QAction *changelogAction = helpMenu->addAction("更新日志(&U)");
-	connect(aboutAction, &QAction::triggered, this, [this]() { HelpDialogs::showAbout(this); });
-	connect(changelogAction, &QAction::triggered, this, [this]() { HelpDialogs::showChangeLog(this); });
+	connect(aboutAction, &QAction::triggered, this, [this]() { AuxDialogs::showAbout(this); });
+	connect(changelogAction, &QAction::triggered, this, [this]() { AuxDialogs::showChangeLog(this); });
 
 	// 视图菜单:主题切换
 	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
@@ -340,28 +341,54 @@ void MainWindow::InitialMenuConnect()
 
 	connect(m_actLightTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Light); });
 	connect(m_actDarkTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
+
+	// 平台菜单(顺序:视图 | 平台 | 帮助)
+	m_platformMenu = new QMenu("平台(&P)", this);
+	ui->menuBar->insertMenu(helpMenu->menuAction(), m_platformMenu);
+
+	m_actShowPlatform = m_platformMenu->addAction("显示平台");
+	m_actShowPlatform->setCheckable(true);
+	connect(m_actShowPlatform, &QAction::toggled, this, [this](bool on){
+		m_simulationPlatform->setVisible(on);
+	});
+
+	m_actAutoWrite = m_platformMenu->addAction("自动写入轴位置");
+	m_actAutoWrite->setCheckable(true);
+
+	QMenu* fmtMenu = m_platformMenu->addMenu("写入格式");
+	m_fmtGroup = new QActionGroup(this);
+	m_fmtGroup->setExclusive(true);
+	m_actFmtFloat = fmtMenu->addAction("浮点写入");
+	m_actFmtInt32 = fmtMenu->addAction("双字写入");
+	m_actFmtFloat->setCheckable(true);
+	m_actFmtInt32->setCheckable(true);
+	m_fmtGroup->addAction(m_actFmtFloat);
+	m_fmtGroup->addAction(m_actFmtInt32);
+	m_actFmtInt32->setChecked(true);   // 默认双字(原 Radio_AxisPos_Int32->setChecked(true))
+
+	m_platformMenu->addSeparator();
+
+	QAction* actPlatformParams = m_platformMenu->addAction("参数设置…");
+	connect(actPlatformParams, &QAction::triggered, this, [this]{
+		if (AuxDialogs::editPlatformParams(this, m_platformParams)) {
+			m_platformController->setUnitPowers(m_platformParams.unitXY, m_platformParams.unitD);
+			refreshAxisAddrStatus();
+		}
+	});
+
+	// 手动写入工具栏
+	QToolBar* platformToolBar = addToolBar("平台操作");
+	platformToolBar->setToolButtonStyle(Qt::ToolButtonTextOnly);
+	QAction* actManualFloat = platformToolBar->addAction("浮点写入");
+	QAction* actManualInt32 = platformToolBar->addAction("双字写入");
+	connect(actManualFloat, &QAction::triggered, this, &MainWindow::OnWriteAxisFloat);
+	connect(actManualInt32, &QAction::triggered, this, &MainWindow::OnWriteAxisDoubleWord);
 }
 
 void MainWindow::InitialWindowConnect()
 {
 	// 连接小窗口的显示主窗口信号到主窗口的show()槽
 	connect(m_subWindow.get(), &QuickPanel::showMainWindow, this, &MainWindow::show);
-
-	// 连接显示/隐藏模拟平台窗口按钮
-	connect(ui->Btn_ShowPlatform, &QPushButton::clicked, this, [=]()
-			{
-		if (m_simulationPlatform->isVisible()) {
-			m_simulationPlatform->hide();
-		} else {
-			m_simulationPlatform->show();
-		} });
-
-	// 连接轴位置写入按钮
-	connect(ui->Btn_WriteAxisDoubleWord, &QPushButton::clicked, this, &MainWindow::OnWriteAxisDoubleWord);
-	connect(ui->Btn_WriteAxisFloat, &QPushButton::clicked, this, &MainWindow::OnWriteAxisFloat);
-
-	// 连接自动写入复选框
-	connect(ui->ChkBox_WritePosAutoEnable, &QCheckBox::stateChanged, this, &MainWindow::OnWritePosAutoEnableChanged);
 
 	// 隐藏主窗口槽函数
 	connect(ui->Btn_HideMainWindow, &QPushButton::clicked, this, [=]()
@@ -674,16 +701,10 @@ void MainWindow::InitialLineEditValidator()
 	QIntValidator *PortValid = new QIntValidator(0, 65535, this);
 	QIntValidator *RegisterShowAddr = new QIntValidator(0,
 														REGISTER_VAL_NUM - 1 - REGISTER_TABLE_COLUMN_COUNT * REGISTER_TABLE_ROW_COUNT / 2, this);
-	QIntValidator *UnitXYD = new QIntValidator(1, 20, this);
 
-	QIntValidator *AxisRegisterAddr = new QIntValidator(0, REGISTER_VAL_NUM - 1 - 6, this);
 	// 只能输入整型数
 	ui->edit_Port->setValidator(PortValid);
 	ui->edit_RegisterAddr->setValidator(RegisterShowAddr);
-	ui->edit_Unit_XY->setValidator(UnitXYD);
-	ui->edit_Unit_D->setValidator(UnitXYD);
-	ui->edit_AxisPosRegisterAddr->setValidator(AxisRegisterAddr);
-	ui->edit_AxisPosRegisterAddr_2->setValidator(AxisRegisterAddr);
 
 	ui->edit_IP->setInputMask("000.000.000.000;"); // IP地址格式
 }
@@ -719,9 +740,7 @@ void MainWindow::writeAxisManual(PlatformController::NumFormat fmt)
 {
     if (m_simulationPlatform == nullptr) return;
 
-    bool ok = false;
-    int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
-    if (!ok) { UpdateLogDisplay("错误: 轴位置地址无效"); return; }
+    int startAddr = m_platformParams.objAddr;
     if (!axisStartAddrValid(startAddr)) { UpdateLogDisplay("错误: 寄存器地址超出范围"); return; }
 
     writeAxisPos(startAddr, fmt, Platform::Live);
@@ -740,37 +759,22 @@ void MainWindow::OnWriteAxisFloat()
 
 // ====================自动写入相关槽函数实现====================
 
-void MainWindow::setAutoWriteControlsEnabled(bool autoEnabled)
-{
-	ui->Radio_AxisPos_Float->setEnabled(autoEnabled);
-	ui->Radio_AxisPos_Int32->setEnabled(autoEnabled);
-	ui->Btn_WriteAxisDoubleWord->setEnabled(!autoEnabled);
-	ui->Btn_WriteAxisFloat->setEnabled(!autoEnabled);
-}
-
-void MainWindow::OnWritePosAutoEnableChanged(int state)
-{
-	setAutoWriteControlsEnabled(state == Qt::Checked);
-}
-
 void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 {
     Q_UNUSED(pose);
-    if (!ui->ChkBox_WritePosAutoEnable->isChecked()) return;
+    if (!m_actAutoWrite->isChecked()) return;
     if (m_simulationPlatform == nullptr) return;
 
-    QLineEdit* addrEdit = (which == Platform::Live)
-        ? ui->edit_AxisPosRegisterAddr
-        : ui->edit_AxisPosRegisterAddr_2;
+    int startAddr = (which == Platform::Live)
+        ? m_platformParams.objAddr
+        : m_platformParams.tgtAddr;
 
-    bool ok = false;
-    int startAddr = addrEdit->text().toInt(&ok);
-    if (!ok || !axisStartAddrValid(startAddr)) return;
+    if (!axisStartAddrValid(startAddr)) return;
 
     PlatformController::NumFormat fmt;
-    if (ui->Radio_AxisPos_Float->isChecked())
+    if (m_actFmtFloat->isChecked())
         fmt = PlatformController::NumFormat::Float;
-    else if (ui->Radio_AxisPos_Int32->isChecked())
+    else if (m_actFmtInt32->isChecked())
         fmt = PlatformController::NumFormat::Int32;
     else
         return; // 两者都未选中,不写
@@ -798,6 +802,17 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 		}
 		m_subWindow->activateWindow();
 	}
+
+	// 平台窗口显隐 → 回写菜单勾选(QSignalBlocker 防回环)
+	if (watched == m_simulationPlatform &&
+		(event->type() == QEvent::Show || event->type() == QEvent::Hide))
+	{
+		if (m_actShowPlatform) {
+			QSignalBlocker blocker(m_actShowPlatform);
+			m_actShowPlatform->setChecked(m_simulationPlatform->isVisible());
+		}
+	}
+
 	return QMainWindow::eventFilter(watched, event);
 }
 

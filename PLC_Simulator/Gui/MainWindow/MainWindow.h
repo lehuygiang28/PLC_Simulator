@@ -15,6 +15,7 @@
 #include "RegisterTableManager.h"
 #include "ScriptManager.h"
 #include "PlatformController.h"
+#include "AuxDialogs.h"
 #include "Config/ConfigStore.h"
 #include "MainWorkFlow.h"
 #include "Theme/ThemeManager.h"
@@ -26,8 +27,10 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; };
 class QAction;
+class QActionGroup;
 class QTimer;
 class QLineEdit;
+class QLabel;
 QT_END_NAMESPACE
 
 class SimulationPlatform;
@@ -69,9 +72,10 @@ private:
     void writeAxisManual(PlatformController::NumFormat fmt);
 
     // 自动写入相关
-    void OnWritePosAutoEnableChanged(int state);
-    void setAutoWriteControlsEnabled(bool autoEnabled);
     void OnPlatformPoseChanged(Platform which, const Pose& pose);
+
+    // 平台参数相关
+    void refreshAxisAddrStatus();
 
     // 菜单栏相关
     void OnThemeSelected(Theme theme);
@@ -89,6 +93,18 @@ private:
     Ui::MainWindow* ui;
     QAction* m_actLightTheme = nullptr;
     QAction* m_actDarkTheme = nullptr;
+
+    // 平台控制:参数数据成员
+    QMenu* m_platformMenu = nullptr;
+    AuxDialogs::PlatformParams m_platformParams{3, 3, 114, 120};
+    QLabel* m_statusAddrLabel = nullptr;
+
+    // 平台菜单 actions
+    QAction* m_actShowPlatform = nullptr;
+    QAction* m_actAutoWrite = nullptr;
+    QAction* m_actFmtFloat = nullptr;
+    QAction* m_actFmtInt32 = nullptr;
+    QActionGroup* m_fmtGroup = nullptr;
 
     // 子窗口
     std::unique_ptr<QuickPanel> m_subWindow;
