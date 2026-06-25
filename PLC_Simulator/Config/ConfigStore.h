@@ -6,8 +6,8 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef CONFIGMANAGER_H
-#define CONFIGMANAGER_H
+#ifndef CONFIGSTORE_H
+#define CONFIGSTORE_H
 
 #include <QObject>
 #include <QJsonDocument>
@@ -19,17 +19,17 @@
 
 struct CommConfig;
 
-class ConfigManager : public QObject
+class ConfigStore : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit ConfigManager(QObject* parent = nullptr);
-    virtual ~ConfigManager();
+    explicit ConfigStore(QObject* parent = nullptr);
+    virtual ~ConfigStore();
 
     // 禁用拷贝和赋值
-    ConfigManager(const ConfigManager&) = delete;
-    ConfigManager& operator=(const ConfigManager&) = delete;
+    ConfigStore(const ConfigStore&) = delete;
+    ConfigStore& operator=(const ConfigStore&) = delete;
 
     // ==================== 通信参数相关接口 ====================
     
@@ -195,4 +195,4 @@ private:
     QString GetConfigFilePath() const;
 };
 
-#endif // CONFIGMANAGER_H
+#endif // CONFIGSTORE_H

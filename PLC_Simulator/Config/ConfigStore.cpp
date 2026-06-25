@@ -1,4 +1,4 @@
-#include "ConfigManager.h"
+#include "ConfigStore.h"
 #include "Comm/CommBase.h"
 #include "Comm/Socket/CommSocket.h"
 #include "MainWorkFlow.h"
@@ -9,19 +9,19 @@
 #include <QDebug>
 #include <QStandardPaths>
 
-ConfigManager::ConfigManager(QObject* parent)
+ConfigStore::ConfigStore(QObject* parent)
     : QObject(parent)
 {
     InitializeConfigDirectory();
 }
 
-ConfigManager::~ConfigManager()
+ConfigStore::~ConfigStore()
 {
     // 析构时确保所有配置已保存
     SaveAllConfigs();
 }
 
-bool ConfigManager::InitializeConfigDirectory()
+bool ConfigStore::InitializeConfigDirectory()
 {
     // 获取可执行文件所在目录
     QString appDir = QCoreApplication::applicationDirPath();
@@ -44,12 +44,12 @@ bool ConfigManager::InitializeConfigDirectory()
     return true;
 }
 
-QString ConfigManager::GetConfigFilePath() const
+QString ConfigStore::GetConfigFilePath() const
 {
     return m_configFilePath;
 }
 
-bool ConfigManager::ReadConfigFile()
+bool ConfigStore::ReadConfigFile()
 {
     QFile file(m_configFilePath);
     
@@ -82,7 +82,7 @@ bool ConfigManager::ReadConfigFile()
     return true;
 }
 
-bool ConfigManager::WriteConfigFile()
+bool ConfigStore::WriteConfigFile()
 {
     QFile file(m_configFilePath);
     
@@ -105,7 +105,7 @@ bool ConfigManager::WriteConfigFile()
     return true;
 }
 
-bool ConfigManager::SaveCommInfo(CommConfig* commInfo)
+bool ConfigStore::SaveCommInfo(CommConfig* commInfo)
 {
     if (!commInfo)
     {
@@ -130,7 +130,7 @@ bool ConfigManager::SaveCommInfo(CommConfig* commInfo)
     return WriteConfigFile();
 }
 
-bool ConfigManager::LoadCommInfo(std::unique_ptr<CommConfig>& commInfo)
+bool ConfigStore::LoadCommInfo(std::unique_ptr<CommConfig>& commInfo)
 {
     if (!ReadConfigFile())
     {
@@ -149,7 +149,7 @@ bool ConfigManager::LoadCommInfo(std::unique_ptr<CommConfig>& commInfo)
     return ParseCommInfoFromJson(commObj, commInfo);
 }
 
-bool ConfigManager::SerializeCommInfoToJson(CommConfig* commInfo, QJsonObject& jsonObj)
+bool ConfigStore::SerializeCommInfoToJson(CommConfig* commInfo, QJsonObject& jsonObj)
 {
     if (!commInfo)
     {
@@ -184,7 +184,7 @@ bool ConfigManager::SerializeCommInfoToJson(CommConfig* commInfo, QJsonObject& j
     return true;
 }
 
-bool ConfigManager::ParseCommInfoFromJson(const QJsonObject& jsonObj, std::unique_ptr<CommConfig>& commInfo)
+bool ConfigStore::ParseCommInfoFromJson(const QJsonObject& jsonObj, std::unique_ptr<CommConfig>& commInfo)
 {
     QString commType = jsonObj["comm_type"].toString();
     commInfo = std::make_unique<CommConfig>();
@@ -212,7 +212,7 @@ bool ConfigManager::ParseCommInfoFromJson(const QJsonObject& jsonObj, std::uniqu
     return true;
 }
 
-bool ConfigManager::SaveProtocolType(int protocolType)
+bool ConfigStore::SaveProtocolType(int protocolType)
 {
     if (!ReadConfigFile())
     {
@@ -228,7 +228,7 @@ bool ConfigManager::SaveProtocolType(int protocolType)
     return WriteConfigFile();
 }
 
-bool ConfigManager::LoadProtocolType(int& protocolType)
+bool ConfigStore::LoadProtocolType(int& protocolType)
 {
     if (!ReadConfigFile())
     {
@@ -249,7 +249,7 @@ bool ConfigManager::LoadProtocolType(int& protocolType)
     return protocolType != -1;
 }
 
-bool ConfigManager::SaveThemePref(int themeId)
+bool ConfigStore::SaveThemePref(int themeId)
 {
     if (!ReadConfigFile())
     {
@@ -263,7 +263,7 @@ bool ConfigManager::SaveThemePref(int themeId)
     return WriteConfigFile();
 }
 
-bool ConfigManager::LoadThemePref(int& themeId)
+bool ConfigStore::LoadThemePref(int& themeId)
 {
     if (!ReadConfigFile())
     {
@@ -280,7 +280,7 @@ bool ConfigManager::LoadThemePref(int& themeId)
     return true;
 }
 
-bool ConfigManager::SaveScriptNames(const QStringList& scriptNames)
+bool ConfigStore::SaveScriptNames(const QStringList& scriptNames)
 {
     if (scriptNames.size() != 6)
     {
@@ -309,7 +309,7 @@ bool ConfigManager::SaveScriptNames(const QStringList& scriptNames)
     return WriteConfigFile();
 }
 
-bool ConfigManager::LoadScriptNames(QStringList& scriptNames)
+bool ConfigStore::LoadScriptNames(QStringList& scriptNames)
 {
     if (!ReadConfigFile())
     {
@@ -343,7 +343,7 @@ bool ConfigManager::LoadScriptNames(QStringList& scriptNames)
     return true;
 }
 
-bool ConfigManager::SaveSimulationPlatformParams(double markCenterDistance, double screenRatio)
+bool ConfigStore::SaveSimulationPlatformParams(double markCenterDistance, double screenRatio)
 {
     if (!ReadConfigFile())
     {
@@ -365,7 +365,7 @@ bool ConfigManager::SaveSimulationPlatformParams(double markCenterDistance, doub
     return WriteConfigFile();
 }
 
-bool ConfigManager::LoadSimulationPlatformParams(double& markCenterDistance, double& screenRatio)
+bool ConfigStore::LoadSimulationPlatformParams(double& markCenterDistance, double& screenRatio)
 {
     if (!ReadConfigFile())
     {
@@ -391,7 +391,7 @@ bool ConfigManager::LoadSimulationPlatformParams(double& markCenterDistance, dou
     return true;
 }
 
-bool ConfigManager::LoadAllConfigs()
+bool ConfigStore::LoadAllConfigs()
 {
     bool success = true;
     
@@ -432,7 +432,7 @@ bool ConfigManager::LoadAllConfigs()
     return success;
 }
 
-bool ConfigManager::SaveAllConfigs()
+bool ConfigStore::SaveAllConfigs()
 {
     bool success = true;
     
