@@ -78,6 +78,19 @@ void SimulationPlatform::setSceneParams(double markCenterDistance, double screen
     update();
 }
 
+QVariantMap SimulationPlatform::sceneParamsToMap() const
+{
+    return m_scene->toVariantMap();
+}
+
+void SimulationPlatform::setSceneParamsFromMap(const QVariantMap& params)
+{
+    m_scene->fromVariantMap(params);
+    // 沿用 setSceneParams 的对外通知(状态栏/落盘)与重绘
+    emit sceneParamsChanged(m_scene->markCenterDistance(), m_scene->screenRatio());
+    update();
+}
+
 void SimulationPlatform::setupUI()
 {
     m_stack = new QStackedWidget(this);

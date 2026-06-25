@@ -3,31 +3,25 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QSaveFile>
 #include <QDebug>
 
 namespace {
-// 配置文件中的 JSON 键(集中定义,避免 Save/Load 两处字面量漂移)
+// 顶层 JSON 键(文件布局,ConfigStore 自身职责;记录内部字段名/类型名由各子系统拥有)
 constexpr auto kCommInfo           = "comm_info";
-constexpr auto kCommType           = "comm_type";
-constexpr auto kParams             = "params";
 constexpr auto kProtocolType       = "protocol_type";
 constexpr auto kTheme              = "theme";
 constexpr auto kScriptNames        = "script_names";
 constexpr auto kSimulationPlatform = "simulation_platform";
-constexpr auto kMarkCenterDistance = "mark_center_distance";
-constexpr auto kScreenRatio        = "screen_ratio";
-// comm_type 取值
-constexpr auto kTypeSocket  = "Socket";
-constexpr auto kTypeSerial  = "Serial";
-constexpr auto kTypeUnknown = "Unknown";
 }
 
 ConfigStore::ConfigStore(QObject* parent)
     : QObject(parent)
 {
     InitializeConfigDirectory();
-    readFile();   // 载入 m_root,后续全程内存操作
+    ReadFile();   // 载入 m_root,后续全程内存操作
 }
 
 ConfigStore::~ConfigStore() = default;   // 改一项写一次,析构无需再存
@@ -55,12 +49,7 @@ bool ConfigStore::InitializeConfigDirectory()
     return true;
 }
 
-QString ConfigStore::GetConfigFilePath() const
-{
-    return m_configFilePath;
-}
-
-bool ConfigStore::readFile()
+bool ConfigStore::ReadFile()
 {
     QFile file(m_configFilePath);
     if (!file.exists()) { m_root = QJsonObject(); return true; } // 首次运行
@@ -80,7 +69,7 @@ bool ConfigStore::readFile()
     return true;
 }
 
-bool ConfigStore::writeFile()
+bool ConfigStore::WriteFile()
 {
     QSaveFile file(m_configFilePath);   // 原子写:写临时文件,commit 时 rename
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -95,56 +84,39 @@ bool ConfigStore::writeFile()
     return true;
 }
 
-bool ConfigStore::SaveCommInfo(CommBase::CommInfoBase* info)
+bool ConfigStore::SaveCommInfo(const QVariantMap& record)
 {
-    if (!info) { qWarning() << "CommInfo is null"; return false; }
-    const CommBase::CommType t = info->GetCommType();
-    const QString typeStr = (t == CommBase::CommType::eSocket) ? kTypeSocket
-                          : (t == CommBase::CommType::eSerial) ? kTypeSerial : kTypeUnknown;
-    QJsonObject commObj;
-    commObj[kCommType] = typeStr;
-    commObj[kParams]   = QJsonObject::fromVariantMap(info->toVariantMap());
-    set(kCommInfo, commObj);
-    return true;
+    return Set(kCommInfo, QJsonObject::fromVariantMap(record));
 }
 
-bool ConfigStore::LoadCommInfo(std::unique_ptr<CommBase::CommInfoBase>& info)
+bool ConfigStore::LoadCommInfo(QVariantMap& record) const
 {
-    if (!m_root.contains(kCommInfo)) { qWarning() << "No comm_info found in config file"; return false; }
-    const QJsonObject commObj = get(kCommInfo).toObject();
-    const QString typeStr = commObj[kCommType].toString();
-    const CommBase::CommType type = (typeStr == kTypeSocket) ? CommBase::CommType::eSocket
-                                  : (typeStr == kTypeSerial) ? CommBase::CommType::eSerial
-                                  : CommBase::CommType::eCommUnknown;
-    info = CommInfoFactory::Create(type);
-    if (!info) return false;
-    info->fromVariantMap(commObj[kParams].toObject().toVariantMap());
+    if (!m_root.contains(kCommInfo)) return false;
+    record = Get(kCommInfo).toObject().toVariantMap();
     return true;
 }
 
 bool ConfigStore::SaveProtocolType(int protocolType)
 {
-    set(kProtocolType, protocolType);
-    return true;
+    return Set(kProtocolType, protocolType);
 }
 
-bool ConfigStore::LoadProtocolType(int& protocolType)
+bool ConfigStore::LoadProtocolType(int& protocolType) const
 {
     if (!m_root.contains(kProtocolType)) return false;
-    protocolType = get(kProtocolType).toInt(-1);
+    protocolType = Get(kProtocolType).toInt(-1);
     return protocolType != -1;
 }
 
 bool ConfigStore::SaveThemePref(int themeId)
 {
-    set(kTheme, themeId);
-    return true;
+    return Set(kTheme, themeId);
 }
 
-bool ConfigStore::LoadThemePref(int& themeId)
+bool ConfigStore::LoadThemePref(int& themeId) const
 {
     if (!m_root.contains(kTheme)) return false;
-    themeId = get(kTheme).toInt(themeId);
+    themeId = Get(kTheme).toInt(themeId);
     return true;
 }
 
@@ -156,14 +128,13 @@ bool ConfigStore::SaveScriptNames(const QStringList& scriptNames)
     }
     QJsonArray arr;
     for (const QString& n : scriptNames) arr.append(n);
-    set(kScriptNames, arr);
-    return true;
+    return Set(kScriptNames, arr);
 }
 
-bool ConfigStore::LoadScriptNames(QStringList& scriptNames)
+bool ConfigStore::LoadScriptNames(QStringList& scriptNames) const
 {
     if (!m_root.contains(kScriptNames)) return false;
-    const QJsonArray arr = get(kScriptNames).toArray();
+    const QJsonArray arr = Get(kScriptNames).toArray();
     if (arr.size() != 6) {
         qWarning() << "Script names array size is not 6:" << arr.size();
         return false;
@@ -173,20 +144,14 @@ bool ConfigStore::LoadScriptNames(QStringList& scriptNames)
     return true;
 }
 
-bool ConfigStore::SaveSimulationPlatformParams(double markCenterDistance, double screenRatio)
+bool ConfigStore::SaveSimulationPlatformParams(const QVariantMap& params)
 {
-    QJsonObject obj;
-    obj[kMarkCenterDistance] = markCenterDistance;
-    obj[kScreenRatio]        = screenRatio;
-    set(kSimulationPlatform, obj);
-    return true;
+    return Set(kSimulationPlatform, QJsonObject::fromVariantMap(params));
 }
 
-bool ConfigStore::LoadSimulationPlatformParams(double& markCenterDistance, double& screenRatio)
+bool ConfigStore::LoadSimulationPlatformParams(QVariantMap& params) const
 {
     if (!m_root.contains(kSimulationPlatform)) return false;
-    const QJsonObject obj = get(kSimulationPlatform).toObject();
-    markCenterDistance = obj[kMarkCenterDistance].toDouble(0.0);
-    screenRatio        = obj[kScreenRatio].toDouble(0.0);
+    params = Get(kSimulationPlatform).toObject().toVariantMap();
     return true;
 }

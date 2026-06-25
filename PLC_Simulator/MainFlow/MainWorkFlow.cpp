@@ -21,7 +21,6 @@ MainWorkFlow::MainWorkFlow(QObject* pParent /*= nullptr*/)
 	qRegisterMetaType<CommEvent>("CommEvent");
 
 	m_pComm = nullptr;
-	m_pCommInfo = nullptr;
 
 	m_bValidComm = false;
 	m_eProtocolType = ProtocolType::eProUnknown;
@@ -44,10 +43,6 @@ MainWorkFlow::~MainWorkFlow()
 		delete m_pComm;
 		m_pComm = nullptr;
 	}
-
-	// 协议类型为值类型成员，无需释放
-
-	// m_pCommInfo 会自动释放（unique_ptr）
 }
 
 //初始化静态实例
@@ -80,8 +75,7 @@ void MainWorkFlow::ReleaseWorkFlow()
 bool MainWorkFlow::SetCommInfo(std::unique_ptr<CommBase::CommInfoBase> info)
 {
     if (info == nullptr) return false;
-    m_ownedCommInfo = std::move(info);
-    m_pCommInfo = m_ownedCommInfo.get();
+    m_pCommInfo = std::move(info);
     return true;
 }
 
@@ -94,6 +88,8 @@ void MainWorkFlow::SetRequestProcessor(std::function<bool(const QByteArray&, QBy
 
 bool MainWorkFlow::OpenComm()
 {
+	if (m_pCommInfo == nullptr) return false;
+
 	if (m_pCommInfo->GetCommType() == CommBase::CommType::eSocket)
 	{
 		//删除原本的通信实例
@@ -131,7 +127,7 @@ bool MainWorkFlow::OpenComm()
 			});
 		}
 
-		m_bValidComm = m_pComm->Open(m_pCommInfo);
+		m_bValidComm = m_pComm->Open(m_pCommInfo.get());
 
 
 		return m_bValidComm;

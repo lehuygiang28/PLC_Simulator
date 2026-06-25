@@ -10,11 +10,13 @@
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
 #include "Comm/Socket/CommSocket.h"
+#include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
 #include "version.h"
 #include <QDir>
 #include <QFile>
 #include <QWindow>
+#include <QVariantMap>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr), m_nLogStat(0)
@@ -132,13 +134,16 @@ void MainWindow::InitialAllConfigs()
 	{
 		// 加载通信信息
 		{
-			std::unique_ptr<CommBase::CommInfoBase> commInfo;
-			if (m_configStore->LoadCommInfo(commInfo) && commInfo &&
-			    commInfo->GetCommType() == CommBase::CommType::eSocket)
+			QVariantMap commRec;
+			if (m_configStore->LoadCommInfo(commRec))
 			{
-				auto* sock = static_cast<CommSocket::SocketCommInfo*>(commInfo.get());
-				ui->edit_IP->setText(sock->m_strSocketIPAddress);
-				ui->edit_Port->setText(QString::number(sock->m_nSocketPort));
+				auto commInfo = CommInfoFactory::Deserialize(commRec);
+				if (commInfo && commInfo->GetCommType() == CommBase::CommType::eSocket)
+				{
+					auto* sock = static_cast<CommSocket::SocketCommInfo*>(commInfo.get());
+					ui->edit_IP->setText(sock->m_strSocketIPAddress);
+					ui->edit_Port->setText(QString::number(sock->m_nSocketPort));
+				}
 			}
 		}
 
@@ -177,11 +182,10 @@ void MainWindow::InitialAllConfigs()
 		}
 
 		// 加载模拟平台参数
-		double markCenterDistance = 0.0, screenRatio = 0.0;
-		if (m_configStore->LoadSimulationPlatformParams(markCenterDistance, screenRatio))
+		QVariantMap platformParams;
+		if (m_configStore->LoadSimulationPlatformParams(platformParams) && m_simulationPlatform != nullptr)
 		{
-			if (m_simulationPlatform != nullptr)
-				m_simulationPlatform->setSceneParams(markCenterDistance, screenRatio);
+			m_simulationPlatform->setSceneParamsFromMap(platformParams);
 		}
 	}
 }
@@ -523,16 +527,20 @@ void MainWindow::InitialSignalConnect()
 			info->m_nSocketPort        = ui->edit_Port->text().toUShort();
 			info->m_nSocketListenNum   = 10;
 
-			if (m_configStore)
-			{
-				m_configStore->SaveCommInfo(info.get());
-			}
+			// 非拥有视图,连接成功后落盘用;所有权随即转交工作流(对象仍由其持有,指针有效)
+			CommBase::CommInfoBase* infoView = info.get();
 			m_pWorkFlow->SetCommInfo(std::move(info));
 
 			if (!m_pWorkFlow->OpenComm())
 			{
 				UpdateLogDisplay("打开连接失败!");
 				return;
+			}
+
+			// 仅在连接成功后持久化,避免保存打不开的通信参数
+			if (m_configStore)
+			{
+				m_configStore->SaveCommInfo(CommInfoFactory::Serialize(*infoView));
 			}
 			auto ExecuteRequest = [this](const QByteArray& in, QByteArray& out) {
 				if (!m_pWorkFlow) return false;
@@ -651,11 +659,12 @@ void MainWindow::InitialSignalConnect()
 	}
 
 	// 初始化SimulationPlatform自动保存参数
-	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [=](double markCenterDistance, double screenRatio)
+	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [this](double, double)
 			{
 		if (m_configStore)
 		{
-			m_configStore->SaveSimulationPlatformParams(markCenterDistance, screenRatio);
+			// 字段由 PlatformScene 自描述,MainWindow 不再拼字段名
+			m_configStore->SaveSimulationPlatformParams(m_simulationPlatform->sceneParamsToMap());
 		} });
 }
 

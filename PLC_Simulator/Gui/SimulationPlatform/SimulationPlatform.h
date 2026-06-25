@@ -12,6 +12,7 @@
 #include <QMainWindow>
 #include <QSize>
 #include <QString>
+#include <QVariantMap>
 #include "PlatformTypes.h"   // 信号参数 Pose / Platform
 
 // 成员均为指针,前向声明即可;完整定义在 .cpp 中包含
@@ -43,6 +44,10 @@ public:
     Pose pose(Platform which = Platform::Live) const;
 
     void setSceneParams(double markCenterDistance, double screenRatio);
+
+    // 场景参数持久化(转发给 PlatformScene 自描述,字段名不在此层)
+    QVariantMap sceneParamsToMap() const;
+    void setSceneParamsFromMap(const QVariantMap& params);
 
 private:
     // UI控件

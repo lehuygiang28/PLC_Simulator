@@ -11,12 +11,10 @@
 
 #include <QObject>
 #include <QJsonObject>
-#include <QJsonArray>
 #include <QJsonValue>
-#include <QSaveFile>
+#include <QString>
 #include <QStringList>
-#include <memory>
-#include "Comm/CommInfoFactory.h"  // 提供 CommInfoBase + 工厂
+#include <QVariantMap>
 
 class ConfigStore : public QObject
 {
@@ -32,11 +30,11 @@ public:
 
     // ==================== 通信参数相关接口 ====================
 
-    // 保存当前通信信息(多态序列化)
-    bool SaveCommInfo(CommBase::CommInfoBase* info);
+    // 保存通信信息(不透明字典,序列化由 CommInfoFactory 负责)
+    bool SaveCommInfo(const QVariantMap& record);
 
-    // 加载通信信息(按类型用工厂创建并反序列化)
-    bool LoadCommInfo(std::unique_ptr<CommBase::CommInfoBase>& info);
+    // 加载通信信息(不透明字典,反序列化由 CommInfoFactory 负责)
+    bool LoadCommInfo(QVariantMap& record) const;
 
     // ==================== 协议类型相关接口 ====================
 
@@ -44,13 +42,13 @@ public:
     bool SaveProtocolType(int protocolType);
 
     // 加载协议类型配置
-    bool LoadProtocolType(int& protocolType);
+    bool LoadProtocolType(int& protocolType) const;
 
     // 保存主题偏好(0=浅色, 1=深色)
     bool SaveThemePref(int themeId);
 
     // 读取主题偏好(无配置时保持入参不变)
-    bool LoadThemePref(int& themeId);
+    bool LoadThemePref(int& themeId) const;
 
     // ==================== 脚本名称相关接口 ====================
 
@@ -58,15 +56,15 @@ public:
     bool SaveScriptNames(const QStringList& scriptNames);
 
     // 加载脚本名称配置,返回的列表大小为6
-    bool LoadScriptNames(QStringList& scriptNames);
+    bool LoadScriptNames(QStringList& scriptNames) const;
 
     // ==================== 模拟平台参数相关接口 ====================
 
-    // 保存模拟平台的参数
-    bool SaveSimulationPlatformParams(double markCenterDistance, double screenRatio);
+    // 保存模拟平台参数(不透明字典,字段由 PlatformScene 自描述)
+    bool SaveSimulationPlatformParams(const QVariantMap& params);
 
-    // 加载模拟平台参数
-    bool LoadSimulationPlatformParams(double& markCenterDistance, double& screenRatio);
+    // 加载模拟平台参数(不透明字典)
+    bool LoadSimulationPlatformParams(QVariantMap& params) const;
 
 private:
     // 配置文件路径 + 内存事实源
@@ -75,14 +73,12 @@ private:
     QJsonObject m_root;   // 唯一内存事实源:构造时读入,改一项写一次
 
     bool InitializeConfigDirectory();
-    bool readFile();   // 文件 → m_root(仅构造时调用一次);文件不存在视为首次运行
-    bool writeFile();  // m_root → 文件(QSaveFile 原子写)
+    bool ReadFile();   // 文件 → m_root(仅构造时调用一次);文件不存在视为首次运行
+    bool WriteFile();  // m_root → 文件(QSaveFile 原子写)
 
     // 泛型存取(顶层键)
-    QJsonValue get(const QString& key) const { return m_root.value(key); }
-    void set(const QString& key, const QJsonValue& value) { m_root.insert(key, value); writeFile(); }
-
-    QString GetConfigFilePath() const;
+    QJsonValue Get(const QString& key) const { return m_root.value(key); }
+    bool Set(const QString& key, const QJsonValue& value) { m_root.insert(key, value); return WriteFile(); }
 };
 
 #endif // CONFIGSTORE_H

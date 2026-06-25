@@ -88,6 +88,26 @@ void PlatformScene::setSceneParams(double markCenterDistance, double screenRatio
     emit changed();
 }
 
+namespace {
+constexpr auto kMarkCenterDistance = "mark_center_distance";
+constexpr auto kScreenRatio        = "screen_ratio";
+} // namespace
+
+QVariantMap PlatformScene::toVariantMap() const
+{
+    QVariantMap m;
+    m[kMarkCenterDistance] = m_markCenterDistance;
+    m[kScreenRatio]        = m_screenRatio;
+    return m;
+}
+
+void PlatformScene::fromVariantMap(const QVariantMap& m)
+{
+    // 缺字段时退回当前值(= 默认 20.0 / 200.0),并走 setSceneParams 重算缩放+发 changed
+    setSceneParams(m.value(kMarkCenterDistance, m_markCenterDistance).toDouble(),
+                   m.value(kScreenRatio, m_screenRatio).toDouble());
+}
+
 Pose PlatformScene::baseMarkFinalPose() const
 {
     if (m_baseMark.followsPlatform)
