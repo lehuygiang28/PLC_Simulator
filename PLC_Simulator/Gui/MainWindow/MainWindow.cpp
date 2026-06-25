@@ -725,32 +725,37 @@ void MainWindow::CreateCurrentProtocol()
 
 // ====================轴位置写入相关槽函数实现====================
 
-void MainWindow::OnWriteAxisDoubleWord()
+bool MainWindow::axisStartAddrValid(int addr) const
+{
+    return addr < REGISTER_VAL_NUM - 6;
+}
+
+void MainWindow::writeAxisPos(int startAddr, PlatformController::NumFormat fmt, Platform which)
+{
+    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4, fmt, which);
+}
+
+void MainWindow::writeAxisManual(PlatformController::NumFormat fmt)
 {
     if (m_simulationPlatform == nullptr) return;
 
     bool ok = false;
     int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
     if (!ok) { UpdateLogDisplay("错误: 轴位置地址无效"); return; }
-    if (startAddr >= REGISTER_VAL_NUM - 6) { UpdateLogDisplay("错误: 寄存器地址超出范围"); return; }
+    if (!axisStartAddrValid(startAddr)) { UpdateLogDisplay("错误: 寄存器地址超出范围"); return; }
 
-    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4,
-                                          PlatformController::NumFormat::Int32, Platform::Live);
-    UpdateLogDisplay(QString("轴位置双字写入成功 (地址:%1)").arg(startAddr));
+    writeAxisPos(startAddr, fmt, Platform::Live);
+    UpdateLogDisplay(QString("轴位置写入成功 (地址:%1)").arg(startAddr));
+}
+
+void MainWindow::OnWriteAxisDoubleWord()
+{
+    writeAxisManual(PlatformController::NumFormat::Int32);
 }
 
 void MainWindow::OnWriteAxisFloat()
 {
-    if (m_simulationPlatform == nullptr) return;
-
-    bool ok = false;
-    int startAddr = ui->edit_AxisPosRegisterAddr->text().toInt(&ok);
-    if (!ok) { UpdateLogDisplay("错误: 轴位置地址无效"); return; }
-    if (startAddr >= REGISTER_VAL_NUM - 6) { UpdateLogDisplay("错误: 寄存器地址超出范围"); return; }
-
-    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4,
-                                          PlatformController::NumFormat::Float, Platform::Live);
-    UpdateLogDisplay(QString("轴位置浮点写入成功 (地址:%1)").arg(startAddr));
+    writeAxisManual(PlatformController::NumFormat::Float);
 }
 
 // ====================自动写入相关槽函数实现====================
@@ -780,7 +785,7 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 
     bool ok = false;
     int startAddr = addrEdit->text().toInt(&ok);
-    if (!ok || startAddr >= REGISTER_VAL_NUM - 6) return;
+    if (!ok || !axisStartAddrValid(startAddr)) return;
 
     PlatformController::NumFormat fmt;
     if (ui->Radio_AxisPos_Float->isChecked())
@@ -790,7 +795,7 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
     else
         return; // 两者都未选中,不写
 
-    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4, fmt, which);
+    writeAxisPos(startAddr, fmt, which);
 }
 
 void MainWindow::OnThemeSelected(Theme theme)

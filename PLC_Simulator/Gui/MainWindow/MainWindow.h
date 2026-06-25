@@ -61,6 +61,11 @@ private:
     void OnWriteAxisDoubleWord();
     void OnWriteAxisFloat();
 
+    // 轴写入辅助
+    bool axisStartAddrValid(int addr) const;
+    void writeAxisPos(int startAddr, PlatformController::NumFormat fmt, Platform which);
+    void writeAxisManual(PlatformController::NumFormat fmt);
+
     // 自动写入相关
     void OnWritePosAutoEnableChanged(int state);
     void setAutoWriteControlsEnabled(bool autoEnabled);
