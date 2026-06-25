@@ -6,30 +6,27 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QJsonDocument>
 #include <QDebug>
-#include <QStandardPaths>
 
 ConfigStore::ConfigStore(QObject* parent)
     : QObject(parent)
 {
     InitializeConfigDirectory();
+    readFile();   // 载入 m_root,后续全程内存操作
 }
 
-ConfigStore::~ConfigStore()
-{
-    // 析构时确保所有配置已保存
-    SaveAllConfigs();
-}
+ConfigStore::~ConfigStore() = default;   // 改一项写一次,析构无需再存
 
 bool ConfigStore::InitializeConfigDirectory()
 {
     // 获取可执行文件所在目录
     QString appDir = QCoreApplication::applicationDirPath();
-    
+
     // 构建Config目录路径
     m_configDirPath = appDir + "/Config";
     m_configFilePath = m_configDirPath + "/app_config.json";
-    
+
     // 创建目录如果不存在
     QDir dir;
     if (!dir.exists(m_configDirPath))
@@ -40,7 +37,7 @@ bool ConfigStore::InitializeConfigDirectory()
             return false;
         }
     }
-    
+
     return true;
 }
 
@@ -49,104 +46,54 @@ QString ConfigStore::GetConfigFilePath() const
     return m_configFilePath;
 }
 
-bool ConfigStore::ReadConfigFile()
+bool ConfigStore::readFile()
 {
     QFile file(m_configFilePath);
-    
-    // 如果文件不存在，返回true（认为是首次运行）
-    if (!file.exists())
-    {
-        m_configDoc = QJsonDocument(QJsonObject());
-        return true;
-    }
-    
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
+    if (!file.exists()) { m_root = QJsonObject(); return true; } // 首次运行
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qWarning() << "Failed to open config file for reading:" << m_configFilePath;
-        return false;
+        m_root = QJsonObject(); return false;
     }
-    
-    QByteArray data = file.readAll();
+    const QByteArray data = file.readAll();
     file.close();
-    
-    QJsonParseError parseError;
-    m_configDoc = QJsonDocument::fromJson(data, &parseError);
-    
-    if (parseError.error != QJsonParseError::NoError)
-    {
-        qWarning() << "JSON parse error:" << parseError.errorString();
-        m_configDoc = QJsonDocument(QJsonObject());
-        return false;
+    QJsonParseError err;
+    const QJsonDocument doc = QJsonDocument::fromJson(data, &err);
+    if (err.error != QJsonParseError::NoError) {
+        qWarning() << "JSON parse error:" << err.errorString();
+        m_root = QJsonObject(); return false;
     }
-    
+    m_root = doc.object();
     return true;
 }
 
-bool ConfigStore::WriteConfigFile()
+bool ConfigStore::writeFile()
 {
-    QFile file(m_configFilePath);
-    
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
-    {
+    QSaveFile file(m_configFilePath);   // 原子写:写临时文件,commit 时 rename
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qWarning() << "Failed to open config file for writing:" << m_configFilePath;
         return false;
     }
-    
-    QByteArray data = m_configDoc.toJson();
-    qint64 written = file.write(data);
-    file.close();
-    
-    if (written == -1)
-    {
-        qWarning() << "Failed to write config file:" << m_configFilePath;
+    file.write(QJsonDocument(m_root).toJson());
+    if (!file.commit()) {
+        qWarning() << "Failed to commit config file:" << m_configFilePath;
         return false;
     }
-    
     return true;
 }
 
 bool ConfigStore::SaveCommInfo(CommConfig* commInfo)
 {
-    if (!commInfo)
-    {
-        qWarning() << "CommInfo is null";
-        return false;
-    }
-    
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
+    if (!commInfo) { qWarning() << "CommInfo is null"; return false; }
     QJsonObject commObj;
-    if (!SerializeCommInfoToJson(commInfo, commObj))
-    {
-        return false;
-    }
-    root["comm_info"] = commObj;
-    m_configDoc.setObject(root);
-    
-    return WriteConfigFile();
+    if (!SerializeCommInfoToJson(commInfo, commObj)) return false;
+    set("comm_info", commObj);
+    return true;
 }
 
 bool ConfigStore::LoadCommInfo(std::unique_ptr<CommConfig>& commInfo)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
-    
-    if (!root.contains("comm_info"))
-    {
-        qWarning() << "No comm_info found in config file";
-        return false;
-    }
-    
-    QJsonObject commObj = root["comm_info"].toObject();
-    return ParseCommInfoFromJson(commObj, commInfo);
+    if (!m_root.contains("comm_info")) { qWarning() << "No comm_info found in config file"; return false; }
+    return ParseCommInfoFromJson(get("comm_info").toObject(), commInfo);
 }
 
 bool ConfigStore::SerializeCommInfoToJson(CommConfig* commInfo, QJsonObject& jsonObj)
@@ -214,258 +161,69 @@ bool ConfigStore::ParseCommInfoFromJson(const QJsonObject& jsonObj, std::unique_
 
 bool ConfigStore::SaveProtocolType(int protocolType)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
-    root["protocol_type"] = protocolType;
-    m_configDoc.setObject(root);
-    
-    m_cachedConfig.protocolType = protocolType;
-    
-    return WriteConfigFile();
+    set("protocol_type", protocolType);
+    return true;
 }
 
 bool ConfigStore::LoadProtocolType(int& protocolType)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
-    
-    if (!root.contains("protocol_type"))
-    {
-        qWarning() << "No protocol_type found in config file";
-        return false;
-    }
-    
-    protocolType = root["protocol_type"].toInt(-1);
-    m_cachedConfig.protocolType = protocolType;
-
+    if (!m_root.contains("protocol_type")) return false;
+    protocolType = get("protocol_type").toInt(-1);
     return protocolType != -1;
 }
 
 bool ConfigStore::SaveThemePref(int themeId)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-
-    QJsonObject root = m_configDoc.object();
-    root["theme"] = themeId;
-    m_configDoc.setObject(root);
-
-    return WriteConfigFile();
+    set("theme", themeId);
+    return true;
 }
 
 bool ConfigStore::LoadThemePref(int& themeId)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-
-    QJsonObject root = m_configDoc.object();
-    if (!root.contains("theme"))
-    {
-        return false;
-    }
-
-    themeId = root["theme"].toInt(themeId);
+    if (!m_root.contains("theme")) return false;
+    themeId = get("theme").toInt(themeId);
     return true;
 }
 
 bool ConfigStore::SaveScriptNames(const QStringList& scriptNames)
 {
-    if (scriptNames.size() != 6)
-    {
+    if (scriptNames.size() != 6) {
         qWarning() << "Script names list must contain exactly 6 items";
         return false;
     }
-    
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
-    QJsonArray scriptArray;
-    
-    for (const QString& name : scriptNames)
-    {
-        scriptArray.append(name);
-    }
-    
-    root["script_names"] = scriptArray;
-    m_configDoc.setObject(root);
-    
-    m_cachedConfig.scriptNames = scriptNames;
-    
-    return WriteConfigFile();
+    QJsonArray arr;
+    for (const QString& n : scriptNames) arr.append(n);
+    set("script_names", arr);
+    return true;
 }
 
 bool ConfigStore::LoadScriptNames(QStringList& scriptNames)
 {
-    if (!ReadConfigFile())
-    {
+    if (!m_root.contains("script_names")) return false;
+    const QJsonArray arr = get("script_names").toArray();
+    if (arr.size() != 6) {
+        qWarning() << "Script names array size is not 6:" << arr.size();
         return false;
     }
-    
-    QJsonObject root = m_configDoc.object();
-    
-    if (!root.contains("script_names"))
-    {
-        qWarning() << "No script_names found in config file";
-        return false;
-    }
-    
-    QJsonArray scriptArray = root["script_names"].toArray();
-    
-    if (scriptArray.size() != 6)
-    {
-        qWarning() << "Script names array size is not 6:" << scriptArray.size();
-        return false;
-    }
-    
     scriptNames.clear();
-    for (int i = 0; i < scriptArray.size(); ++i)
-    {
-        scriptNames.append(scriptArray[i].toString());
-    }
-    
-    m_cachedConfig.scriptNames = scriptNames;
-    
+    for (const QJsonValue& v : arr) scriptNames.append(v.toString());
     return true;
 }
 
 bool ConfigStore::SaveSimulationPlatformParams(double markCenterDistance, double screenRatio)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
-    QJsonObject platformObj;
-    
-    platformObj["mark_center_distance"] = markCenterDistance;
-    platformObj["screen_ratio"] = screenRatio;
-    
-    root["simulation_platform"] = platformObj;
-    m_configDoc.setObject(root);
-    
-    m_cachedConfig.markCenterDistance = markCenterDistance;
-    m_cachedConfig.screenRatio = screenRatio;
-    
-    return WriteConfigFile();
+    QJsonObject obj;
+    obj["mark_center_distance"] = markCenterDistance;
+    obj["screen_ratio"]         = screenRatio;
+    set("simulation_platform", obj);
+    return true;
 }
 
 bool ConfigStore::LoadSimulationPlatformParams(double& markCenterDistance, double& screenRatio)
 {
-    if (!ReadConfigFile())
-    {
-        return false;
-    }
-    
-    QJsonObject root = m_configDoc.object();
-    
-    if (!root.contains("simulation_platform"))
-    {
-        qWarning() << "No simulation_platform found in config file";
-        return false;
-    }
-    
-    QJsonObject platformObj = root["simulation_platform"].toObject();
-    
-    markCenterDistance = platformObj["mark_center_distance"].toDouble(0.0);
-    screenRatio = platformObj["screen_ratio"].toDouble(0.0);
-    
-    m_cachedConfig.markCenterDistance = markCenterDistance;
-    m_cachedConfig.screenRatio = screenRatio;
-    
+    if (!m_root.contains("simulation_platform")) return false;
+    const QJsonObject obj = get("simulation_platform").toObject();
+    markCenterDistance = obj["mark_center_distance"].toDouble(0.0);
+    screenRatio        = obj["screen_ratio"].toDouble(0.0);
     return true;
-}
-
-bool ConfigStore::LoadAllConfigs()
-{
-    bool success = true;
-    
-    // 尝试加载所有配置，失败时继续尝试其他配置
-   /* CommConfig* commInfo = nullptr;*/
-    std::unique_ptr<CommConfig> commInfo;
-    if (!LoadCommInfo(commInfo))
-    {
-        qWarning() << "Failed to load comm info";
-        success = false;
-    }
-//     else if (commInfo)
-//     {
-//         delete commInfo;
-//     }
-    
-    int protocolType = -1;
-    if (!LoadProtocolType(protocolType))
-    {
-        qWarning() << "Failed to load protocol type";
-        success = false;
-    }
-    
-    QStringList scriptNames;
-    if (!LoadScriptNames(scriptNames))
-    {
-        qWarning() << "Failed to load script names";
-        success = false;
-    }
-    
-    double markCenterDistance = 0.0, screenRatio = 0.0;
-    if (!LoadSimulationPlatformParams(markCenterDistance, screenRatio))
-    {
-        qWarning() << "Failed to load simulation platform params";
-        success = false;
-    }
-    
-    return success;
-}
-
-bool ConfigStore::SaveAllConfigs()
-{
-    bool success = true;
-    
-    // 保存缓存的配置数据
-    if (m_cachedConfig.protocolType != -1)
-    {
-        if (!SaveProtocolType(m_cachedConfig.protocolType))
-        {
-            qWarning() << "Failed to save protocol type";
-            success = false;
-        }
-    }
-    
-    if (!m_cachedConfig.scriptNames.isEmpty())
-    {
-        if (m_cachedConfig.scriptNames.size() == 6)
-        {
-            if (!SaveScriptNames(m_cachedConfig.scriptNames))
-            {
-                qWarning() << "Failed to save script names";
-                success = false;
-            }
-        }
-    }
-    
-    if (m_cachedConfig.markCenterDistance > 0 || m_cachedConfig.screenRatio > 0)
-    {
-        if (!SaveSimulationPlatformParams(m_cachedConfig.markCenterDistance, m_cachedConfig.screenRatio))
-        {
-            qWarning() << "Failed to save simulation platform params";
-            success = false;
-        }
-    }
-    
-    return success;
 }

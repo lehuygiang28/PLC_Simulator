@@ -129,8 +129,6 @@ void MainWindow::InitialAllConfigs()
 	// 加载之前保存的配置
 	if (m_configStore)
 	{
-		m_configStore->LoadAllConfigs();
-
 		// 加载通信信息
 		{
 			std::unique_ptr<CommConfig> commInfo;
