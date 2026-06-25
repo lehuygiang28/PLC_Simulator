@@ -102,10 +102,7 @@ MainWindow::MainWindow(QWidget *parent)
 	group1->addButton(ui->Radio_AxisPos_Float);
 	group1->addButton(ui->Radio_AxisPos_Int32);
 	ui->Radio_AxisPos_Int32->setChecked(true);
-	ui->Radio_AxisPos_Float->setEnabled(isAutoEnabled);
-	ui->Radio_AxisPos_Int32->setEnabled(isAutoEnabled);
-	ui->Btn_WriteAxisDoubleWord->setEnabled(!isAutoEnabled);
-	ui->Btn_WriteAxisFloat->setEnabled(!isAutoEnabled);
+	setAutoWriteControlsEnabled(isAutoEnabled);
 }
 
 MainWindow::~MainWindow()
@@ -771,16 +768,17 @@ void MainWindow::OnWriteAxisFloat()
 
 // ====================自动写入相关槽函数实现====================
 
+void MainWindow::setAutoWriteControlsEnabled(bool autoEnabled)
+{
+	ui->Radio_AxisPos_Float->setEnabled(autoEnabled);
+	ui->Radio_AxisPos_Int32->setEnabled(autoEnabled);
+	ui->Btn_WriteAxisDoubleWord->setEnabled(!autoEnabled);
+	ui->Btn_WriteAxisFloat->setEnabled(!autoEnabled);
+}
+
 void MainWindow::OnWritePosAutoEnableChanged(int state)
 {
-	bool isAutoEnabled = (state == Qt::Checked);
-
-	// 当启用自动写入时，Radio按钮可操作，手动写入按钮不可操作
-	// 未启用时则相反
-	ui->Radio_AxisPos_Float->setEnabled(isAutoEnabled);
-	ui->Radio_AxisPos_Int32->setEnabled(isAutoEnabled);
-	ui->Btn_WriteAxisDoubleWord->setEnabled(!isAutoEnabled);
-	ui->Btn_WriteAxisFloat->setEnabled(!isAutoEnabled);
+	setAutoWriteControlsEnabled(state == Qt::Checked);
 }
 
 void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)

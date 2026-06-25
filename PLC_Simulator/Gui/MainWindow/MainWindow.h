@@ -63,6 +63,7 @@ private:
 
     // 自动写入相关
     void OnWritePosAutoEnableChanged(int state);
+    void setAutoWriteControlsEnabled(bool autoEnabled);
     void OnPlatformPoseChanged(Platform which, const Pose& pose);
 
     // 菜单栏相关
