@@ -52,6 +52,12 @@ private:
     // 初始化方法
     void InitializeMember();
     void InitialSignalConnect();
+    void InitialMenuConnect();
+    void InitialCommConnect();
+    void InitialRegisterTableConnect();
+    void InitialLogConnect();
+    void InitialWindowConnect();
+    void InitialScriptConnect();
     void InitialLineEditValidator();
     void InitialAllConfigs();
 

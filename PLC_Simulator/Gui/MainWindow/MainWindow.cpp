@@ -56,27 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
 	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
 	m_scriptManager->initScriptExecution();
 
-	// 连接脚本执行和编辑按钮
-	m_scriptManager->connectExecuteButton(0, ui->Btn_Execute_1);
-	m_scriptManager->connectExecuteButton(1, ui->Btn_Execute_2);
-	m_scriptManager->connectExecuteButton(2, ui->Btn_Execute_3);
-	m_scriptManager->connectExecuteButton(3, ui->Btn_Execute_4);
-	m_scriptManager->connectExecuteButton(4, ui->Btn_Execute_5);
-	m_scriptManager->connectExecuteButton(5, ui->Btn_Execute_6);
-
-	m_scriptManager->connectEditButton(1, ui->Btn_Edit_1);
-	m_scriptManager->connectEditButton(2, ui->Btn_Edit_2);
-	m_scriptManager->connectEditButton(3, ui->Btn_Edit_3);
-	m_scriptManager->connectEditButton(4, ui->Btn_Edit_4);
-	m_scriptManager->connectEditButton(5, ui->Btn_Edit_5);
-	m_scriptManager->connectEditButton(6, ui->Btn_Edit_6);
-
-	m_scriptManager->connectLoopCheckBox(0, ui->ChkBox_LoopEnable_1);
-	m_scriptManager->connectLoopCheckBox(1, ui->ChkBox_LoopEnable_2);
-	m_scriptManager->connectLoopCheckBox(2, ui->ChkBox_LoopEnable_3);
-	m_scriptManager->connectLoopCheckBox(3, ui->ChkBox_LoopEnable_4);
-	m_scriptManager->connectLoopCheckBox(4, ui->ChkBox_LoopEnable_5);
-	m_scriptManager->connectLoopCheckBox(5, ui->ChkBox_LoopEnable_6);
+	InitialScriptConnect();
 
 	// 初始化输入限制
 	InitialLineEditValidator();
@@ -328,6 +308,16 @@ void MainWindow::InitializeMember()
 
 void MainWindow::InitialSignalConnect()
 {
+	InitialMenuConnect();
+	InitialWindowConnect();
+	InitialRegisterTableConnect();
+	InitialCommConnect();
+	InitialLogConnect();
+
+}
+
+void MainWindow::InitialMenuConnect()
+{
 	// 初始化菜单栏
 	QMenu *helpMenu = ui->menuBar->addMenu("帮助(&H)");
 	QAction *aboutAction = helpMenu->addAction("关于(&A)");
@@ -355,26 +345,12 @@ void MainWindow::InitialSignalConnect()
 
 	connect(m_actLightTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Light); });
 	connect(m_actDarkTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
+}
 
+void MainWindow::InitialWindowConnect()
+{
 	// 连接小窗口的显示主窗口信号到主窗口的show()槽
 	connect(m_subWindow.get(), &QuickPanel::showMainWindow, this, &MainWindow::show);
-
-	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [=](int buttonId)
-			{
-        if (m_pWorkFlow == nullptr) return;
-        int idx = buttonId;
-        QString strLuaPath = QCoreApplication::applicationDirPath();
-		strLuaPath += "/Config/LuaScript/";
-		strLuaPath += QString("LuaFile%1.lua").arg(idx);
-        QFile f(strLuaPath);
-        if (!f.exists()) {
-            QMessageBox::critical(this, "Lua执行错误", QString("脚本不存在: %1").arg(strLuaPath));
-			UpdateLogDisplay(QString("脚本不存在: %1").arg(strLuaPath));
-            return;
-        }
-        // 异步投递执行;运行结果(成功/失败)经 scriptFinished → scriptLog 反馈到日志
-        m_pWorkFlow->scriptHost()->runScript(idx-1, strLuaPath); // buttonId从1开始，索引从0开始
-        });
 
 	// 连接显示/隐藏模拟平台窗口按钮
 	connect(ui->Btn_ShowPlatform, &QPushButton::clicked, this, [=]()
@@ -417,6 +393,83 @@ void MainWindow::InitialSignalConnect()
 				}
 			});
 
+	// 初始化SimulationPlatform自动保存参数
+	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [this](double, double)
+			{
+		if (m_configStore)
+		{
+			// 字段由 PlatformScene 自描述,MainWindow 不再拼字段名
+			m_configStore->SaveSimulationPlatformParams(m_simulationPlatform->sceneParamsToMap());
+		} });
+}
+
+void MainWindow::InitialScriptConnect()
+{
+	// 连接脚本执行和编辑按钮
+	m_scriptManager->connectExecuteButton(0, ui->Btn_Execute_1);
+	m_scriptManager->connectExecuteButton(1, ui->Btn_Execute_2);
+	m_scriptManager->connectExecuteButton(2, ui->Btn_Execute_3);
+	m_scriptManager->connectExecuteButton(3, ui->Btn_Execute_4);
+	m_scriptManager->connectExecuteButton(4, ui->Btn_Execute_5);
+	m_scriptManager->connectExecuteButton(5, ui->Btn_Execute_6);
+
+	m_scriptManager->connectEditButton(1, ui->Btn_Edit_1);
+	m_scriptManager->connectEditButton(2, ui->Btn_Edit_2);
+	m_scriptManager->connectEditButton(3, ui->Btn_Edit_3);
+	m_scriptManager->connectEditButton(4, ui->Btn_Edit_4);
+	m_scriptManager->connectEditButton(5, ui->Btn_Edit_5);
+	m_scriptManager->connectEditButton(6, ui->Btn_Edit_6);
+
+	m_scriptManager->connectLoopCheckBox(0, ui->ChkBox_LoopEnable_1);
+	m_scriptManager->connectLoopCheckBox(1, ui->ChkBox_LoopEnable_2);
+	m_scriptManager->connectLoopCheckBox(2, ui->ChkBox_LoopEnable_3);
+	m_scriptManager->connectLoopCheckBox(3, ui->ChkBox_LoopEnable_4);
+	m_scriptManager->connectLoopCheckBox(4, ui->ChkBox_LoopEnable_5);
+	m_scriptManager->connectLoopCheckBox(5, ui->ChkBox_LoopEnable_6);
+
+	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [=](int buttonId)
+			{
+        if (m_pWorkFlow == nullptr) return;
+        int idx = buttonId;
+        QString strLuaPath = QCoreApplication::applicationDirPath();
+		strLuaPath += "/Config/LuaScript/";
+		strLuaPath += QString("LuaFile%1.lua").arg(idx);
+        QFile f(strLuaPath);
+        if (!f.exists()) {
+            QMessageBox::critical(this, "Lua执行错误", QString("脚本不存在: %1").arg(strLuaPath));
+			UpdateLogDisplay(QString("脚本不存在: %1").arg(strLuaPath));
+            return;
+        }
+        // 异步投递执行;运行结果(成功/失败)经 scriptFinished → scriptLog 反馈到日志
+        m_pWorkFlow->scriptHost()->runScript(idx-1, strLuaPath); // buttonId从1开始，索引从0开始
+        });
+
+	if (m_configStore)
+	{
+		auto saveScriptNames = [this]()
+		{
+			QStringList names;
+			names << ui->edit_ScriptName_1->text()
+				  << ui->edit_ScriptName_2->text()
+				  << ui->edit_ScriptName_3->text()
+				  << ui->edit_ScriptName_4->text()
+				  << ui->edit_ScriptName_5->text()
+				  << ui->edit_ScriptName_6->text();
+			m_configStore->SaveScriptNames(names);
+		};
+
+		// 用 editingFinished(失焦/回车)触发保存,避免 textChanged 每字符全量写配置
+		connect(ui->edit_ScriptName_1, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_2, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_3, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_4, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_5, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_6, &QLineEdit::editingFinished, this, saveScriptNames);
+	}
+}
+
+void MainWindow::InitialRegisterTableConnect()
+{
 	// 寄存器表格相关信号
 	{
 		// 表格闪烁提示槽函数
@@ -491,6 +544,55 @@ void MainWindow::InitialSignalConnect()
 			} });
 	}
 
+	// 点击清除寄存器按钮
+	connect(ui->Btn_ClearRegister, &QPushButton::clicked, this, [=]
+			{
+		if (m_pWorkFlow == nullptr)	return;
+		m_registerTableManager->setShouldFlash(false);
+		m_pWorkFlow->registerStore()->resetAll(0);
+		m_registerTableManager->setShouldFlash(true); });
+
+	// 修改显示寄存器地址
+	connect(ui->edit_RegisterAddr, &QLineEdit::textChanged, this, [=](const QString &text)
+			{
+				if (text == "")
+					return;
+
+				int nAddr = text.toInt();
+
+				if (nAddr < 0)
+					return;
+
+				// 从工作流获取寄存器数据
+				m_registerTableManager->getRegisterVals(nAddr);
+
+				m_registerTableManager->setShouldFlash(false);
+				const QSignalBlocker blocker(ui->table_RegisterData);
+
+				m_registerTableManager->updateTableInfo(nAddr);
+
+				m_registerTableManager->setShouldFlash(true);
+			});
+
+	// 修改显示寄存器数据类型
+	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
+			{
+				m_registerTableManager->setShouldFlash(false);
+				const QSignalBlocker blocker(ui->table_RegisterData);
+				m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
+				m_registerTableManager->setShouldFlash(true);
+			});
+
+	// 寄存器数据改变
+	if (m_pWorkFlow != nullptr)
+	{
+		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
+				{ m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt()); });
+	}
+}
+
+void MainWindow::InitialCommConnect()
+{
 	// 切换协议
 	connect(ui->cmbBox_ProtocolType, &QComboBox::currentIndexChanged, this, [this](int index)
 			{
@@ -554,49 +656,13 @@ void MainWindow::InitialSignalConnect()
 			ui->edit_Port->setEnabled(false);
 			ui->cmbBox_ProtocolType->setEnabled(false);
 		} });
+}
 
-	// 点击清除寄存器按钮
-	connect(ui->Btn_ClearRegister, &QPushButton::clicked, this, [=]
-			{
-		if (m_pWorkFlow == nullptr)	return;
-		m_registerTableManager->setShouldFlash(false);
-		m_pWorkFlow->registerStore()->resetAll(0);
-		m_registerTableManager->setShouldFlash(true); });
-
+void MainWindow::InitialLogConnect()
+{
 	// 点击清除日志
 	connect(ui->Btn_ClearCommLog, &QPushButton::clicked, this, [=]
 			{ ui->text_CommLog->clear(); });
-
-	// 修改显示寄存器地址
-	connect(ui->edit_RegisterAddr, &QLineEdit::textChanged, this, [=](const QString &text)
-			{
-				if (text == "")
-					return;
-
-				int nAddr = text.toInt();
-
-				if (nAddr < 0)
-					return;
-
-				// 从工作流获取寄存器数据
-				m_registerTableManager->getRegisterVals(nAddr);
-
-				m_registerTableManager->setShouldFlash(false);
-				const QSignalBlocker blocker(ui->table_RegisterData);
-
-				m_registerTableManager->updateTableInfo(nAddr);
-
-				m_registerTableManager->setShouldFlash(true);
-			});
-
-	// 修改显示寄存器数据类型
-	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
-			{
-				m_registerTableManager->setShouldFlash(false);
-				const QSignalBlocker blocker(ui->table_RegisterData);
-				m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
-				m_registerTableManager->setShouldFlash(true);
-			});
 
 	// 主控类持有的通信实例信号转发
 	if (m_pWorkFlow != nullptr)
@@ -629,44 +695,7 @@ void MainWindow::InitialSignalConnect()
 					const QString pfx = (ev.direction == CommDirection::eReceive) ? "Rece" : "Send";
 					UpdateLogDisplay(QString("%1:[%2]:").arg(pfx, ev.endpointId) + body);
 				});
-
-		// 寄存器数据改变
-		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
-				{ m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt()); });
 	}
-
-	// 脚本名称编辑框自动保存事件
-	if (m_configStore)
-	{
-		auto saveScriptNames = [this]()
-		{
-			QStringList names;
-			names << ui->edit_ScriptName_1->text()
-				  << ui->edit_ScriptName_2->text()
-				  << ui->edit_ScriptName_3->text()
-				  << ui->edit_ScriptName_4->text()
-				  << ui->edit_ScriptName_5->text()
-				  << ui->edit_ScriptName_6->text();
-			m_configStore->SaveScriptNames(names);
-		};
-
-		// 用 editingFinished(失焦/回车)触发保存,避免 textChanged 每字符全量写配置
-		connect(ui->edit_ScriptName_1, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_2, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_3, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_4, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_5, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_6, &QLineEdit::editingFinished, this, saveScriptNames);
-	}
-
-	// 初始化SimulationPlatform自动保存参数
-	connect(m_simulationPlatform, &SimulationPlatform::sceneParamsChanged, this, [this](double, double)
-			{
-		if (m_configStore)
-		{
-			// 字段由 PlatformScene 自描述,MainWindow 不再拼字段名
-			m_configStore->SaveSimulationPlatformParams(m_simulationPlatform->sceneParamsToMap());
-		} });
 }
 
 void MainWindow::InitialLineEditValidator()
