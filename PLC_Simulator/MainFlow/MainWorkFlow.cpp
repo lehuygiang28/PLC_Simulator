@@ -114,13 +114,6 @@ void MainWorkFlow::SetRequestProcessor(std::function<bool(const QByteArray&, QBy
     }
 }
 
-CommBase::CommInfoBase* MainWorkFlow::GetCommInfo()
-{
-	if (nullptr == m_pCommInfo) return nullptr;
-
-	return m_pCommInfo;
-}
-
 bool MainWorkFlow::OpenComm()
 {
 	if (m_pCommInfo->GetCommType() == CommBase::CommType::eSocket)
@@ -313,15 +306,4 @@ bool MainWorkFlow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
 
     return true;
 }
-
-CommBase* MainWorkFlow::GetCommBase()
-{
-	if (m_pComm != nullptr)
-	{
-		return m_pComm;
-	}
-
-	return nullptr;
-}
-
 

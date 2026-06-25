@@ -56,7 +56,6 @@ public:
 
 	//通信信息相关
 	bool SetCommInfo(CommBase::CommInfoBase* commInfo);
-	CommBase::CommInfoBase* GetCommInfo();
 
 	//通信实例相关
 	bool OpenComm();
@@ -67,11 +66,8 @@ public:
 	bool CreateCommProtocol(ProtocolType ProType);
 
 	//主要工作函数.当接收到数据时,通过该函数进行流程处理
-	void	WorkProcess(QByteArray& RecInfo);
 	bool	ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply);
 
-
-	CommBase* GetCommBase();
 
     // 获取寄存器数据模型
     RegisterStore* registerStore() const { return m_registerStore.get(); }
@@ -82,14 +78,6 @@ public:
     bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
 
-//解析指令的详细信息
-private:
-	bool	WorkProcess_AnalyzeReceiveInfo(QByteArray& strRecevie,CmdType& CurCmdType);
-
-	bool	WorkProcess_WriteReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum);
-	bool	WorkProcess_ReadReg(const QByteArray& strRecevie, QByteArray& strSend, int& nAddress, int& nDataNum);
-
-	bool	WorkProcess_SendCommInfo(const QByteArray& strSend);
 //MainWorkFlow初始化相关
 private:
 	explicit MainWorkFlow(QObject* pParent = nullptr);	//构造函数私有化,全局只能有一个MainWorkFlow实例
