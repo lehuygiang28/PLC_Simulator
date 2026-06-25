@@ -7,6 +7,7 @@
  */
 
 #include "MainWindow.h"
+#include "HelpDialogs.h"
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
 #include "Comm/Socket/CommSocket.h"
@@ -331,8 +332,8 @@ void MainWindow::InitialSignalConnect()
 	QMenu *helpMenu = ui->menuBar->addMenu("帮助(&H)");
 	QAction *aboutAction = helpMenu->addAction("关于(&A)");
 	QAction *changelogAction = helpMenu->addAction("更新日志(&U)");
-	connect(aboutAction, &QAction::triggered, this, &MainWindow::OnShowAboutDialog);
-	connect(changelogAction, &QAction::triggered, this, &MainWindow::OnShowChangeLog);
+	connect(aboutAction, &QAction::triggered, this, [this]() { HelpDialogs::showAbout(this); });
+	connect(changelogAction, &QAction::triggered, this, [this]() { HelpDialogs::showChangeLog(this); });
 
 	// 视图菜单:主题切换
 	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
@@ -769,174 +770,6 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
         return; // 两者都未选中,不写
 
     m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4, fmt, which);
-}
-
-// ====================菜单栏相关槽函数实现====================
-
-void MainWindow::OnShowAboutDialog()
-{
-	QDialog aboutDialog(this);
-	aboutDialog.setWindowTitle(QString("关于 %1").arg(APP_NAME));
-	aboutDialog.setFixedSize(420, 500);
-	aboutDialog.setWindowFlags(aboutDialog.windowFlags() & ~Qt::WindowContextHelpButtonHint);
-
-	QVBoxLayout *mainLayout = new QVBoxLayout(&aboutDialog);
-	mainLayout->setSpacing(15);
-	mainLayout->setContentsMargins(30, 25, 30, 20);
-
-	// 图标显示（居中）
-	QLabel *iconLabel = new QLabel(&aboutDialog);
-	QPixmap iconPixmap(":/app/PLC_Simulator.ico");
-	iconLabel->setPixmap(iconPixmap.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-	iconLabel->setAlignment(Qt::AlignCenter);
-	mainLayout->addWidget(iconLabel);
-
-	// 应用名称（居中）
-	QLabel *nameLabel = new QLabel(APP_NAME, &aboutDialog);
-	nameLabel->setAlignment(Qt::AlignCenter);
-	nameLabel->setStyleSheet("font-size: 18pt; font-weight: bold;");
-	mainLayout->addWidget(nameLabel);
-
-	// 版本信息（居中）
-	QString compileDate = QString::fromLatin1(APP_COMPILE_DATE);
-	QString compileTime = QString::fromLatin1(APP_COMPILE_TIME);
-	QString versionInfo = QString("Version: %1\nCompile Time: %2 %3\nAuthor: %4")
-							  .arg(APP_VERSION)
-							  .arg(compileDate)
-							  .arg(compileTime)
-							  .arg(APP_AUTHOR);
-							  
-	QLabel *versionLabel = new QLabel(versionInfo, &aboutDialog);
-	versionLabel->setAlignment(Qt::AlignCenter);
-	versionLabel->setObjectName("secondaryText");
-	mainLayout->addWidget(versionLabel);
-
-	// 分隔线(复用主题细分隔线)
-	QFrame *line = new QFrame(&aboutDialog);
-	line->setObjectName("hSeparator");
-	mainLayout->addWidget(line);
-
-	// 应用描述（靠左）
-	QLabel *descLabel = new QLabel(APP_DESCRIPTION, &aboutDialog);
-	descLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-	descLabel->setWordWrap(true);
-	mainLayout->addWidget(descLabel);
-
-	mainLayout->addStretch();
-
-	// 第三方许可按钮(样式跟随全局主题)
-	QPushButton *licenseButton = new QPushButton("第三方许可", &aboutDialog);
-	licenseButton->setFixedSize(100, 30);
-	connect(licenseButton, &QPushButton::clicked, [this]() {
-		// 读取第三方许可证文件（与可执行文件在同一目录）
-		QString licensePath = QCoreApplication::applicationDirPath() + "/THIRD_PARTY_LICENSES.txt";
-		QFile licenseFile(licensePath);
-
-		QString licenseContent;
-		if (licenseFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-			QTextStream in(&licenseFile);
-			in.setEncoding(QStringConverter::Utf8);
-			licenseContent = in.readAll();
-			licenseFile.close();
-		} else {
-			licenseContent = "无法读取第三方许可证文件。\n\n"
-							 "本软件使用了以下第三方库：\n"
-							 "1. Qt Framework (LGPL v3)\n"
-							 "2. Lua 5.4 (MIT License)\n\n"
-							 "详细信息请查看 THIRD_PARTY_LICENSES.txt 文件。";
-		}
-
-		// 显示许可证对话框
-		QDialog *licenseDialog = new QDialog(this);
-		licenseDialog->setWindowTitle("第三方许可证");
-		licenseDialog->setFixedSize(620, 520);
-		licenseDialog->setAttribute(Qt::WA_DeleteOnClose);
-
-		QVBoxLayout *layout = new QVBoxLayout(licenseDialog);
-
-		QTextEdit *textEdit = new QTextEdit(licenseDialog);
-		textEdit->setReadOnly(true);
-		textEdit->setPlainText(licenseContent);
-		layout->addWidget(textEdit);
-
-		QPushButton *closeBtn = new QPushButton("关闭", licenseDialog);
-		closeBtn->setFixedSize(80, 30);
-		connect(closeBtn, &QPushButton::clicked, licenseDialog, &QDialog::accept);
-
-		QHBoxLayout *btnLayout = new QHBoxLayout();
-		btnLayout->addStretch();
-		btnLayout->addWidget(closeBtn);
-		btnLayout->addStretch();
-		layout->addLayout(btnLayout);
-
-		licenseDialog->exec();
-	});
-
-	// // 确定按钮
-	// QPushButton *okButton = new QPushButton("确定", &aboutDialog);
-	// okButton->setFixedSize(80, 30);
-	// okButton->setStyleSheet(buttonStyle);
-	// connect(okButton, &QPushButton::clicked, &aboutDialog, &QDialog::accept);
-
-	QHBoxLayout *buttonLayout = new QHBoxLayout();
-	buttonLayout->addStretch();
-	buttonLayout->addWidget(licenseButton);
-	//buttonLayout->addWidget(okButton);
-	buttonLayout->addStretch();
-	mainLayout->addLayout(buttonLayout);
-
-	// 版权信息
-	QLabel *copyrightLabel = new QLabel(APP_COPYRIGHT_RC, &aboutDialog);
-	QLabel *linkLabel = new QLabel(APP_DOMAIN, &aboutDialog);
-	copyrightLabel->setAlignment(Qt::AlignCenter);
-	copyrightLabel->setObjectName("captionText");
-	linkLabel->setAlignment(Qt::AlignCenter);
-	linkLabel->setObjectName("captionText");
-	mainLayout->addWidget(copyrightLabel);
-	mainLayout->addWidget(linkLabel);
-
-	aboutDialog.exec();
-}
-
-void MainWindow::OnShowChangeLog()
-{
-	QString changeLogPath = QCoreApplication::applicationDirPath() + "/ChangeLog.txt";
-		QFile licenseFile(changeLogPath);
-
-		QString LogContent;
-		if (licenseFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-			QTextStream in(&licenseFile);
-			in.setEncoding(QStringConverter::Utf8);
-			LogContent = in.readAll();
-			licenseFile.close();
-		} else {
-			LogContent = "There is no changeog.";
-		}
-
-	// 显示更新日志对话框(样式跟随全局主题)
-	QDialog *licenseDialog = new QDialog(this);
-	licenseDialog->setWindowTitle("更新日志");
-	licenseDialog->setFixedSize(520, 500);
-	licenseDialog->setAttribute(Qt::WA_DeleteOnClose);
-
-	QVBoxLayout *layout = new QVBoxLayout(licenseDialog);
-
-	QTextEdit *textEdit = new QTextEdit(licenseDialog);
-	textEdit->setReadOnly(true);
-	textEdit->setPlainText(LogContent);
-	layout->addWidget(textEdit);
-
-	QPushButton *closeBtn = new QPushButton("关闭", licenseDialog);
-	closeBtn->setFixedSize(80, 30);
-	connect(closeBtn, &QPushButton::clicked, licenseDialog, &QDialog::accept);
-
-	QHBoxLayout *btnLayout = new QHBoxLayout();
-	btnLayout->addStretch();
-	btnLayout->addWidget(closeBtn);
-	btnLayout->addStretch();
-	layout->addLayout(btnLayout);
-
-	licenseDialog->exec();
 }
 
 void MainWindow::OnThemeSelected(Theme theme)

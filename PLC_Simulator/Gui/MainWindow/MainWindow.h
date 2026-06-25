@@ -67,8 +67,6 @@ private:
     void OnPlatformPoseChanged(Platform which, const Pose& pose);
 
     // 菜单栏相关
-    void OnShowAboutDialog();
-    void OnShowChangeLog();
     void OnThemeSelected(Theme theme);
 
     // 日志显示

@@ -66,6 +66,7 @@ set(GUI_MAINWINDOW_SOURCES
     Gui/MainWindow/RegisterTableManager.cpp
     Gui/MainWindow/ScriptManager.cpp
     Gui/MainWindow/PlatformController.cpp
+    Gui/MainWindow/HelpDialogs.cpp
 )
 
 set(GUI_MAINWINDOW_HEADERS
@@ -74,6 +75,7 @@ set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/RegisterTableManager.h
     Gui/MainWindow/ScriptManager.h
     Gui/MainWindow/PlatformController.h
+    Gui/MainWindow/HelpDialogs.h
 )
 
 # Gui\Theme 模块
