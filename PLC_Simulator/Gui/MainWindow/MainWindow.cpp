@@ -8,16 +8,23 @@
 
 #include "MainWindow.h"
 #include "HelpDialogs.h"
+#include "SimulationPlatform/SimulationPlatform.h"
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
 #include "Comm/Socket/CommSocket.h"
 #include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
 #include "version.h"
-#include <QDir>
 #include <QFile>
 #include <QWindow>
 #include <QVariantMap>
+#include <QColor>
+#include <QTimer>
+#include <QButtonGroup>
+#include <QMessageBox>
+#include <QMenu>
+#include <QAction>
+#include <QActionGroup>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkFlow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr), m_nLogStat(0)

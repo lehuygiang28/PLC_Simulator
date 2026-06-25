@@ -11,7 +11,7 @@
 
 #include "ui_MainWindow.h"
 #include "QuickPanel.h"
-#include "SimulationPlatform/SimulationPlatform.h"
+#include "SimulationPlatform/PlatformTypes.h"
 #include "RegisterTableManager.h"
 #include "ScriptManager.h"
 #include "PlatformController.h"
@@ -20,22 +20,15 @@
 #include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>
-#include <QColor>
-#include <QTimer>
-#include <QTcpSocket>
-#include <QTcpServer>
-#include <QThread>
-#include <QButtonGroup>
-#include <QMessageBox>
-#include <QMenu>
-#include <QAction>
-#include <QActionGroup>
-#include <QDialog>
-#include <QFrame>
+#include <QMap>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; };
+class QAction;
+class QTimer;
 QT_END_NAMESPACE
+
+class SimulationPlatform;
 
 class MainWindow : public QMainWindow
 {
@@ -53,10 +46,10 @@ private:
     void InitializeMember();
     void InitialSignalConnect();
     void InitialMenuConnect();
-    void InitialCommConnect();
-    void InitialRegisterTableConnect();
-    void InitialLogConnect();
     void InitialWindowConnect();
+    void InitialRegisterTableConnect();
+    void InitialCommConnect();
+    void InitialLogConnect();
     void InitialScriptConnect();
     void InitialLineEditValidator();
     void InitialAllConfigs();
