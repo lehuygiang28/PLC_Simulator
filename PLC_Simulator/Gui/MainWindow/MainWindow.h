@@ -86,7 +86,6 @@ private:
     // 工作流
     MainWorkFlow* m_pWorkFlow;
     std::unique_ptr<PlatformController> m_platformController;
-    std::unique_ptr<CommBase::CommInfoBase> m_CurInfo;
 
     // 配置管理
     ConfigStore* m_configStore;

@@ -12,12 +12,11 @@
 #include <QObject>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonValue>
 #include <QSaveFile>
 #include <QStringList>
 #include <memory>
-#include "Comm/CommBase.h"
-
-struct CommConfig;
+#include "Comm/CommInfoFactory.h"  // 提供 CommInfoBase + 工厂
 
 class ConfigStore : public QObject
 {
@@ -33,11 +32,11 @@ public:
 
     // ==================== 通信参数相关接口 ====================
 
-    // 保存通信参数配置
-    bool SaveCommInfo(CommConfig* commInfo);
+    // 保存当前通信信息(多态序列化)
+    bool SaveCommInfo(CommBase::CommInfoBase* info);
 
-    // 加载通信参数配置
-    bool LoadCommInfo(std::unique_ptr<CommConfig>& commInfo);
+    // 加载通信信息(按类型用工厂创建并反序列化)
+    bool LoadCommInfo(std::unique_ptr<CommBase::CommInfoBase>& info);
 
     // ==================== 协议类型相关接口 ====================
 
@@ -84,10 +83,6 @@ private:
     void set(const QString& key, const QJsonValue& value) { m_root.insert(key, value); writeFile(); }
 
     QString GetConfigFilePath() const;
-
-    // 通信参数 JSON 序列化(Task 4 将改为基于 CommInfoBase;本任务沿用 CommConfig)
-    bool ParseCommInfoFromJson(const QJsonObject& jsonObj, std::unique_ptr<CommConfig>& commConfig);
-    bool SerializeCommInfoToJson(CommConfig* commInfo, QJsonObject& jsonObj);
 };
 
 #endif // CONFIGSTORE_H

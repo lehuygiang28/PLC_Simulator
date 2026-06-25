@@ -9,6 +9,7 @@
 #include "MainWindow.h"
 #include "Theme/ThemeManager.h"
 #include "Core/RegisterStore.h"
+#include "Comm/Socket/CommSocket.h"
 #include "PlatformBinding.h"
 #include "version.h"
 #include <QDir>
@@ -131,14 +132,13 @@ void MainWindow::InitialAllConfigs()
 	{
 		// 加载通信信息
 		{
-			std::unique_ptr<CommConfig> commInfo;
-			if (m_configStore->LoadCommInfo(commInfo))
+			std::unique_ptr<CommBase::CommInfoBase> commInfo;
+			if (m_configStore->LoadCommInfo(commInfo) && commInfo &&
+			    commInfo->GetCommType() == CommBase::CommType::eSocket)
 			{
-				if (commInfo != nullptr && commInfo->type == CommBase::CommType::eSocket)
-				{
-					ui->edit_IP->setText(commInfo->params["ip"].toString());
-					ui->edit_Port->setText(commInfo->params["port"].toString());
-				}
+				auto* sock = static_cast<CommSocket::SocketCommInfo*>(commInfo.get());
+				ui->edit_IP->setText(sock->m_strSocketIPAddress);
+				ui->edit_Port->setText(QString::number(sock->m_nSocketPort));
 			}
 		}
 
@@ -517,22 +517,22 @@ void MainWindow::InitialSignalConnect()
 		}
 		else
 		{
-			CommConfig cfg;
-			cfg.type = CommBase::CommType::eSocket;
-			cfg.params.insert("ip", ui->edit_IP->text());
-			cfg.params.insert("port", ui->edit_Port->text().toUShort());
-			cfg.params.insert("listenNum", 10);
-			cfg.params.insert("socketType", 0);
-			m_pWorkFlow->ConfigureComm(cfg);
+			auto info = std::make_unique<CommSocket::SocketCommInfo>();
+			info->m_SocketType         = CommSocket::SocketType::eSTServer;
+			info->m_strSocketIPAddress = ui->edit_IP->text();
+			info->m_nSocketPort        = ui->edit_Port->text().toUShort();
+			info->m_nSocketListenNum   = 10;
+
+			if (m_configStore)
+			{
+				m_configStore->SaveCommInfo(info.get());
+			}
+			m_pWorkFlow->SetCommInfo(std::move(info));
 
 			if (!m_pWorkFlow->OpenComm())
 			{
 				UpdateLogDisplay("打开连接失败!");
 				return;
-			}
-			if (m_configStore)
-			{
-				m_configStore->SaveCommInfo(&cfg);
 			}
 			auto ExecuteRequest = [this](const QByteArray& in, QByteArray& out) {
 				if (!m_pWorkFlow) return false;
@@ -641,12 +641,13 @@ void MainWindow::InitialSignalConnect()
 			m_configStore->SaveScriptNames(names);
 		};
 
-		connect(ui->edit_ScriptName_1, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_2, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_3, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_4, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_5, &QLineEdit::textChanged, this, saveScriptNames);
-		connect(ui->edit_ScriptName_6, &QLineEdit::textChanged, this, saveScriptNames);
+		// 用 editingFinished(失焦/回车)触发保存,避免 textChanged 每字符全量写配置
+		connect(ui->edit_ScriptName_1, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_2, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_3, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_4, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_5, &QLineEdit::editingFinished, this, saveScriptNames);
+		connect(ui->edit_ScriptName_6, &QLineEdit::editingFinished, this, saveScriptNames);
 	}
 
 	// 初始化SimulationPlatform自动保存参数

@@ -1,13 +1,27 @@
 #include "ConfigStore.h"
-#include "Comm/CommBase.h"
-#include "Comm/Socket/CommSocket.h"
-#include "MainWorkFlow.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <QDebug>
+
+namespace {
+// 配置文件中的 JSON 键(集中定义,避免 Save/Load 两处字面量漂移)
+constexpr auto kCommInfo           = "comm_info";
+constexpr auto kCommType           = "comm_type";
+constexpr auto kParams             = "params";
+constexpr auto kProtocolType       = "protocol_type";
+constexpr auto kTheme              = "theme";
+constexpr auto kScriptNames        = "script_names";
+constexpr auto kSimulationPlatform = "simulation_platform";
+constexpr auto kMarkCenterDistance = "mark_center_distance";
+constexpr auto kScreenRatio        = "screen_ratio";
+// comm_type 取值
+constexpr auto kTypeSocket  = "Socket";
+constexpr auto kTypeSerial  = "Serial";
+constexpr auto kTypeUnknown = "Unknown";
+}
 
 ConfigStore::ConfigStore(QObject* parent)
     : QObject(parent)
@@ -81,107 +95,56 @@ bool ConfigStore::writeFile()
     return true;
 }
 
-bool ConfigStore::SaveCommInfo(CommConfig* commInfo)
+bool ConfigStore::SaveCommInfo(CommBase::CommInfoBase* info)
 {
-    if (!commInfo) { qWarning() << "CommInfo is null"; return false; }
+    if (!info) { qWarning() << "CommInfo is null"; return false; }
+    const CommBase::CommType t = info->GetCommType();
+    const QString typeStr = (t == CommBase::CommType::eSocket) ? kTypeSocket
+                          : (t == CommBase::CommType::eSerial) ? kTypeSerial : kTypeUnknown;
     QJsonObject commObj;
-    if (!SerializeCommInfoToJson(commInfo, commObj)) return false;
-    set("comm_info", commObj);
+    commObj[kCommType] = typeStr;
+    commObj[kParams]   = QJsonObject::fromVariantMap(info->toVariantMap());
+    set(kCommInfo, commObj);
     return true;
 }
 
-bool ConfigStore::LoadCommInfo(std::unique_ptr<CommConfig>& commInfo)
+bool ConfigStore::LoadCommInfo(std::unique_ptr<CommBase::CommInfoBase>& info)
 {
-    if (!m_root.contains("comm_info")) { qWarning() << "No comm_info found in config file"; return false; }
-    return ParseCommInfoFromJson(get("comm_info").toObject(), commInfo);
-}
-
-bool ConfigStore::SerializeCommInfoToJson(CommConfig* commInfo, QJsonObject& jsonObj)
-{
-    if (!commInfo)
-    {
-        return false;
-    }
-    // 新结构：保存通信类型与通用参数字典
-    QString typeStr = (commInfo->type == CommBase::CommType::eSocket) ? "Socket" :
-                      (commInfo->type == CommBase::CommType::eSerial) ? "Serial" : "Unknown";
-    jsonObj["comm_type"] = typeStr;
-    QJsonObject paramsObj;
-    for (auto it = commInfo->params.begin(); it != commInfo->params.end(); ++it)
-    {
-        const QString& key = it.key();
-        const QVariant& val = it.value();
-        switch (val.typeId()) {
-        case QMetaType::Int:
-        case QMetaType::UInt:
-            paramsObj[key] = val.toInt();
-            break;
-        case QMetaType::Double:
-            paramsObj[key] = val.toDouble();
-            break;
-        case QMetaType::Bool:
-            paramsObj[key] = val.toBool();
-            break;
-        default:
-            paramsObj[key] = val.toString();
-            break;
-        }
-    }
-    jsonObj["params"] = paramsObj;
-    return true;
-}
-
-bool ConfigStore::ParseCommInfoFromJson(const QJsonObject& jsonObj, std::unique_ptr<CommConfig>& commInfo)
-{
-    QString commType = jsonObj["comm_type"].toString();
-    commInfo = std::make_unique<CommConfig>();
-    if (commType == "Socket")
-    {
-        commInfo->type = CommBase::CommType::eSocket;
-    }
-    else if (commType == "Serial")
-    {
-        commInfo->type = CommBase::CommType::eSerial;
-    }
-    else
-    {
-        commInfo->type = CommBase::CommType::eCommUnknown;
-    }
-    if (jsonObj.contains("params"))
-    {
-        QJsonObject paramsObj = jsonObj["params"].toObject();
-        for (auto it = paramsObj.begin(); it != paramsObj.end(); ++it)
-        {
-            commInfo->params.insert(it.key(), it.value().toVariant());
-        }
-    }
-   // commInfo = cfg.release();
+    if (!m_root.contains(kCommInfo)) { qWarning() << "No comm_info found in config file"; return false; }
+    const QJsonObject commObj = get(kCommInfo).toObject();
+    const QString typeStr = commObj[kCommType].toString();
+    const CommBase::CommType type = (typeStr == kTypeSocket) ? CommBase::CommType::eSocket
+                                  : (typeStr == kTypeSerial) ? CommBase::CommType::eSerial
+                                  : CommBase::CommType::eCommUnknown;
+    info = CommInfoFactory::Create(type);
+    if (!info) return false;
+    info->fromVariantMap(commObj[kParams].toObject().toVariantMap());
     return true;
 }
 
 bool ConfigStore::SaveProtocolType(int protocolType)
 {
-    set("protocol_type", protocolType);
+    set(kProtocolType, protocolType);
     return true;
 }
 
 bool ConfigStore::LoadProtocolType(int& protocolType)
 {
-    if (!m_root.contains("protocol_type")) return false;
-    protocolType = get("protocol_type").toInt(-1);
+    if (!m_root.contains(kProtocolType)) return false;
+    protocolType = get(kProtocolType).toInt(-1);
     return protocolType != -1;
 }
 
 bool ConfigStore::SaveThemePref(int themeId)
 {
-    set("theme", themeId);
+    set(kTheme, themeId);
     return true;
 }
 
 bool ConfigStore::LoadThemePref(int& themeId)
 {
-    if (!m_root.contains("theme")) return false;
-    themeId = get("theme").toInt(themeId);
+    if (!m_root.contains(kTheme)) return false;
+    themeId = get(kTheme).toInt(themeId);
     return true;
 }
 
@@ -193,14 +156,14 @@ bool ConfigStore::SaveScriptNames(const QStringList& scriptNames)
     }
     QJsonArray arr;
     for (const QString& n : scriptNames) arr.append(n);
-    set("script_names", arr);
+    set(kScriptNames, arr);
     return true;
 }
 
 bool ConfigStore::LoadScriptNames(QStringList& scriptNames)
 {
-    if (!m_root.contains("script_names")) return false;
-    const QJsonArray arr = get("script_names").toArray();
+    if (!m_root.contains(kScriptNames)) return false;
+    const QJsonArray arr = get(kScriptNames).toArray();
     if (arr.size() != 6) {
         qWarning() << "Script names array size is not 6:" << arr.size();
         return false;
@@ -213,17 +176,17 @@ bool ConfigStore::LoadScriptNames(QStringList& scriptNames)
 bool ConfigStore::SaveSimulationPlatformParams(double markCenterDistance, double screenRatio)
 {
     QJsonObject obj;
-    obj["mark_center_distance"] = markCenterDistance;
-    obj["screen_ratio"]         = screenRatio;
-    set("simulation_platform", obj);
+    obj[kMarkCenterDistance] = markCenterDistance;
+    obj[kScreenRatio]        = screenRatio;
+    set(kSimulationPlatform, obj);
     return true;
 }
 
 bool ConfigStore::LoadSimulationPlatformParams(double& markCenterDistance, double& screenRatio)
 {
-    if (!m_root.contains("simulation_platform")) return false;
-    const QJsonObject obj = get("simulation_platform").toObject();
-    markCenterDistance = obj["mark_center_distance"].toDouble(0.0);
-    screenRatio        = obj["screen_ratio"].toDouble(0.0);
+    if (!m_root.contains(kSimulationPlatform)) return false;
+    const QJsonObject obj = get(kSimulationPlatform).toObject();
+    markCenterDistance = obj[kMarkCenterDistance].toDouble(0.0);
+    screenRatio        = obj[kScreenRatio].toDouble(0.0);
     return true;
 }

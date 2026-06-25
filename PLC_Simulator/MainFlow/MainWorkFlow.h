@@ -34,12 +34,6 @@
 
 #define REGISTER_VAL_NUM (RegisterStore::kRegisterCount)
 
-struct CommConfig {
-	CommBase::CommType type;
-	QVariantMap params; // 通用参数字典，支持不同通信方式扩展
-	CommConfig() : type(CommBase::CommType::eSocket) {}
-};
-
 class MainWorkFlow :public QObject
 {
 	Q_OBJECT
@@ -52,8 +46,8 @@ public:
 	static MainWorkFlow* InitialWorkFlow(QObject* pParent = nullptr);	//初始化唯一MainWorkFlow
 	static void ReleaseWorkFlow();										//释放单例实例
 
-	//通信信息相关
-	bool SetCommInfo(CommBase::CommInfoBase* commInfo);
+	// 通信信息相关(取得所有权)
+	bool SetCommInfo(std::unique_ptr<CommBase::CommInfoBase> info);
 
 	//通信实例相关
 	bool OpenComm();
@@ -73,7 +67,6 @@ public:
     // 获取 Lua 脚本引擎宿主
     ScriptEngineHost* scriptHost() const { return m_scriptHost.get(); }
 
-    bool ConfigureComm(const CommConfig& cfg);
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
 
 //MainWorkFlow初始化相关
