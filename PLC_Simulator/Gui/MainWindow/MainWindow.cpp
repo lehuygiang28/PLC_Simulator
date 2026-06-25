@@ -137,12 +137,8 @@ void MainWindow::InitialAllConfigs()
 		QStringList scriptNames;
 		if (m_configStore->LoadScriptNames(scriptNames) && scriptNames.size() == 6)
 		{
-			ui->edit_ScriptName_1->setText(scriptNames[0]);
-			ui->edit_ScriptName_2->setText(scriptNames[1]);
-			ui->edit_ScriptName_3->setText(scriptNames[2]);
-			ui->edit_ScriptName_4->setText(scriptNames[3]);
-			ui->edit_ScriptName_5->setText(scriptNames[4]);
-			ui->edit_ScriptName_6->setText(scriptNames[5]);
+			auto nameEdits = scriptNameEdits();
+			for (int i = 0; i < 6; ++i) nameEdits[i]->setText(scriptNames[i]);
 		}
 
 		// 加载协议类型
@@ -371,12 +367,7 @@ void MainWindow::InitialWindowConnect()
 	connect(ui->Btn_HideMainWindow, &QPushButton::clicked, this, [=]()
 			{
 				QStringList lineEditTexts;
-				lineEditTexts << ui->edit_ScriptName_1->text()
-							  << ui->edit_ScriptName_2->text()
-							  << ui->edit_ScriptName_3->text()
-							  << ui->edit_ScriptName_4->text()
-							  << ui->edit_ScriptName_5->text()
-							  << ui->edit_ScriptName_6->text();
+				for (QLineEdit* e : scriptNameEdits()) lineEditTexts << e->text();
 
 				// 设置小窗口6个按钮的文本
 				if (m_subWindow != nullptr)
@@ -405,26 +396,18 @@ void MainWindow::InitialWindowConnect()
 void MainWindow::InitialScriptConnect()
 {
 	// 连接脚本执行和编辑按钮
-	m_scriptManager->connectExecuteButton(0, ui->Btn_Execute_1);
-	m_scriptManager->connectExecuteButton(1, ui->Btn_Execute_2);
-	m_scriptManager->connectExecuteButton(2, ui->Btn_Execute_3);
-	m_scriptManager->connectExecuteButton(3, ui->Btn_Execute_4);
-	m_scriptManager->connectExecuteButton(4, ui->Btn_Execute_5);
-	m_scriptManager->connectExecuteButton(5, ui->Btn_Execute_6);
-
-	m_scriptManager->connectEditButton(1, ui->Btn_Edit_1);
-	m_scriptManager->connectEditButton(2, ui->Btn_Edit_2);
-	m_scriptManager->connectEditButton(3, ui->Btn_Edit_3);
-	m_scriptManager->connectEditButton(4, ui->Btn_Edit_4);
-	m_scriptManager->connectEditButton(5, ui->Btn_Edit_5);
-	m_scriptManager->connectEditButton(6, ui->Btn_Edit_6);
-
-	m_scriptManager->connectLoopCheckBox(0, ui->ChkBox_LoopEnable_1);
-	m_scriptManager->connectLoopCheckBox(1, ui->ChkBox_LoopEnable_2);
-	m_scriptManager->connectLoopCheckBox(2, ui->ChkBox_LoopEnable_3);
-	m_scriptManager->connectLoopCheckBox(3, ui->ChkBox_LoopEnable_4);
-	m_scriptManager->connectLoopCheckBox(4, ui->ChkBox_LoopEnable_5);
-	m_scriptManager->connectLoopCheckBox(5, ui->ChkBox_LoopEnable_6);
+	QPushButton* execBtns[6] = { ui->Btn_Execute_1, ui->Btn_Execute_2, ui->Btn_Execute_3,
+	                             ui->Btn_Execute_4, ui->Btn_Execute_5, ui->Btn_Execute_6 };
+	QPushButton* editBtns[6] = { ui->Btn_Edit_1, ui->Btn_Edit_2, ui->Btn_Edit_3,
+	                             ui->Btn_Edit_4, ui->Btn_Edit_5, ui->Btn_Edit_6 };
+	QCheckBox*   loopChks[6] = { ui->ChkBox_LoopEnable_1, ui->ChkBox_LoopEnable_2, ui->ChkBox_LoopEnable_3,
+	                             ui->ChkBox_LoopEnable_4, ui->ChkBox_LoopEnable_5, ui->ChkBox_LoopEnable_6 };
+	for (int i = 0; i < 6; ++i)
+	{
+		m_scriptManager->connectExecuteButton(i, execBtns[i]);   // execute 0-based
+		m_scriptManager->connectEditButton(i + 1, editBtns[i]);  // edit 1-based
+		m_scriptManager->connectLoopCheckBox(i, loopChks[i]);    // loop 0-based
+	}
 
 	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [=](int buttonId)
 			{
@@ -448,23 +431,20 @@ void MainWindow::InitialScriptConnect()
 		auto saveScriptNames = [this]()
 		{
 			QStringList names;
-			names << ui->edit_ScriptName_1->text()
-				  << ui->edit_ScriptName_2->text()
-				  << ui->edit_ScriptName_3->text()
-				  << ui->edit_ScriptName_4->text()
-				  << ui->edit_ScriptName_5->text()
-				  << ui->edit_ScriptName_6->text();
+			for (QLineEdit* e : scriptNameEdits()) names << e->text();
 			m_configStore->SaveScriptNames(names);
 		};
 
 		// 用 editingFinished(失焦/回车)触发保存,避免 textChanged 每字符全量写配置
-		connect(ui->edit_ScriptName_1, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_2, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_3, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_4, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_5, &QLineEdit::editingFinished, this, saveScriptNames);
-		connect(ui->edit_ScriptName_6, &QLineEdit::editingFinished, this, saveScriptNames);
+		for (QLineEdit* e : scriptNameEdits())
+			connect(e, &QLineEdit::editingFinished, this, saveScriptNames);
 	}
+}
+
+std::array<QLineEdit*, 6> MainWindow::scriptNameEdits() const
+{
+	return { ui->edit_ScriptName_1, ui->edit_ScriptName_2, ui->edit_ScriptName_3,
+	         ui->edit_ScriptName_4, ui->edit_ScriptName_5, ui->edit_ScriptName_6 };
 }
 
 void MainWindow::InitialRegisterTableConnect()
