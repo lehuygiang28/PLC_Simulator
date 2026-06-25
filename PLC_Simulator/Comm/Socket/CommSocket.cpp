@@ -16,9 +16,6 @@ CommSocket::CommSocket(QObject* pParent) : CommBase(pParent)
 	m_Server = nullptr;
 	m_Client = nullptr;
 	m_ClientMap.clear();
-	m_requestTimeout = 1000;
-	m_threadPool = new QThreadPool(this);
-	m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
 
 	auto SendDataTask = [this](const QString& clientId, const QByteArray& data) {
 		if (!m_bConnected) return false;
@@ -224,25 +221,8 @@ bool CommSocket::SendData(const QByteArray& strData)
 bool CommSocket::SendDataToEndpoint(const QString& clientId, const QByteArray& strData)
 {
 	if (!m_bConnected) return false;
-//     QTcpSocket* targetClient = m_ClientMap.value(clientId, nullptr);
-//     if (!targetClient || targetClient->state() != QAbstractSocket::ConnectedState)
-//     {
-//         return false;
-//     }
-//     qint64 bytesWritten = targetClient->write(strData);
-//     if (bytesWritten == -1)
-//     {
-//         return false;
-//     }
-// 	if (!targetClient->flush()) {
-// 		qDebug() << "Flush failed for client:" << clientId;
-// 	}
-// 	qDebug() << "Sent" << bytesWritten << "bytes to client:" << clientId
-// 		<< "Data:" << strData; 
-//	emit dataSend(QString("Send:[%1]:").arg(clientId), strData);
-
 	emit dataSendRequest(clientId, strData);
-    return true;
+	return true;
 }
 
 
