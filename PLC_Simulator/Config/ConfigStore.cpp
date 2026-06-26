@@ -122,10 +122,6 @@ bool ConfigStore::LoadThemePref(int& themeId) const
 
 bool ConfigStore::SaveScriptNames(const QStringList& scriptNames)
 {
-    if (scriptNames.size() != 6) {
-        qWarning() << "Script names list must contain exactly 6 items";
-        return false;
-    }
     QJsonArray arr;
     for (const QString& n : scriptNames) arr.append(n);
     return Set(kScriptNames, arr);
@@ -135,10 +131,6 @@ bool ConfigStore::LoadScriptNames(QStringList& scriptNames) const
 {
     if (!m_root.contains(kScriptNames)) return false;
     const QJsonArray arr = Get(kScriptNames).toArray();
-    if (arr.size() != 6) {
-        qWarning() << "Script names array size is not 6:" << arr.size();
-        return false;
-    }
     scriptNames.clear();
     for (const QJsonValue& v : arr) scriptNames.append(v.toString());
     return true;

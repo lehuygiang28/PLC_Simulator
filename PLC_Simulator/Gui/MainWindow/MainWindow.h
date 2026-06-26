@@ -11,31 +11,26 @@
 
 #include "ui_MainWindow.h"
 #include "QuickPanel.h"
-#include "SimulationPlatform/SimulationPlatform.h"
+#include "SimulationPlatform/PlatformTypes.h"
 #include "RegisterTableManager.h"
 #include "ScriptManager.h"
 #include "PlatformController.h"
+#include "AuxDialogs.h"
 #include "Config/ConfigStore.h"
 #include "MainWorkFlow.h"
 #include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>
-#include <QColor>
-#include <QTimer>
-#include <QTcpSocket>
-#include <QTcpServer>
-#include <QThread>
-#include <QButtonGroup>
-#include <QMessageBox>
-#include <QMenu>
-#include <QAction>
-#include <QActionGroup>
-#include <QDialog>
-#include <QFrame>
+#include <QVector>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; };
+class QAction;
+class QLineEdit;
+class QLabel;
 QT_END_NAMESPACE
+
+class SimulationPlatform;
 
 class MainWindow : public QMainWindow
 {
@@ -49,11 +44,22 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    // 初始化方法
-    void InitializeMember();
-    void InitialSignalConnect();
-    void InitialLineEditValidator();
-    void InitialAllConfigs();
+    // 初始化阶段(构造函数按此顺序调用)
+    void createMembers();          // ① 创建所有成员对象
+    void setupUiContent();         // ② 填充静态 UI(下拉框 / 只读 / 状态栏)
+    void loadConfigs();            // ③ 读取持久化配置
+    void setupInputValidators();   // ④ 输入校验(须晚于 loadConfigs)
+    void applyThemePref();         // ⑤ 应用持久化主题(须先于建菜单)
+    void connectSignals();         // ⑥ 连接所有信号槽
+    void initialRefresh();         // ⑦ 首屏刷新表格
+
+    // 信号连接分组(由 connectSignals 调用)
+    void buildMenus();
+    void connectWindowSignals();
+    void connectRegisterTable();
+    void connectComm();
+    void connectLog();
+    void connectScript();
 
     // 协议相关
     void CreateCurrentProtocol();
@@ -62,22 +68,39 @@ private:
     void OnWriteAxisDoubleWord();
     void OnWriteAxisFloat();
 
+    // 轴写入辅助
+    bool axisStartAddrValid(int addr) const;
+    void writeAxisPos(int startAddr, PlatformController::NumFormat fmt, Platform which);
+    void writeAxisManual(PlatformController::NumFormat fmt);
+
     // 自动写入相关
-    void OnWritePosAutoEnableChanged(int state);
     void OnPlatformPoseChanged(Platform which, const Pose& pose);
 
+    // 平台参数相关
+    void refreshAxisAddrStatus();
+
     // 菜单栏相关
-    void OnShowAboutDialog();
-    void OnShowChangeLog();
     void OnThemeSelected(Theme theme);
 
     // 日志显示
     void UpdateLogDisplay(QString strNewLog);
 
+
+    // 脚本名称编辑框辅助
+    QVector<QLineEdit*> scriptNameEdits() const;
+
 private:
     Ui::MainWindow* ui;
-    QAction* m_actLightTheme = nullptr;
-    QAction* m_actDarkTheme = nullptr;
+
+    // 平台控制:参数数据成员
+    AuxDialogs::PlatformParams m_platformParams{3, 3, 114, 120};
+    QLabel* m_statusAddrLabel = nullptr;
+
+    // 平台菜单 actions(跨槽访问的才做成员;仅菜单构建期用的为局部变量)
+    QAction* m_actShowPlatform = nullptr;
+    QAction* m_actAutoWrite = nullptr;
+    QAction* m_actFmtFloat = nullptr;
+    QAction* m_actFmtInt32 = nullptr;
 
     // 子窗口
     std::unique_ptr<QuickPanel> m_subWindow;
@@ -96,9 +119,6 @@ private:
     // 脚本管理器
     std::unique_ptr<ScriptManager> m_scriptManager;
 
-    // 表格闪烁相关
-    QMap<QTableWidgetItem*, QTimer*> m_animationTimers;
-    QMap<QTableWidgetItem*, QString> m_lastTextValues;
 
     // 日志显示状态
     int m_nLogStat;
