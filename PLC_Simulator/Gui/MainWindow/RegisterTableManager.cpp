@@ -1,6 +1,11 @@
 #include "RegisterTableManager.h"
 #include "Core/RegisterStore.h"
 #include <QApplication>
+#include <QColor>
+#include <QBrush>
+#include <QMessageBox>
+#include <QRegularExpression>
+#include <cfloat>
 
 RegisterTableManager::RegisterTableManager(
     QTableWidget* tableWidget,
@@ -23,6 +28,10 @@ RegisterTableManager::RegisterTableManager(
     int dataCellCount = REGISTER_TABLE_ROW_COUNT * (REGISTER_TABLE_COLUMN_COUNT / 2);
     int convertCount = (dataCellCount + 3) / 4;  // 向上取整到4的倍数
     m_vecRegisterVal.resize(convertCount);
+
+    // 值变化闪红提示:连接本表格的 itemChanged
+    if (m_tableWidget)
+        connect(m_tableWidget, &QTableWidget::itemChanged, this, &RegisterTableManager::onItemChanged);
 }
 
 void RegisterTableManager::initTable()
@@ -65,7 +74,7 @@ void RegisterTableManager::initTable()
     // 表格外观由全局主题样式表(ThemeManager)统一控制,此处不再设置局部样式
 }
 
-void RegisterTableManager::updateTableInfo(int nStart, bool bInitialize)
+void RegisterTableManager::updateTableInfo(int nStart)
 {
     if (!m_tableWidget || !m_store) return;
 
@@ -90,6 +99,51 @@ void RegisterTableManager::updateTableInfo(int nStart, bool bInitialize)
 
     getRegisterVals(nStart);
     displayRegisterVals();
+}
+
+void RegisterTableManager::refreshSilently(int nStart)
+{
+    // 静默刷新:关闭闪烁意图 → updateTableInfo 全程不闪(无需 QSignalBlocker)
+    setShouldFlash(false);
+    updateTableInfo(nStart);
+    setShouldFlash(true);
+}
+
+void RegisterTableManager::onItemChanged(QTableWidgetItem* item)
+{
+    if (!item) return;
+    if (!m_bShouldFlash) return;
+
+    // 只处理值列(奇数列),跳过地址列(偶数列)
+    if (item->column() % 2 == 0) return;
+
+    // 文本未实际变化则忽略
+    const QString currentText = item->text();
+    if (currentText == m_lastTextValues.value(item)) return;
+    m_lastTextValues[item] = currentText;
+
+    // 取消该 item 可能存在的未完成恢复动画
+    if (m_animationTimers.contains(item))
+    {
+        QTimer* existing = m_animationTimers.value(item);
+        existing->stop();
+        existing->deleteLater();
+        m_animationTimers.remove(item);
+    }
+
+    // 高亮 + 400ms 后恢复
+    item->setBackground(QColor(255, 100, 100));
+
+    QTimer* restoreTimer = new QTimer(this);
+    restoreTimer->setSingleShot(true);
+    connect(restoreTimer, &QTimer::timeout, this, [this, item, restoreTimer]()
+    {
+        if (item) item->setBackground(QBrush());
+        m_animationTimers.remove(item);
+        restoreTimer->deleteLater();
+    });
+    m_animationTimers[item] = restoreTimer;
+    restoreTimer->start(400);  // 400ms 后恢复
 }
 
 void RegisterTableManager::getRegisterVals(int nStart)
@@ -403,6 +457,9 @@ void RegisterTableManager::displayRegisterVals()
         m_nEditCol = editIndex.column();
     }
 
+    // 保存调用方的闪烁意图:清空阶段一律不闪,填值阶段还原意图
+    // (不写死 true,使 setShouldFlash(false) 的静默路径真正生效,无需 QSignalBlocker)
+    const bool flashIntent = m_bShouldFlash;
     m_bShouldFlash = false;
 
     QVariant data = m_dataTypeCombo->itemData(nCurIndex);
@@ -426,7 +483,7 @@ void RegisterTableManager::displayRegisterVals()
         }
     }
 
-    m_bShouldFlash = true;
+    m_bShouldFlash = flashIntent;
 
     RegisterDataType type = data.value<RegisterDataType>();
     switch (type)

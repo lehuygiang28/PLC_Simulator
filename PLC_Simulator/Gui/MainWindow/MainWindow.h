@@ -21,13 +21,11 @@
 #include "Theme/ThemeManager.h"
 
 #include <QtWidgets/QMainWindow>
-#include <QMap>
 #include <QVector>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; };
 class QAction;
-class QTimer;
 class QLineEdit;
 class QLabel;
 QT_END_NAMESPACE
@@ -87,8 +85,6 @@ private:
     // 日志显示
     void UpdateLogDisplay(QString strNewLog);
 
-    // 寄存器表相关
-    void silentRefreshTable(int addr);
 
     // 脚本名称编辑框辅助
     QVector<QLineEdit*> scriptNameEdits() const;
@@ -123,9 +119,6 @@ private:
     // 脚本管理器
     std::unique_ptr<ScriptManager> m_scriptManager;
 
-    // 表格闪烁相关
-    QMap<QTableWidgetItem*, QTimer*> m_animationTimers;
-    QMap<QTableWidgetItem*, QString> m_lastTextValues;
 
     // 日志显示状态
     int m_nLogStat;

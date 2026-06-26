@@ -15,13 +15,10 @@
 #include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
 #include "version.h"
-#include <QFile>
 #include <QWindow>
 #include <QVariantMap>
-#include <QColor>
-#include <QTimer>
+#include <QMap>
 #include <QButtonGroup>
-#include <QMessageBox>
 #include <QMenu>
 #include <QAction>
 #include <QActionGroup>
@@ -29,6 +26,9 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QLineEdit>
+#include <QIntValidator>
+#include <QTextDocument>
+#include <QAbstractItemDelegate>
 
 void MainWindow::refreshAxisAddrStatus()
 {
@@ -227,7 +227,7 @@ void MainWindow::applyThemePref()
 
 void MainWindow::initialRefresh()
 {
-	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
+	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
 }
 
 void MainWindow::connectSignals()
@@ -418,122 +418,46 @@ QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 
 void MainWindow::connectRegisterTable()
 {
-	// 寄存器表格相关信号
-	{
-		// 表格闪烁提示槽函数
-		connect(ui->table_RegisterData, &QTableWidget::itemChanged, this, [=](QTableWidgetItem *item)
-				{
-					if (!item)
-						return;
-					if (!m_registerTableManager->shouldFlash())
-						return;
-
-					// 忽略奇数列的变化(地址列)
-					if (item->column() % 2 == 0)
-						return;
-
-					// 检查文本是否真的改变了
-					QString currentText = item->text();
-					QString lastText = m_lastTextValues.value(item);
-
-					if (currentText == lastText)
-					{
-						return; // 文本没有实际改变，忽略
-					}
-
-					// 更新保存的文本值
-					m_lastTextValues[item] = currentText;
-
-					// 取消该item可能存在的未完成动画
-					if (m_animationTimers.contains(item))
-					{
-						QTimer *existingTimer = m_animationTimers.value(item);
-						existingTimer->stop();
-						existingTimer->deleteLater();
-						m_animationTimers.remove(item);
-					}
-
-					// 设置高亮颜色
-					item->setBackground(QColor(255, 100, 100));
-
-					// 创建定时器用于恢复颜色
-					QTimer *restoreTimer = new QTimer(this);
-					restoreTimer->setSingleShot(true);
-
-					connect(restoreTimer, &QTimer::timeout, this, [=]()
-							{
-				if (item)
-				{
-					item->setBackground(QBrush());
-				}
-
-				// 清理定时器
-				if (m_animationTimers.contains(item)) {
-					m_animationTimers.remove(item);
-				}
-				restoreTimer->deleteLater(); });
-
-					m_animationTimers[item] = restoreTimer;
-
-					restoreTimer->start(400); // 启动定时器，400ms后执行
-				});
-
-		QAbstractItemDelegate *delegate = ui->table_RegisterData->itemDelegate();
-
-		// 连接表格单元格输入完成信号槽
-		connect(delegate, &QAbstractItemDelegate::commitData, this, [this](QWidget *editor)
-				{
-			// 这个信号在数据提交时触发，可以获取到正确的单元格
-			QModelIndex currentIndex = ui->table_RegisterData->currentIndex();
-			QTableWidgetItem* currentItem = ui->table_RegisterData->item(currentIndex.row(), currentIndex.column());
-			if(currentItem != nullptr)
+	// 单元格输入完成 → 写回寄存器(闪烁逻辑已下沉至 RegisterTableManager)
+	QAbstractItemDelegate *delegate = ui->table_RegisterData->itemDelegate();
+	connect(delegate, &QAbstractItemDelegate::commitData, this, [this](QWidget *editor)
 			{
-				m_registerTableManager->updateRegisterVals(currentItem);
-			} });
-	}
+		QModelIndex currentIndex = ui->table_RegisterData->currentIndex();
+		QTableWidgetItem* currentItem = ui->table_RegisterData->item(currentIndex.row(), currentIndex.column());
+		if (currentItem != nullptr)
+			m_registerTableManager->updateRegisterVals(currentItem);
+			});
 
-	// 点击清除寄存器按钮
+	// 点击清除寄存器:归零;经 dataChanged 闪红提示"已全清"
 	connect(ui->Btn_ClearRegister, &QPushButton::clicked, this, [=]
 			{
-		if (m_pWorkFlow == nullptr)	return;
-		m_registerTableManager->setShouldFlash(false);
-		m_pWorkFlow->registerStore()->resetAll(0);
-		m_registerTableManager->setShouldFlash(true); });
+		if (m_pWorkFlow == nullptr) return;
+		m_pWorkFlow->registerStore()->resetAll(0); });
 
-	// 修改显示寄存器地址
+	// 修改显示寄存器地址(静默刷新)
 	connect(ui->edit_RegisterAddr, &QLineEdit::textChanged, this, [=](const QString &text)
 			{
 				if (text == "")
 					return;
-
 				int nAddr = text.toInt();
-
 				if (nAddr < 0)
 					return;
-
-				// 从工作流获取寄存器数据
 				m_registerTableManager->getRegisterVals(nAddr);
-
-				silentRefreshTable(nAddr);
+				m_registerTableManager->refreshSilently(nAddr);
 			});
 
-	// 修改显示寄存器数据类型
+	// 修改显示寄存器数据类型(静默刷新)
 	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
-			{
-				silentRefreshTable(ui->edit_RegisterAddr->text().toUInt());
-			});
+			{ m_registerTableManager->refreshSilently(ui->edit_RegisterAddr->text().toUInt()); });
 
-	// 寄存器数据改变
+	// 寄存器数据改变(实时闪红)
 	if (m_pWorkFlow != nullptr)
 	{
 		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
 				{ m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt()); });
 	}
 
-	// 表格事件过滤(供 eventFilter 处理)
-	ui->table_RegisterData->installEventFilter(this);
-
-	// 数据显示进制切换(DEC/HEX)
+	// 数据显示进制切换(DEC/HEX,静默刷新)
 	QButtonGroup *group1 = new QButtonGroup(this);
 	group1->addButton(ui->Radio_Data_DEC);
 	group1->addButton(ui->Radio_Data_HEX);
@@ -542,16 +466,11 @@ void MainWindow::connectRegisterTable()
 			{
 		if (checked)
 		{
-			qDebug() << "组1中选中了:" << button->text();
 			if (button == ui->Radio_Data_DEC)
-			{
 				m_registerTableManager->setIntDisplayStat(0);
-			}
 			else if (button == ui->Radio_Data_HEX)
-			{
 				m_registerTableManager->setIntDisplayStat(1);
-			}
-			silentRefreshTable(ui->edit_RegisterAddr->text().toUInt());
+			m_registerTableManager->refreshSilently(ui->edit_RegisterAddr->text().toUInt());
 		} });
 }
 
@@ -799,14 +718,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 	}
 
 	return QMainWindow::eventFilter(watched, event);
-}
-
-void MainWindow::silentRefreshTable(int addr)
-{
-	m_registerTableManager->setShouldFlash(false);
-	const QSignalBlocker blocker(ui->table_RegisterData);
-	m_registerTableManager->updateTableInfo(addr);
-	m_registerTableManager->setShouldFlash(true);
 }
 
 void MainWindow::UpdateLogDisplay(QString strNewLog)

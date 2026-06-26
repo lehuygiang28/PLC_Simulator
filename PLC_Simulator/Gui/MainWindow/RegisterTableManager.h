@@ -12,17 +12,15 @@
 #include <QObject>
 #include <QTableWidget>
 #include <QTableWidgetItem>
-#include <QAbstractItemView>
 #include <QComboBox>
 #include <QLineEdit>
-#include <QMessageBox>
-#include <QRegularExpression>
+#include <QMap>
+#include <QTimer>
 #include <vector>
-#include <cfloat>
 
 #include "Core/DataTypeConvert.h"
 
-//数据类型枚举类
+// 数据类型枚举类
 enum class RegisterDataType
 {
     eDataTypeUnkown = -1,
@@ -39,26 +37,15 @@ class RegisterStore;
 #define REGISTER_TABLE_COLUMN_COUNT 10
 #define REGISTER_TABLE_ROW_COUNT    21
 
-/**
- * 20251225 wm 从MainWindow.cpp拆分
- * @brief 寄存器表格管理器
- *
- * 负责管理寄存器数据的显示、编辑和验证。
- * 从 MainWindow 中拆分出来，专注于表格相关逻辑。
- */
+// 寄存器表格管理器:负责寄存器数据的显示、编辑和验证。
+// 20251225 wm 从 MainWindow.cpp 拆分,专注表格相关逻辑。
 class RegisterTableManager : public QObject
 {
     Q_OBJECT
 
 public:
-    /**
-     * @brief 构造函数
-     * @param tableWidget 寄存器表格控件
-     * @param dataTypeCombo 数据类型选择下拉框
-     * @param addrEdit 起始地址输入框
-     * @param workFlow 工作流指针
-     * @param parent 父对象
-     */
+    // tableWidget: 寄存器表格控件; dataTypeCombo: 数据类型下拉框;
+    // addrEdit: 起始地址输入框; store: 寄存器数据存储; parent: 父对象
     explicit RegisterTableManager(
         QTableWidget* tableWidget,
         QComboBox* dataTypeCombo,
@@ -69,97 +56,59 @@ public:
 
     ~RegisterTableManager() override = default;
 
-    /**
-     * @brief 初始化寄存器表格
-     */
+    // 初始化寄存器表格
     void initTable();
 
-    /**
-     * @brief 更新表格信息
-     * @param nStart 起始地址
-     * @param bInitialize 是否初始化
-     */
-    void updateTableInfo(int nStart, bool bInitialize = false);
+    // 更新表格信息(nStart 起始地址)
+    void updateTableInfo(int nStart);
 
-    /**
-     * @brief 从工作流获取寄存器数据
-     * @param nStart 起始地址
-     */
+    // 静默刷新(不闪烁):用于视图刷新(改地址/类型/进制)
+    void refreshSilently(int nStart);
+
+    // 从工作流获取寄存器数据(nStart 起始地址)
     void getRegisterVals(int nStart);
 
-    /**
-     * @brief 将数据写入工作流
-     * @param nStart 起始地址
-     */
+    // 将数据写入工作流(nStart 起始地址)
     void setRegisterVals(int nStart);
 
-    /**
-     * @brief 更新单个单元格对应的寄存器值
-     * @param pItem 表格项指针
-     */
+    // 更新单个单元格对应的寄存器值
     void updateRegisterVals(QTableWidgetItem* pItem);
 
-    /**
-     * @brief 显示寄存器数据
-     */
+    // 显示寄存器数据
     void displayRegisterVals();
 
-    /**
-     * @brief 设置整数显示状态（十进制/十六进制）
-     * @param stat 0=十进制, 1=十六进制
-     */
+    // 设置整数显示状态(0=十进制, 1=十六进制)
     void setIntDisplayStat(int stat) { m_nIntStat = stat; }
 
-    /**
-     * @brief 获取整数显示状态
-     * @return 0=十进制, 1=十六进制
-     */
+    // 获取整数显示状态(0=十进制, 1=十六进制)
     int intDisplayStat() const { return m_nIntStat; }
 
-    /**
-     * @brief 设置是否允许闪烁效果
-     * @param enable 是否启用
-     */
+    // 设置是否允许闪烁效果
     void setShouldFlash(bool enable) { m_bShouldFlash = enable; }
 
-    /**
-     * @brief 获取是否允许闪烁效果
-     * @return 是否启用闪烁效果
-     */
+    // 获取是否允许闪烁效果
     bool shouldFlash() const { return m_bShouldFlash; }
 
-    /**
-     * @brief 获取寄存器数据缓存
-     * @return 数据缓存引用
-     */
+    // 获取寄存器数据缓存
     std::vector<DataTypeConvert>& registerValCache() { return m_vecRegisterVal; }
 
 private:
-    /**
-     * @brief 检查输入合法性
-     * @param pItem 表格项指针
-     * @return 是否合法
-     */
+    // 表格项变化 → 值列单元闪红提示(itemChanged 槽)
+    void onItemChanged(QTableWidgetItem* item);
+
+    // 检查输入合法性
     bool checkInput(QTableWidgetItem* pItem);
 
-    /**
-     * @brief 检查字符串输入
-     */
+    // 检查字符串输入
     bool checkInput_str(QTableWidgetItem* pItem, const QString& text);
 
-    /**
-     * @brief 检查整数输入
-     */
+    // 检查整数输入
     bool checkInput_int(QTableWidgetItem* pItem, const QString& text, int32_t minVal, int32_t maxVal);
 
-    /**
-     * @brief 检查浮点数输入
-     */
+    // 检查浮点数输入
     bool checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal);
 
-    /**
-     * @brief 检查十六进制整数输入
-     */
+    // 检查十六进制整数输入
     bool checkInput_int_Hex(QTableWidgetItem* pItem, const RegisterDataType& type);
 
     // 各类型数据显示方法
@@ -170,17 +119,20 @@ private:
     void displayRegisterVals_Double();
 
 private:
-    QTableWidget* m_tableWidget;      ///< 寄存器表格控件
-    QComboBox* m_dataTypeCombo;       ///< 数据类型选择下拉框
-    QLineEdit* m_addrEdit;            ///< 起始地址输入框
-    RegisterStore* m_store;           ///< 寄存器数据存储
-    QWidget* m_parentWidget;          ///< 父窗口（用于显示消息框）
+    QTableWidget* m_tableWidget;      // 寄存器表格控件
+    QComboBox* m_dataTypeCombo;       // 数据类型选择下拉框
+    QLineEdit* m_addrEdit;            // 起始地址输入框
+    RegisterStore* m_store;           // 寄存器数据存储
+    QWidget* m_parentWidget;          // 父窗口(用于显示消息框)
 
-    std::vector<DataTypeConvert> m_vecRegisterVal;  ///< 寄存器数据缓存
-    int m_nIntStat;                   ///< 整数显示状态 0=十进制, 1=十六进制
-    bool m_bShouldFlash;              ///< 是否允许闪烁效果
-    int m_nEditRow;                   ///< 当前正在编辑的行(-1 表示无),刷新时跳过保护
-    int m_nEditCol;                   ///< 当前正在编辑的列(-1 表示无),刷新时跳过保护
+    std::vector<DataTypeConvert> m_vecRegisterVal;  // 寄存器数据缓存
+    int m_nIntStat;                   // 整数显示状态 0=十进制, 1=十六进制
+    bool m_bShouldFlash;              // 是否允许闪烁效果
+    int m_nEditRow;                   // 当前正在编辑的行(-1 表示无),刷新时跳过保护
+    int m_nEditCol;                   // 当前正在编辑的列(-1 表示无),刷新时跳过保护
+
+    QMap<QTableWidgetItem*, QTimer*> m_animationTimers;   // 各单元的高亮恢复定时器
+    QMap<QTableWidgetItem*, QString> m_lastTextValues;    // 各单元上次文本(判定真实变化)
 };
 
 #endif // REGISTERTABLEMANAGER_H
