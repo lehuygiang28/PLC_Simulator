@@ -7,6 +7,19 @@
 #include <QRegularExpression>
 #include <cfloat>
 
+namespace
+{
+// 浮点显示/录入的有效数字位数:贴近各自类型真实精度,受列宽约束做的折中
+constexpr int kFloatSigDigits = 7;    // float 约 7 位有效数字
+constexpr int kDoubleSigDigits = 15;  // double 约 15-16 位,取 15
+
+// 浮点统一格式化:'g' 按有效数字。录入规范化与显示共用,保证录完刷新不变样
+QString formatReal(double value, int sigDigits)
+{
+    return QString::number(value, 'g', sigDigits);
+}
+}
+
 RegisterTableManager::RegisterTableManager(
     QTableWidget* tableWidget,
     QComboBox* dataTypeCombo,
@@ -289,9 +302,9 @@ bool RegisterTableManager::checkInput(QTableWidgetItem* pItem)
     case RegisterDataType::eDataTypeInt32:
         return checkInput_int(pItem, text, INT32_MIN, INT32_MAX);
     case RegisterDataType::eDataTypeFloat:
-        return checkInput_float(pItem, text, -FLT_MAX, FLT_MAX);
+        return checkInput_float(pItem, text, -FLT_MAX, FLT_MAX, kFloatSigDigits);
     case RegisterDataType::eDataTypeDouble:
-        return checkInput_float(pItem, text, -DBL_MAX, DBL_MAX);
+        return checkInput_float(pItem, text, -DBL_MAX, DBL_MAX, kDoubleSigDigits);
     default:
         return false;
     }
@@ -346,7 +359,7 @@ bool RegisterTableManager::checkInput_int(QTableWidgetItem* pItem, const QString
     return true;
 }
 
-bool RegisterTableManager::checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal)
+bool RegisterTableManager::checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal, int sigDigits)
 {
     QRegularExpression regExp("^(?!-0(\\.0*)?$)-?\\d+(\\.\\d+)?$");
     QRegularExpressionMatch match = regExp.match(text);
@@ -372,7 +385,7 @@ bool RegisterTableManager::checkInput_float(QTableWidgetItem* pItem, const QStri
             );
             pItem->setText("0.0");
         }
-        pItem->setText(QString("%1").arg(tmp, 0, 'f', 6));
+        pItem->setText(formatReal(tmp, sigDigits));
     }
     return true;
 }
@@ -512,9 +525,9 @@ QString RegisterTableManager::formatCell(RegisterDataType type, int k) const
             return QString("%1").arg(QString::number(cell.u_Int32[s / 2], 16), 8, '0').toUpper();
         return QString("%1").arg(cell.u_Int32[s / 2]);
     case RegisterDataType::eDataTypeFloat:
-        return QString("%1").arg(cell.u_float[s / 2]);
+        return formatReal(cell.u_float[s / 2], kFloatSigDigits);
     case RegisterDataType::eDataTypeDouble:
-        return QString("%1").arg(cell.u_double);
+        return formatReal(cell.u_double, kDoubleSigDigits);
     default:
         return QString();
     }

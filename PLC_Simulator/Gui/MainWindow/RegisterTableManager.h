@@ -106,8 +106,8 @@ private:
     // 检查整数输入
     bool checkInput_int(QTableWidgetItem* pItem, const QString& text, int32_t minVal, int32_t maxVal);
 
-    // 检查浮点数输入
-    bool checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal);
+    // 检查浮点数输入(sigDigits: 规范化保留的有效数字位数,与显示一致)
+    bool checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal, int sigDigits);
 
     // 检查十六进制整数输入
     bool checkInput_int_Hex(QTableWidgetItem* pItem, const RegisterDataType& type);
