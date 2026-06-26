@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "Core/DataTypeConvert.h"
+#include "RegisterCellLayout.h"
 
 // 数据类型枚举类
 enum class RegisterDataType
@@ -111,12 +112,14 @@ private:
     // 检查十六进制整数输入
     bool checkInput_int_Hex(QTableWidgetItem* pItem, const RegisterDataType& type);
 
-    // 各类型数据显示方法
-    void displayRegisterVals_Char8();
-    void displayRegisterVals_Int16();
-    void displayRegisterVals_Int32();
-    void displayRegisterVals_Float();
-    void displayRegisterVals_Double();
+    // 每值占几个 Int16 寄存器(Char8/Int16=1, Int32/Float=2, Double=4)
+    int registersPerValue(RegisterDataType type) const;
+
+    // 将单元格文本按类型解析写回缓存联合体(k 为线性寄存器下标)
+    void writeCell(RegisterDataType type, int k, const QString& text);
+
+    // 按类型格式化第 k 个寄存器的显示文本
+    QString formatCell(RegisterDataType type, int k) const;
 
 private:
     QTableWidget* m_tableWidget;      // 寄存器表格控件
@@ -124,6 +127,7 @@ private:
     QLineEdit* m_addrEdit;            // 起始地址输入框
     RegisterStore* m_store;           // 寄存器数据存储
     QWidget* m_parentWidget;          // 父窗口(用于显示消息框)
+    RegisterCellLayout m_layout;      // cell<->寄存器映射(单一真相源)
 
     std::vector<DataTypeConvert> m_vecRegisterVal;  // 寄存器数据缓存
     int m_nIntStat;                   // 整数显示状态 0=十进制, 1=十六进制

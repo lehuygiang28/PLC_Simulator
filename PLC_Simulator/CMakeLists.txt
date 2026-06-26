@@ -73,6 +73,7 @@ set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/MainWindow.h
     Gui/MainWindow/QuickPanel.h
     Gui/MainWindow/RegisterTableManager.h
+    Gui/MainWindow/RegisterCellLayout.h
     Gui/MainWindow/ScriptManager.h
     Gui/MainWindow/PlatformController.h
     Gui/MainWindow/AuxDialogs.h

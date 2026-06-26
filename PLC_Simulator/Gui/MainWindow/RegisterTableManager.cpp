@@ -19,6 +19,7 @@ RegisterTableManager::RegisterTableManager(
     , m_addrEdit(addrEdit)
     , m_store(store)
     , m_parentWidget(parent)
+    , m_layout{REGISTER_TABLE_ROW_COUNT, REGISTER_TABLE_COLUMN_COUNT}
     , m_nIntStat(0)
     , m_bShouldFlash(true)
     , m_nEditRow(-1)
@@ -80,7 +81,6 @@ void RegisterTableManager::updateTableInfo(int nStart)
 
     const int rowCount = m_tableWidget->rowCount();
     const int colCount = m_tableWidget->columnCount();
-    const int step = rowCount;
 
     for (int row = 0; row < rowCount; ++row)
     {
@@ -88,8 +88,7 @@ void RegisterTableManager::updateTableInfo(int nStart)
         {
             QTableWidgetItem* item = m_tableWidget->item(row, col);
 
-            int group = col / 2;
-            int addrNum = nStart + row + group * step;
+            int addrNum = m_layout.registerAddr(m_layout.linearIndex(row, col), nStart);
             item->setText(QString("D%1").arg(addrNum, 5, 10, QChar('0')));
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 
@@ -172,6 +171,64 @@ void RegisterTableManager::setRegisterVals(int nStart)
     }
 }
 
+int RegisterTableManager::registersPerValue(RegisterDataType type) const
+{
+    switch (type)
+    {
+    case RegisterDataType::eDataTypeInt32:
+    case RegisterDataType::eDataTypeFloat:
+        return 2;
+    case RegisterDataType::eDataTypeDouble:
+        return 4;
+    default:  // Char8 / Int16
+        return 1;
+    }
+}
+
+void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString& text)
+{
+    DataTypeConvert& cell = m_vecRegisterVal[m_layout.cacheIndex(k)];
+    const int s = m_layout.subIndex(k);
+    switch (type)
+    {
+    case RegisterDataType::eDataTypeChar8:
+    {
+        // 每个单元格写 2 个字符,字符下标 = Int16 子下标*2 + 字符序
+        int nCurChar = 0;
+        while (nCurChar < 2 && text.length() > nCurChar)
+        {
+            cell.u_chars[s * 2 + nCurChar] = text.at(nCurChar).toLatin1();
+            nCurChar++;
+        }
+        break;
+    }
+    case RegisterDataType::eDataTypeInt16:
+    {
+        int16_t nVal;
+        if (m_nIntStat == 0) { nVal = text.toInt() & 0xFFFF; }
+        else { bool bOk = false; nVal = (text.toInt(&bOk, 16) & 0xFFFF); }
+        cell.u_Int16[s] = nVal;
+        break;
+    }
+    case RegisterDataType::eDataTypeInt32:
+    {
+        int32_t nVal;
+        if (m_nIntStat == 0) { nVal = text.toInt(); }
+        else { bool bOk = false; nVal = text.toInt(&bOk, 16); }
+        cell.u_Int32[s / 2] = nVal;  // 每 Int32 占 2 个 Int16
+        break;
+    }
+    case RegisterDataType::eDataTypeFloat:
+        cell.u_float[s / 2] = text.toFloat();  // 每 float 占 2 个 Int16
+        break;
+    case RegisterDataType::eDataTypeDouble:
+        cell.u_double = text.toDouble();
+        break;
+    default:
+        break;
+    }
+}
+
 void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
 {
     if (!pItem || !m_tableWidget || !m_store || !m_addrEdit) return;
@@ -180,98 +237,26 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
 
     int nRow = pItem->row();
     int nCol = pItem->column();
-
     if (nCol % 2 == 0) return;  // 偶数列为地址列,不处理
-
-    int rowCount = m_tableWidget->rowCount();
-    int nStart = m_addrEdit->text().toUInt();
-
-    int group = (nCol - 1) / 2;
-    int addr = nStart + nRow + group * rowCount;
-    int ndataIndex = nRow + group * rowCount;
-    int nRegisterValIndex = ndataIndex / 4;
 
     if (!m_dataTypeCombo) return;
     int nCurIndex = m_dataTypeCombo->currentIndex();
     if (nCurIndex < 0) return;
+    RegisterDataType type = m_dataTypeCombo->itemData(nCurIndex).value<RegisterDataType>();
 
-    QVariant data = m_dataTypeCombo->itemData(nCurIndex);
-    RegisterDataType type = data.value<RegisterDataType>();
+    int nStart = m_addrEdit->text().toUInt();
+    int k = m_layout.linearIndex(nRow, nCol);
+    int addr = m_layout.registerAddr(k, nStart);
+    int rpv = registersPerValue(type);
 
-    switch (type)
+    writeCell(type, k, pItem->text());
+
+    // 统一回写:每值占 rpv 个 Int16,从 subIndex 起连续 rpv 个推入 store
+    const DataTypeConvert& cell = m_vecRegisterVal[m_layout.cacheIndex(k)];
+    const int s = m_layout.subIndex(k);
+    for (int j = 0; j < rpv; ++j)
     {
-    case RegisterDataType::eDataTypeChar8:
-    {
-        // 每个单元格对应 1 个 Int16(2 个字符),Int16 下标与 Int16 分支一致使用 ndataIndex % 4
-        int nInt16Index = ndataIndex % 4;
-        int nCurChar = 0;
-        while (nCurChar < 2 && pItem->text().length() > nCurChar)
-        {
-            int ncharIndex = nInt16Index * 2 + nCurChar;
-            char nchar = pItem->text().at(nCurChar).toLatin1();
-            m_vecRegisterVal[nRegisterValIndex].u_chars[ncharIndex] = nchar;
-            nCurChar++;
-        }
-        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
-    }
-    break;
-    case RegisterDataType::eDataTypeInt16:
-    {
-        int16_t nVal;
-        if (m_nIntStat == 0)
-        {
-            nVal = pItem->text().toInt() & 0xFFFF;
-        }
-        else
-        {
-            bool bOk = false;
-            nVal = (pItem->text().toInt(&bOk, 16) & 0xFFFF);
-        }
-        m_vecRegisterVal[nRegisterValIndex].u_Int16[ndataIndex % 4] = nVal;
-        m_store->setCell(addr, nVal);
-    }
-    break;
-    case RegisterDataType::eDataTypeInt32:
-    {
-        int32_t nVal;
-        if (m_nIntStat == 0)
-        {
-            nVal = pItem->text().toInt();
-        }
-        else
-        {
-            bool bOk = false;
-            nVal = pItem->text().toInt(&bOk, 16);
-        }
-        // 每个 Int32 占 2 个 Int16:子下标按 ndataIndex%4 推导,与 display/读取端保持一致
-        int nInt16Index = ndataIndex % 4;
-        m_vecRegisterVal[nRegisterValIndex].u_Int32[nInt16Index / 2] = nVal;
-        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
-        m_store->setCell(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
-    }
-    break;
-    case RegisterDataType::eDataTypeFloat:
-    {
-        float nVal = pItem->text().toFloat();
-        // 每个 float 占 2 个 Int16:子下标按 ndataIndex%4 推导,与 display/读取端保持一致
-        int nInt16Index = ndataIndex % 4;
-        m_vecRegisterVal[nRegisterValIndex].u_float[nInt16Index / 2] = nVal;
-        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index]);
-        m_store->setCell(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[nInt16Index + 1]);
-    }
-    break;
-    case RegisterDataType::eDataTypeDouble:
-    {
-        double nVal = pItem->text().toDouble();
-        m_vecRegisterVal[nRegisterValIndex].u_double = nVal;
-        m_store->setCell(addr, m_vecRegisterVal[nRegisterValIndex].u_Int16[0]);
-        m_store->setCell(addr + 1, m_vecRegisterVal[nRegisterValIndex].u_Int16[1]);
-        m_store->setCell(addr + 2, m_vecRegisterVal[nRegisterValIndex].u_Int16[2]);
-        m_store->setCell(addr + 3, m_vecRegisterVal[nRegisterValIndex].u_Int16[3]);
-    }
-    break;
-    default:
-        break;
+        m_store->setCell(addr + j, cell.u_Int16[s + j]);
     }
 }
 
@@ -486,235 +471,51 @@ void RegisterTableManager::displayRegisterVals()
     m_bShouldFlash = flashIntent;
 
     RegisterDataType type = data.value<RegisterDataType>();
+    const int rpv = registersPerValue(type);
+
+    // 单循环填值:每个值格锚定线性下标 k,仅在 k % rpv == 0 的锚点格写值,
+    // 非锚点格保持清空阶段的空白(复现原 Char8/Int16 每格、Int32/Float 隔格、Double 每 4 格)
+    for (int col = 1; col < colCount; col += 2)
+    {
+        for (int row = 0; row < rowCount; row++)
+        {
+            int k = m_layout.linearIndex(row, col);
+            if (m_layout.cacheIndex(k) >= static_cast<int>(m_vecRegisterVal.size()))
+                break;                                   // 越界保护(同原 break 语义)
+            if (k % rpv != 0) continue;                  // 非锚点格留空
+            if (row == m_nEditRow && col == m_nEditCol) continue;  // 跳过正在编辑格
+
+            QTableWidgetItem* item = m_tableWidget->item(row, col);
+            if (!item) continue;
+            item->setText(formatCell(type, k));
+            item->setFlags(item->flags() | Qt::ItemIsEditable);
+        }
+    }
+}
+
+QString RegisterTableManager::formatCell(RegisterDataType type, int k) const
+{
+    const DataTypeConvert& cell = m_vecRegisterVal[m_layout.cacheIndex(k)];
+    const int s = m_layout.subIndex(k);
     switch (type)
     {
     case RegisterDataType::eDataTypeChar8:
-        displayRegisterVals_Char8();
-        break;
+        return QString("%1%2")
+            .arg(QChar(cell.u_chars[s * 2]))
+            .arg(QChar(cell.u_chars[s * 2 + 1]));
     case RegisterDataType::eDataTypeInt16:
-        displayRegisterVals_Int16();
-        break;
+        if (m_nIntStat == 1)
+            return QString("%1").arg(QString::number(cell.u_Int16[s], 16), 4, '0').toUpper();
+        return QString("%1").arg(cell.u_Int16[s]);
     case RegisterDataType::eDataTypeInt32:
-        displayRegisterVals_Int32();
-        break;
+        if (m_nIntStat == 1)
+            return QString("%1").arg(QString::number(cell.u_Int32[s / 2], 16), 8, '0').toUpper();
+        return QString("%1").arg(cell.u_Int32[s / 2]);
     case RegisterDataType::eDataTypeFloat:
-        displayRegisterVals_Float();
-        break;
+        return QString("%1").arg(cell.u_float[s / 2]);
     case RegisterDataType::eDataTypeDouble:
-        displayRegisterVals_Double();
-        break;
-    }
-}
-
-void RegisterTableManager::displayRegisterVals_Char8()
-{
-    const int rowCount = m_tableWidget->rowCount();
-    const int colCount = m_tableWidget->columnCount();
-
-    int nRegisterCount = 0;
-    int nRealDataCount = 0;
-    DataTypeConvert* currentData = &m_vecRegisterVal[nRegisterCount];
-
-    for (int col = 1; col < colCount; col += 2)
-    {
-        for (int row = 0; row < rowCount; row++)
-        {
-            QString strInfo(QString("%1%2")
-                .arg(QChar(currentData->u_chars[nRealDataCount++]))
-                .arg(QChar(currentData->u_chars[nRealDataCount++])));
-
-            if (!(row == m_nEditRow && col == m_nEditCol))
-            {
-                m_tableWidget->item(row, col)->setText(strInfo);
-                m_tableWidget->item(row, col)->setFlags(
-                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
-            }
-
-            if (nRealDataCount == 8)
-            {
-                nRealDataCount = 0;
-                nRegisterCount++;
-                if (nRegisterCount >= static_cast<int>(m_vecRegisterVal.size()))
-                {
-                    break;
-                }
-                currentData = &m_vecRegisterVal[nRegisterCount];
-            }
-        }
-    }
-}
-
-void RegisterTableManager::displayRegisterVals_Int16()
-{
-    const int rowCount = m_tableWidget->rowCount();
-    const int colCount = m_tableWidget->columnCount();
-
-    int nRegisterCount = 0;
-    int nRealDataCount = 0;
-    DataTypeConvert* currentData = &m_vecRegisterVal[nRegisterCount];
-
-    for (int col = 1; col < colCount; col += 2)
-    {
-        for (int row = 0; row < rowCount; row++)
-        {
-            QString strInfo;
-            if (m_nIntStat == 1)
-            {
-                strInfo = QString("%1").arg(
-                    QString::number(currentData->u_Int16[nRealDataCount++], 16), 4, '0').toUpper();
-            }
-            else
-            {
-                strInfo = QString("%1").arg(currentData->u_Int16[nRealDataCount++]);
-            }
-
-            if (!(row == m_nEditRow && col == m_nEditCol))
-            {
-                m_tableWidget->item(row, col)->setText(strInfo);
-                m_tableWidget->item(row, col)->setFlags(
-                    m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
-            }
-
-            if (nRealDataCount == 4)
-            {
-                nRealDataCount = 0;
-                nRegisterCount++;
-                if (nRegisterCount >= static_cast<int>(m_vecRegisterVal.size()))
-                {
-                    break;
-                }
-                currentData = &m_vecRegisterVal[nRegisterCount];
-            }
-        }
-    }
-}
-
-void RegisterTableManager::displayRegisterVals_Int32()
-{
-    const int rowCount = m_tableWidget->rowCount();
-    const int colCount = m_tableWidget->columnCount();
-
-    int nRegisterCount = 0;
-    int nRealDataCount = 0;
-    int nCellCount = 0;
-    DataTypeConvert* currentData = &m_vecRegisterVal[nRegisterCount];
-
-    for (int col = 1; col < colCount; col += 2)
-    {
-        for (int row = 0; row < rowCount; row++)
-        {
-            nCellCount++;
-
-            if (nCellCount % 2 == 1)
-            {
-                QString strInfo;
-                if (m_nIntStat == 1)
-                {
-                    strInfo = QString("%1").arg(
-                        QString::number(currentData->u_Int32[nRealDataCount++], 16), 8, '0').toUpper();
-                }
-                else
-                {
-                    strInfo = QString("%1").arg(currentData->u_Int32[nRealDataCount++]);
-                }
-
-                if (!(row == m_nEditRow && col == m_nEditCol))
-                {
-                    m_tableWidget->item(row, col)->setText(strInfo);
-                    m_tableWidget->item(row, col)->setFlags(
-                        m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
-                }
-
-                if (nRealDataCount == 2)
-                {
-                    nRealDataCount = 0;
-                    nRegisterCount++;
-                    if (nRegisterCount >= static_cast<int>(m_vecRegisterVal.size()))
-                    {
-                        break;
-                    }
-                    currentData = &m_vecRegisterVal[nRegisterCount];
-                }
-            }
-        }
-    }
-}
-
-void RegisterTableManager::displayRegisterVals_Float()
-{
-    const int rowCount = m_tableWidget->rowCount();
-    const int colCount = m_tableWidget->columnCount();
-
-    int nRegisterCount = 0;
-    int nRealDataCount = 0;
-    int nCellCount = 0;
-    DataTypeConvert* currentData = &m_vecRegisterVal[nRegisterCount];
-
-    for (int col = 1; col < colCount; col += 2)
-    {
-        for (int row = 0; row < rowCount; row++)
-        {
-            nCellCount++;
-
-            if (nCellCount % 2 == 1)
-            {
-                QString strInfo = QString("%1").arg(currentData->u_float[nRealDataCount++]);
-
-                if (!(row == m_nEditRow && col == m_nEditCol))
-                {
-                    m_tableWidget->item(row, col)->setText(strInfo);
-                    m_tableWidget->item(row, col)->setFlags(
-                        m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
-                }
-
-                if (nRealDataCount == 2)
-                {
-                    nRealDataCount = 0;
-                    nRegisterCount++;
-                    if (nRegisterCount >= static_cast<int>(m_vecRegisterVal.size()))
-                    {
-                        break;
-                    }
-                    currentData = &m_vecRegisterVal[nRegisterCount];
-                }
-            }
-        }
-    }
-}
-
-void RegisterTableManager::displayRegisterVals_Double()
-{
-    const int rowCount = m_tableWidget->rowCount();
-    const int colCount = m_tableWidget->columnCount();
-
-    int nRegisterCount = 0;
-    int nCellCount = 0;
-    DataTypeConvert* currentData = &m_vecRegisterVal[nRegisterCount];
-
-    for (int col = 1; col < colCount; col += 2)
-    {
-        for (int row = 0; row < rowCount; row++)
-        {
-            nCellCount++;
-
-            if (nCellCount % 4 == 1)
-            {
-                QString strInfo = QString("%1").arg(currentData->u_double);
-
-                if (!(row == m_nEditRow && col == m_nEditCol))
-                {
-                    m_tableWidget->item(row, col)->setText(strInfo);
-                    m_tableWidget->item(row, col)->setFlags(
-                        m_tableWidget->item(row, col)->flags() | Qt::ItemIsEditable);
-                }
-
-                nRegisterCount++;
-                if (nRegisterCount >= static_cast<int>(m_vecRegisterVal.size()))
-                {
-                    break;
-                }
-                currentData = &m_vecRegisterVal[nRegisterCount];
-            }
-        }
+        return QString("%1").arg(cell.u_double);
+    default:
+        return QString();
     }
 }
