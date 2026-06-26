@@ -16,11 +16,17 @@ QuickPanel::QuickPanel(QWidget* parent)
 	// 初始化布局（所有按钮垂直排列：6个脚本按钮竖排，退出按钮置底）
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // 创建6个按钮并垂直添加
-    for (int i = 0; i < 6; ++i)
+    // 创建脚本按钮并垂直添加;点击发 executeLuaScript(脚本索引 0-based)
+    constexpr int kScriptButtonCount = 6;
+    for (int i = 0; i < kScriptButtonCount; ++i)
     {
-        btn[i] = new QPushButton(this);
-        mainLayout->addWidget(btn[i]);
+        auto* button = new QPushButton(this);
+        mainLayout->addWidget(button);
+        btn.push_back(button);
+
+        connect(button, &QPushButton::clicked, this, [this, i]() {
+            emit executeLuaScript(i);
+        });
     }
 
     // 脚本按钮与退出按钮之间:间距 + 细分隔线,明确区分两类操作
@@ -40,13 +46,6 @@ QuickPanel::QuickPanel(QWidget* parent)
         emit showMainWindow(); // 发射信号，通知主窗口显示
         });
 
-    connect(btn[0], &QPushButton::clicked, this, &QuickPanel::onButton1Clicked);
-    connect(btn[1], &QPushButton::clicked, this, &QuickPanel::onButton2Clicked);
-    connect(btn[2], &QPushButton::clicked, this, &QuickPanel::onButton3Clicked);
-    connect(btn[3], &QPushButton::clicked, this, &QuickPanel::onButton4Clicked);
-    connect(btn[4], &QPushButton::clicked, this, &QuickPanel::onButton5Clicked);
-    connect(btn[5], &QPushButton::clicked, this, &QuickPanel::onButton6Clicked);
-
     mainLayout->setContentsMargins(8, 8, 8, 8);
     mainLayout->setSpacing(8);
 
@@ -58,47 +57,6 @@ QuickPanel::QuickPanel(QWidget* parent)
 
 void QuickPanel::setButtonTexts(const QStringList& texts)
 {
-    for (int i = 0; i < 6; ++i) 
-    {
-        if (i < texts.size()) 
-        {
-            btn[i]->setText(texts[i]);
-        }
-    }
-}
-
-void QuickPanel::onButton1Clicked()
-{
-    //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script1.lua";
-    emit executeLuaScript(1);
-}
-
-void QuickPanel::onButton2Clicked()
-{
-    //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script2.lua";
-    emit executeLuaScript(2);
-}
-
-void QuickPanel::onButton3Clicked()
-{
-    //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script3.lua";
-    emit executeLuaScript(3);
-}
-
-void QuickPanel::onButton4Clicked()
-{
-   // QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script4.lua";
-    emit executeLuaScript(4);
-}
-
-void QuickPanel::onButton5Clicked()
-{
-    //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script5.lua";
-    emit executeLuaScript(5);
-}
-
-void QuickPanel::onButton6Clicked()
-{
-    //QString p = QCoreApplication::applicationDirPath() + "/Config/LuaScript/script6.lua";
-    emit executeLuaScript(6);
+    for (int i = 0; i < btn.size() && i < texts.size(); ++i)
+        btn[i]->setText(texts[i]);
 }

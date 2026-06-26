@@ -156,7 +156,6 @@ void MainWindow::createMembers()
 
 	// 脚本管理器
 	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
-	m_scriptManager->initScriptExecution();
 
 	// 平台控制器
 	m_platformController = std::make_unique<PlatformController>(
@@ -372,36 +371,22 @@ void MainWindow::connectWindowSignals()
 
 void MainWindow::connectScript()
 {
-	// 连接脚本执行和编辑按钮
-	QPushButton* execBtns[6] = { ui->Btn_Execute_1, ui->Btn_Execute_2, ui->Btn_Execute_3,
-	                             ui->Btn_Execute_4, ui->Btn_Execute_5, ui->Btn_Execute_6 };
-	QPushButton* editBtns[6] = { ui->Btn_Edit_1, ui->Btn_Edit_2, ui->Btn_Edit_3,
-	                             ui->Btn_Edit_4, ui->Btn_Edit_5, ui->Btn_Edit_6 };
-	QCheckBox*   loopChks[6] = { ui->ChkBox_LoopEnable_1, ui->ChkBox_LoopEnable_2, ui->ChkBox_LoopEnable_3,
-	                             ui->ChkBox_LoopEnable_4, ui->ChkBox_LoopEnable_5, ui->ChkBox_LoopEnable_6 };
-	for (int i = 0; i < 6; ++i)
+	// 连接脚本执行/编辑/循环按钮(数量由 UI 推导:Btn_Execute_{i+1} 找不到即停)
+	for (int i = 0; ; ++i)
 	{
-		m_scriptManager->connectExecuteButton(i, execBtns[i]);   // execute 0-based
-		m_scriptManager->connectEditButton(i + 1, editBtns[i]);  // edit 1-based
-		m_scriptManager->connectLoopCheckBox(i, loopChks[i]);    // loop 0-based
+		auto* execBtn = findChild<QPushButton*>(QString("Btn_Execute_%1").arg(i + 1));
+		if (!execBtn) break;   // 行数由 UI 推导:无执行按钮即停
+		auto* editBtn = findChild<QPushButton*>(QString("Btn_Edit_%1").arg(i + 1));
+		auto* loopChk = findChild<QCheckBox*>(QString("ChkBox_LoopEnable_%1").arg(i + 1));
+		m_scriptManager->bindScriptRow(i, execBtn, editBtn, loopChk);
 	}
 
-	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [=](int buttonId)
-			{
-        if (m_pWorkFlow == nullptr) return;
-        int idx = buttonId;
-        QString strLuaPath = QCoreApplication::applicationDirPath();
-		strLuaPath += "/Config/LuaScript/";
-		strLuaPath += QString("LuaFile%1.lua").arg(idx);
-        QFile f(strLuaPath);
-        if (!f.exists()) {
-            QMessageBox::critical(this, "Lua执行错误", QString("脚本不存在: %1").arg(strLuaPath));
-			UpdateLogDisplay(QString("脚本不存在: %1").arg(strLuaPath));
-            return;
-        }
-        // 异步投递执行;运行结果(成功/失败)经 scriptFinished → scriptLog 反馈到日志
-        m_pWorkFlow->scriptHost()->runScript(idx-1, strLuaPath); // buttonId从1开始，索引从0开始
-        });
+	// 子窗口脚本执行:统一走 ScriptManager 单一入口(信号已 0-based)
+	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [this](int scriptIndex)
+			{ m_scriptManager->runScript(scriptIndex); });
+
+	// 脚本相关提示(如脚本不存在)转发到通信日志
+	connect(m_scriptManager.get(), &ScriptManager::logMessage, this, &MainWindow::UpdateLogDisplay);
 
 	if (m_configStore)
 	{
@@ -420,8 +405,15 @@ void MainWindow::connectScript()
 
 QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 {
-	return { ui->edit_ScriptName_1, ui->edit_ScriptName_2, ui->edit_ScriptName_3,
-	         ui->edit_ScriptName_4, ui->edit_ScriptName_5, ui->edit_ScriptName_6 };
+	// 数量由 UI 推导:edit_ScriptName_{i} 找不到即停
+	QVector<QLineEdit*> edits;
+	for (int i = 1; ; ++i)
+	{
+		auto* edit = findChild<QLineEdit*>(QString("edit_ScriptName_%1").arg(i));
+		if (!edit) break;
+		edits << edit;
+	}
+	return edits;
 }
 
 void MainWindow::connectRegisterTable()

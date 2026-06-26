@@ -43,6 +43,9 @@ public:
     void loadScript(const QString &content);
     QString getScriptContent() const;
 
+    // 是否有未保存的更改(内容 ≠ 上次加载/保存)
+    bool isModified() const { return m_isModified; }
+
     // 脚本运行完成时由 ScriptManager 在 GUI 线程调用:收尾运行态并提示结果
     void onRunFinished(bool ok, const QString& err);
 
