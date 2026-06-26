@@ -12,8 +12,6 @@
 #include <QObject>
 #include <QTableWidget>
 #include <QTableWidgetItem>
-#include <QComboBox>
-#include <QLineEdit>
 #include <QMap>
 #include <QTimer>
 #include <vector>
@@ -45,12 +43,10 @@ class RegisterTableManager : public QObject
     Q_OBJECT
 
 public:
-    // tableWidget: 寄存器表格控件; dataTypeCombo: 数据类型下拉框;
-    // addrEdit: 起始地址输入框; store: 寄存器数据存储; parent: 父对象
+    // tableWidget: 寄存器表格控件; store: 寄存器数据存储; parent: 父对象
+    // 当前数据类型/起始地址由 MainWindow 经 setDataType/setStartAddr 推入,RTM 不持有控件
     explicit RegisterTableManager(
         QTableWidget* tableWidget,
-        QComboBox* dataTypeCombo,
-        QLineEdit* addrEdit,
         RegisterStore* store,
         QWidget* parent = nullptr
     );
@@ -60,23 +56,31 @@ public:
     // 初始化寄存器表格
     void initTable();
 
-    // 更新表格信息(nStart 起始地址)
-    void updateTableInfo(int nStart);
+    // 更新表格信息(读持有的起始地址 m_startAddr)
+    void updateTableInfo();
 
     // 静默刷新(不闪烁):用于视图刷新(改地址/类型/进制)
-    void refreshSilently(int nStart);
+    void refreshSilently();
 
-    // 从工作流获取寄存器数据(nStart 起始地址)
-    void getRegisterVals(int nStart);
+    // 从工作流获取寄存器数据(读持有的起始地址 m_startAddr)
+    void getRegisterVals();
 
-    // 将数据写入工作流(nStart 起始地址)
-    void setRegisterVals(int nStart);
+    // 将数据写入工作流(读持有的起始地址 m_startAddr)
+    void setRegisterVals();
 
     // 更新单个单元格对应的寄存器值
     void updateRegisterVals(QTableWidgetItem* pItem);
 
     // 显示寄存器数据
     void displayRegisterVals();
+
+    // 设置/获取当前数据类型(由 MainWindow 在下拉框变化时推入)
+    void setDataType(RegisterDataType type) { m_currentType = type; }
+    RegisterDataType dataType() const { return m_currentType; }
+
+    // 设置/获取起始地址(由 MainWindow 在地址框变化时推入)
+    void setStartAddr(int nStart) { m_startAddr = nStart; }
+    int startAddr() const { return m_startAddr; }
 
     // 设置整数显示状态(0=十进制, 1=十六进制)
     void setIntDisplayStat(int stat) { m_nIntStat = stat; }
@@ -123,11 +127,12 @@ private:
 
 private:
     QTableWidget* m_tableWidget;      // 寄存器表格控件
-    QComboBox* m_dataTypeCombo;       // 数据类型选择下拉框
-    QLineEdit* m_addrEdit;            // 起始地址输入框
     RegisterStore* m_store;           // 寄存器数据存储
     QWidget* m_parentWidget;          // 父窗口(用于显示消息框)
     RegisterCellLayout m_layout;      // cell<->寄存器映射(单一真相源)
+
+    RegisterDataType m_currentType;   // 当前数据类型(MainWindow 推入,不实时读控件)
+    int m_startAddr;                  // 起始地址(MainWindow 推入,不实时读控件)
 
     std::vector<DataTypeConvert> m_vecRegisterVal;  // 寄存器数据缓存
     int m_nIntStat;                   // 整数显示状态 0=十进制, 1=十六进制

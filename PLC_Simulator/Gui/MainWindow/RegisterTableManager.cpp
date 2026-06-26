@@ -22,17 +22,15 @@ QString formatReal(double value, int sigDigits)
 
 RegisterTableManager::RegisterTableManager(
     QTableWidget* tableWidget,
-    QComboBox* dataTypeCombo,
-    QLineEdit* addrEdit,
     RegisterStore* store,
     QWidget* parent)
     : QObject(parent)
     , m_tableWidget(tableWidget)
-    , m_dataTypeCombo(dataTypeCombo)
-    , m_addrEdit(addrEdit)
     , m_store(store)
     , m_parentWidget(parent)
     , m_layout{REGISTER_TABLE_ROW_COUNT, REGISTER_TABLE_COLUMN_COUNT}
+    , m_currentType(RegisterDataType::eDataTypeChar8)  // 对齐下拉框初始 index 0
+    , m_startAddr(0)
     , m_nIntStat(0)
     , m_bShouldFlash(true)
     , m_nEditRow(-1)
@@ -88,7 +86,7 @@ void RegisterTableManager::initTable()
     // 表格外观由全局主题样式表(ThemeManager)统一控制,此处不再设置局部样式
 }
 
-void RegisterTableManager::updateTableInfo(int nStart)
+void RegisterTableManager::updateTableInfo()
 {
     if (!m_tableWidget || !m_store) return;
 
@@ -101,7 +99,7 @@ void RegisterTableManager::updateTableInfo(int nStart)
         {
             QTableWidgetItem* item = m_tableWidget->item(row, col);
 
-            int addrNum = m_layout.registerAddr(m_layout.linearIndex(row, col), nStart);
+            int addrNum = m_layout.registerAddr(m_layout.linearIndex(row, col), m_startAddr);
             item->setText(QString("D%1").arg(addrNum, 5, 10, QChar('0')));
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
 
@@ -109,15 +107,15 @@ void RegisterTableManager::updateTableInfo(int nStart)
         }
     }
 
-    getRegisterVals(nStart);
+    getRegisterVals();
     displayRegisterVals();
 }
 
-void RegisterTableManager::refreshSilently(int nStart)
+void RegisterTableManager::refreshSilently()
 {
     // 静默刷新:关闭闪烁意图 → updateTableInfo 全程不闪(无需 QSignalBlocker)
     setShouldFlash(false);
-    updateTableInfo(nStart);
+    updateTableInfo();
     setShouldFlash(true);
 }
 
@@ -158,7 +156,7 @@ void RegisterTableManager::onItemChanged(QTableWidgetItem* item)
     restoreTimer->start(400);  // 400ms 后恢复
 }
 
-void RegisterTableManager::getRegisterVals(int nStart)
+void RegisterTableManager::getRegisterVals()
 {
     if (!m_store) return;
 
@@ -166,12 +164,13 @@ void RegisterTableManager::getRegisterVals(int nStart)
     {
         for (int j = 0; j < 4; j++)
         {
-            m_vecRegisterVal[i].u_Int16[j] = m_store->cell(nStart + i * 4 + j);
+            m_vecRegisterVal[i].u_Int16[j] = m_store->cell(m_startAddr + i * 4 + j);
         }
     }
 }
 
-void RegisterTableManager::setRegisterVals(int nStart)
+// 注:setRegisterVals 当前全工程无调用点,保留以备整批写回场景
+void RegisterTableManager::setRegisterVals()
 {
     if (!m_store) return;
 
@@ -179,7 +178,7 @@ void RegisterTableManager::setRegisterVals(int nStart)
     {
         for (int j = 0; j < 4; j++)
         {
-            m_store->setCell(nStart + i * 4 + j, m_vecRegisterVal[i].u_Int16[j]);
+            m_store->setCell(m_startAddr + i * 4 + j, m_vecRegisterVal[i].u_Int16[j]);
         }
     }
 }
@@ -244,7 +243,7 @@ void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString
 
 void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
 {
-    if (!pItem || !m_tableWidget || !m_store || !m_addrEdit) return;
+    if (!pItem || !m_tableWidget || !m_store) return;
 
     checkInput(pItem);
 
@@ -252,12 +251,9 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
     int nCol = pItem->column();
     if (nCol % 2 == 0) return;  // 偶数列为地址列,不处理
 
-    if (!m_dataTypeCombo) return;
-    int nCurIndex = m_dataTypeCombo->currentIndex();
-    if (nCurIndex < 0) return;
-    RegisterDataType type = m_dataTypeCombo->itemData(nCurIndex).value<RegisterDataType>();
+    RegisterDataType type = m_currentType;
 
-    int nStart = m_addrEdit->text().toUInt();
+    int nStart = m_startAddr;
     int k = m_layout.linearIndex(nRow, nCol);
     int addr = m_layout.registerAddr(k, nStart);
     int rpv = registersPerValue(type);
@@ -275,17 +271,13 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
 
 bool RegisterTableManager::checkInput(QTableWidgetItem* pItem)
 {
-    if (!pItem || !m_dataTypeCombo) return false;
+    if (!pItem) return false;
 
-    int nCurIndex = m_dataTypeCombo->currentIndex();
-    if (nCurIndex < 0) return false;
-
-    QVariant data = m_dataTypeCombo->itemData(nCurIndex);
     QString text = pItem->text().trimmed();
 
     if (pItem->column() % 2 == 0) return true;
 
-    RegisterDataType type = data.value<RegisterDataType>();
+    RegisterDataType type = m_currentType;
 
     if (m_nIntStat == 1 && (type == RegisterDataType::eDataTypeInt16 ||
         type == RegisterDataType::eDataTypeInt32))
@@ -436,10 +428,7 @@ bool RegisterTableManager::checkInput_int_Hex(QTableWidgetItem* pItem, const Reg
 
 void RegisterTableManager::displayRegisterVals()
 {
-    if (!m_tableWidget || !m_dataTypeCombo) return;
-
-    int nCurIndex = m_dataTypeCombo->currentIndex();
-    if (nCurIndex < 0) return;
+    if (!m_tableWidget) return;
 
     // 记录当前正在编辑的单元格,刷新时跳过它,避免覆盖用户未提交的输入
     // (写文本会触发 dataChanged -> setEditorData,把编辑器内容重置为最新值,导致输入被"复原")
@@ -459,8 +448,6 @@ void RegisterTableManager::displayRegisterVals()
     // (不写死 true,使 setShouldFlash(false) 的静默路径真正生效,无需 QSignalBlocker)
     const bool flashIntent = m_bShouldFlash;
     m_bShouldFlash = false;
-
-    QVariant data = m_dataTypeCombo->itemData(nCurIndex);
 
     const int rowCount = m_tableWidget->rowCount();
     const int colCount = m_tableWidget->columnCount();
@@ -483,7 +470,7 @@ void RegisterTableManager::displayRegisterVals()
 
     m_bShouldFlash = flashIntent;
 
-    RegisterDataType type = data.value<RegisterDataType>();
+    RegisterDataType type = m_currentType;
     const int rpv = registersPerValue(type);
 
     // 单循环填值:每个值格锚定线性下标 k,仅在 k % rpv == 0 的锚点格写值,

@@ -148,8 +148,6 @@ void MainWindow::createMembers()
 	// 寄存器表格管理器
 	m_registerTableManager = std::make_unique<RegisterTableManager>(
 		ui->table_RegisterData,
-		ui->cmbBox_DataType,
-		ui->edit_RegisterAddr,
 		m_pWorkFlow->registerStore(),
 		this);
 	m_registerTableManager->initTable();
@@ -209,6 +207,10 @@ void MainWindow::setupUiContent()
 		}
 
 		ui->cmbBox_DataType->setCurrentIndex(0);
+
+		// 推入初始数据类型(RTM 不再实时读控件)
+		m_registerTableManager->setDataType(
+			ui->cmbBox_DataType->currentData().value<RegisterDataType>());
 	}
 
 	ui->text_CommLog->setReadOnly(true);
@@ -227,7 +229,8 @@ void MainWindow::applyThemePref()
 
 void MainWindow::initialRefresh()
 {
-	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt());
+	m_registerTableManager->setStartAddr(ui->edit_RegisterAddr->text().toUInt());
+	m_registerTableManager->updateTableInfo();
 }
 
 void MainWindow::connectSignals()
@@ -434,7 +437,7 @@ void MainWindow::connectRegisterTable()
 		if (m_pWorkFlow == nullptr) return;
 		m_pWorkFlow->registerStore()->resetAll(0); });
 
-	// 修改显示寄存器地址(静默刷新)
+	// 修改显示寄存器地址(推入地址后静默刷新)
 	connect(ui->edit_RegisterAddr, &QLineEdit::textChanged, this, [=](const QString &text)
 			{
 				if (text == "")
@@ -442,19 +445,24 @@ void MainWindow::connectRegisterTable()
 				int nAddr = text.toInt();
 				if (nAddr < 0)
 					return;
-				m_registerTableManager->getRegisterVals(nAddr);
-				m_registerTableManager->refreshSilently(nAddr);
+				m_registerTableManager->setStartAddr(nAddr);
+				m_registerTableManager->getRegisterVals();
+				m_registerTableManager->refreshSilently();
 			});
 
-	// 修改显示寄存器数据类型(静默刷新)
+	// 修改显示寄存器数据类型(推入类型后静默刷新)
 	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
-			{ m_registerTableManager->refreshSilently(ui->edit_RegisterAddr->text().toUInt()); });
+			{
+				m_registerTableManager->setDataType(
+					ui->cmbBox_DataType->currentData().value<RegisterDataType>());
+				m_registerTableManager->refreshSilently();
+			});
 
 	// 寄存器数据改变(实时闪红)
 	if (m_pWorkFlow != nullptr)
 	{
 		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
-				{ m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt()); });
+				{ m_registerTableManager->updateTableInfo(); });
 	}
 
 	// 数据显示进制切换(DEC/HEX,静默刷新)
@@ -470,7 +478,7 @@ void MainWindow::connectRegisterTable()
 				m_registerTableManager->setIntDisplayStat(0);
 			else if (button == ui->Radio_Data_HEX)
 				m_registerTableManager->setIntDisplayStat(1);
-			m_registerTableManager->refreshSilently(ui->edit_RegisterAddr->text().toUInt());
+			m_registerTableManager->refreshSilently();
 		} });
 }
 
