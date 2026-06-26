@@ -44,64 +44,13 @@ MainWindow::MainWindow(QWidget *parent)
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(APP_NAME).arg(APP_VERSION));
 
-	// 初始化成员实例
-	InitializeMember();
-
-	// 加载配置
-	InitialAllConfigs();
-
-	// 初始化信号槽连接
-	InitialSignalConnect();
-
-	// 初始化界面主题(读取持久化偏好,默认深色)
-	{
-		int themeId = static_cast<int>(Theme::Dark);
-		m_configStore->LoadThemePref(themeId);
-		ThemeManager::instance().applyTheme(static_cast<Theme>(themeId));
-	}
-	ui->text_CommLog->setReadOnly(true);
-
-	// 初始化寄存器表格管理器
-	m_registerTableManager = std::make_unique<RegisterTableManager>(
-		ui->table_RegisterData,
-		ui->cmbBox_DataType,
-		ui->edit_RegisterAddr,
-		m_pWorkFlow->registerStore(),
-		this);
-	m_registerTableManager->initTable();
-	ui->table_RegisterData->installEventFilter(this);
-
-	// 初始化脚本管理器
-	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
-	m_scriptManager->initScriptExecution();
-
-	InitialScriptConnect();
-
-	// 初始化输入限制
-	InitialLineEditValidator();
-
-	// 状态栏:常显轴写入目标地址
-	m_statusAddrLabel = new QLabel(this);
-	ui->statusBar->addPermanentWidget(m_statusAddrLabel);
-	refreshAxisAddrStatus();
-
-	// 更新表格显示
-	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
-
-	m_platformController = std::make_unique<PlatformController>(
-		m_pWorkFlow ? m_pWorkFlow->registerStore() : nullptr,
-		m_simulationPlatform,
-		m_platformParams.unitXY, m_platformParams.unitD, nullptr);
-
-	if (m_pWorkFlow == nullptr)
-		return;
-	m_pWorkFlow->scriptHost()->installModule(
-		std::make_unique<PlatformBinding>(m_platformController.get()));
-
-	// 平台位姿变化信号 → 自动写入寄存器
-	connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
-		[this](Platform which, const Pose& p) { OnPlatformPoseChanged(which, p); });
-
+	createMembers();          // ① 创建所有成员对象(按依赖顺序)
+	setupUiContent();         // ② 填充静态 UI(下拉框 / 只读 / 状态栏初值)
+	loadConfigs();            // ③ 读取持久化配置(须先于连接信号,避免回写回环)
+	setupInputValidators();   // ④ 输入校验(须晚于 loadConfigs:IP 掩码会重排已填文本)
+	applyThemePref();         // ⑤ 应用持久化主题(须先于建菜单:菜单勾选读当前主题)
+	connectSignals();         // ⑥ 连接所有信号槽
+	initialRefresh();         // ⑦ 首屏刷新表格
 }
 
 MainWindow::~MainWindow()
@@ -111,7 +60,7 @@ MainWindow::~MainWindow()
 	delete ui;
 }
 
-void MainWindow::InitialAllConfigs()
+void MainWindow::loadConfigs()
 {
 	// 加载之前保存的配置
 	if (m_configStore)
@@ -171,7 +120,7 @@ void MainWindow::InitialAllConfigs()
 	}
 }
 
-void MainWindow::InitializeMember()
+void MainWindow::createMembers()
 {
 	m_configStore = new ConfigStore(this);
 
@@ -180,15 +129,13 @@ void MainWindow::InitializeMember()
 		m_pWorkFlow = MainWorkFlow::InitialWorkFlow(this);
 	}
 
-	// 初始化小窗口
+	// 小窗口:标题栏保留标题与最小化按钮(支持任务栏最小化/还原),不显示最大化/关闭按钮
 	m_subWindow = std::make_unique<QuickPanel>();
-	// 将当前窗口的名称设置为小窗名称
 	m_subWindow->setWindowTitle(this->windowTitle() + " - 子窗口");
-	// 独立窗口,标题栏保留标题与最小化按钮(支持任务栏最小化/还原),不显示最大化/关闭按钮
 	m_subWindow->setWindowFlags(Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinimizeButtonHint);
-	// 初始化模拟平台窗口
+
+	// 模拟平台窗口
 	m_simulationPlatform = new SimulationPlatform(this);
-	// 将当前窗口的名称设置为模拟平台窗口名称
 	m_simulationPlatform->setWindowTitle(this->windowTitle() + " - 模拟平台");
 	m_simulationPlatform->setWindowFlags(
 		Qt::Dialog | Qt::WindowMinimizeButtonHint // 显示最小化按钮
@@ -198,28 +145,39 @@ void MainWindow::InitializeMember()
 	);
 	m_simulationPlatform->setAttribute(Qt::WA_ShowWithoutActivating, true);
 
-	// 监听所有窗口状态变化
-	connect(windowHandle(), &QWindow::windowStateChanged, this, [this](Qt::WindowState state)
-			{
-        // 主窗口状态变化
-        if (this->isVisible()) {
-            // 只有主窗口显示时才同步
-            m_simulationPlatform->setWindowState(state);
-        } });
+	// 寄存器表格管理器
+	m_registerTableManager = std::make_unique<RegisterTableManager>(
+		ui->table_RegisterData,
+		ui->cmbBox_DataType,
+		ui->edit_RegisterAddr,
+		m_pWorkFlow->registerStore(),
+		this);
+	m_registerTableManager->initTable();
 
-	// 监听子窗口状态变化:用事件过滤器捕获 QEvent::WindowStateChange
-	// (QWidget 级事件,不依赖原生句柄,无需提前 createWinId;状态联动逻辑见 eventFilter)
-	m_subWindow->installEventFilter(this);
-	// 监听平台窗口显隐变化:用事件过滤器同步菜单勾选状态
-	m_simulationPlatform->installEventFilter(this);
+	// 脚本管理器
+	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
+	m_scriptManager->initScriptExecution();
 
-	// 协议设置相关
+	// 平台控制器
+	m_platformController = std::make_unique<PlatformController>(
+		m_pWorkFlow ? m_pWorkFlow->registerStore() : nullptr,
+		m_simulationPlatform,
+		m_platformParams.unitXY, m_platformParams.unitD, nullptr);
+
+	// 状态栏:常显轴写入目标地址
+	m_statusAddrLabel = new QLabel(this);
+	ui->statusBar->addPermanentWidget(m_statusAddrLabel);
+}
+
+void MainWindow::setupUiContent()
+{
+	// 协议类型下拉
 	{
-		QMap<ProtocolType, QString> m_ProtocolTypeMap;
-		m_ProtocolTypeMap[ProtocolType::eProRegKeyencePCLink] = "基恩士PC-LINK上位链路协议";
-		m_ProtocolTypeMap[ProtocolType::eProRegMitsubishiQBinary] = "三菱MC协议二进制通信";
+		QMap<ProtocolType, QString> protocolTypeMap;
+		protocolTypeMap[ProtocolType::eProRegKeyencePCLink] = "基恩士PC-LINK上位链路协议";
+		protocolTypeMap[ProtocolType::eProRegMitsubishiQBinary] = "三菱MC协议二进制通信";
 
-		for (auto it = m_ProtocolTypeMap.begin(); it != m_ProtocolTypeMap.end(); ++it)
+		for (auto it = protocolTypeMap.begin(); it != protocolTypeMap.end(); ++it)
 		{
 			ui->cmbBox_ProtocolType->addItem(it.value(), QVariant::fromValue(it.key()));
 		}
@@ -237,17 +195,16 @@ void MainWindow::InitializeMember()
 		}
 	}
 
-	// ui->cmbBox_DataType 数据类型显示转换
+	// 数据类型下拉
 	{
-		QMap<RegisterDataType, QString> DataType;
-		DataType[RegisterDataType::eDataTypeChar8] = "字符";
-		DataType[RegisterDataType::eDataTypeInt16] = "单字";
-		DataType[RegisterDataType::eDataTypeInt32] = "双字";
-		DataType[RegisterDataType::eDataTypeFloat] = "单精度";
-		DataType[RegisterDataType::eDataTypeDouble] = "双精度";
+		QMap<RegisterDataType, QString> dataTypeMap;
+		dataTypeMap[RegisterDataType::eDataTypeChar8] = "字符";
+		dataTypeMap[RegisterDataType::eDataTypeInt16] = "单字";
+		dataTypeMap[RegisterDataType::eDataTypeInt32] = "双字";
+		dataTypeMap[RegisterDataType::eDataTypeFloat] = "单精度";
+		dataTypeMap[RegisterDataType::eDataTypeDouble] = "双精度";
 
-		// 绑定到comboBox
-		for (auto it = DataType.begin(); it != DataType.end(); ++it)
+		for (auto it = dataTypeMap.begin(); it != dataTypeMap.end(); ++it)
 		{
 			ui->cmbBox_DataType->addItem(it.value(), QVariant::fromValue(it.key()));
 		}
@@ -255,65 +212,46 @@ void MainWindow::InitializeMember()
 		ui->cmbBox_DataType->setCurrentIndex(0);
 	}
 
-	// 数据格式显示相关
+	ui->text_CommLog->setReadOnly(true);
+
+	// 状态栏轴地址初值(label 已在 createMembers 创建)
+	refreshAxisAddrStatus();
+}
+
+void MainWindow::applyThemePref()
+{
+	// 读取持久化主题偏好,默认深色;须先于 buildMenus(菜单勾选读当前主题)
+	int themeId = static_cast<int>(Theme::Dark);
+	m_configStore->LoadThemePref(themeId);
+	ThemeManager::instance().applyTheme(static_cast<Theme>(themeId));
+}
+
+void MainWindow::initialRefresh()
+{
+	m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt(), true);
+}
+
+void MainWindow::connectSignals()
+{
+	buildMenus();
+	connectWindowSignals();
+	connectRegisterTable();
+	connectComm();
+	connectLog();
+	connectScript();
+
+	// 平台绑定 + 位姿自动写入(workflow 实际恒非空,守卫仅为防御)
+	if (m_pWorkFlow)
 	{
-		QButtonGroup *group1 = new QButtonGroup(this);
-		QButtonGroup *group2 = new QButtonGroup(this);
+		m_pWorkFlow->scriptHost()->installModule(
+			std::make_unique<PlatformBinding>(m_platformController.get()));
 
-		group1->addButton(ui->Radio_Data_DEC);
-		group1->addButton(ui->Radio_Data_HEX);
-		ui->Radio_Data_DEC->setChecked(true);
-
-		group2->addButton(ui->Radio_Log_Ascii);
-		group2->addButton(ui->Radio_Log_HEX);
-		ui->Radio_Log_Ascii->setChecked(true);
-
-		connect(group1, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
-				{
-			if (checked)
-			{
-				qDebug() << "组1中选中了:" << button->text();
-				if (button == ui->Radio_Data_DEC)
-				{
-					m_registerTableManager->setIntDisplayStat(0);
-				}
-				else if (button == ui->Radio_Data_HEX)
-				{
-					m_registerTableManager->setIntDisplayStat(1);
-				}
-				silentRefreshTable(ui->edit_RegisterAddr->text().toUInt());
-			} });
-
-		connect(group2, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
-				{
-			if (checked)
-			{
-
-				if (button == ui->Radio_Log_Ascii)
-				{
-					m_nLogStat = 0;
-				}
-				else if (button == ui->Radio_Log_HEX)
-				{
-					m_nLogStat = 1;
-				}
-
-				qDebug() << "日志组中选中了:" << button->text() << "m_nLogStat = " << m_nLogStat;
-			} });
+		connect(m_simulationPlatform, &SimulationPlatform::poseChanged, this,
+			[this](Platform which, const Pose& p) { OnPlatformPoseChanged(which, p); });
 	}
 }
 
-void MainWindow::InitialSignalConnect()
-{
-	InitialMenuConnect();
-	InitialWindowConnect();
-	InitialRegisterTableConnect();
-	InitialCommConnect();
-	InitialLogConnect();
-
-}
-
-void MainWindow::InitialMenuConnect()
+void MainWindow::buildMenus()
 {
 	// 初始化菜单栏
 	QMenu *helpMenu = ui->menuBar->addMenu("帮助(&H)");
@@ -326,50 +264,50 @@ void MainWindow::InitialMenuConnect()
 	QMenu* viewMenu = ui->menuBar->addMenu("视图(&V)");
 	ui->menuBar->insertMenu(helpMenu->menuAction(), viewMenu);
 	QMenu* themeMenu = viewMenu->addMenu("主题");
-	m_actLightTheme = themeMenu->addAction("浅色");
-	m_actDarkTheme = themeMenu->addAction("深色");
-	m_actLightTheme->setCheckable(true);
-	m_actDarkTheme->setCheckable(true);
+	QAction* lightThemeAction = themeMenu->addAction("浅色");
+	QAction* darkThemeAction = themeMenu->addAction("深色");
+	lightThemeAction->setCheckable(true);
+	darkThemeAction->setCheckable(true);
 	QActionGroup* themeGroup = new QActionGroup(this);
 	themeGroup->setExclusive(true);
-	themeGroup->addAction(m_actLightTheme);
-	themeGroup->addAction(m_actDarkTheme);
+	themeGroup->addAction(lightThemeAction);
+	themeGroup->addAction(darkThemeAction);
 
 	// 同步当前主题的勾选状态
 	Theme cur = ThemeManager::instance().currentTheme();
-	m_actLightTheme->setChecked(cur == Theme::Light);
-	m_actDarkTheme->setChecked(cur == Theme::Dark);
+	lightThemeAction->setChecked(cur == Theme::Light);
+	darkThemeAction->setChecked(cur == Theme::Dark);
 
-	connect(m_actLightTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Light); });
-	connect(m_actDarkTheme, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
+	connect(lightThemeAction, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Light); });
+	connect(darkThemeAction, &QAction::triggered, this, [this]() { OnThemeSelected(Theme::Dark); });
 
 	// 平台菜单(顺序:视图 | 平台 | 帮助)
-	m_platformMenu = new QMenu("平台(&P)", this);
-	ui->menuBar->insertMenu(helpMenu->menuAction(), m_platformMenu);
+	QMenu* platformMenu = new QMenu("平台(&P)", this);
+	ui->menuBar->insertMenu(helpMenu->menuAction(), platformMenu);
 
-	m_actShowPlatform = m_platformMenu->addAction("显示平台");
+	m_actShowPlatform = platformMenu->addAction("显示平台");
 	m_actShowPlatform->setCheckable(true);
 	connect(m_actShowPlatform, &QAction::toggled, this, [this](bool on){
 		m_simulationPlatform->setVisible(on);
 	});
 
-	m_actAutoWrite = m_platformMenu->addAction("自动写入轴位置");
+	m_actAutoWrite = platformMenu->addAction("自动写入轴位置");
 	m_actAutoWrite->setCheckable(true);
 
-	QMenu* fmtMenu = m_platformMenu->addMenu("写入格式");
-	m_fmtGroup = new QActionGroup(this);
-	m_fmtGroup->setExclusive(true);
+	QMenu* fmtMenu = platformMenu->addMenu("写入格式");
+	QActionGroup* fmtGroup = new QActionGroup(this);
+	fmtGroup->setExclusive(true);
 	m_actFmtFloat = fmtMenu->addAction("浮点写入");
 	m_actFmtInt32 = fmtMenu->addAction("双字写入");
 	m_actFmtFloat->setCheckable(true);
 	m_actFmtInt32->setCheckable(true);
-	m_fmtGroup->addAction(m_actFmtFloat);
-	m_fmtGroup->addAction(m_actFmtInt32);
+	fmtGroup->addAction(m_actFmtFloat);
+	fmtGroup->addAction(m_actFmtInt32);
 	m_actFmtInt32->setChecked(true);   // 默认双字(原 Radio_AxisPos_Int32->setChecked(true))
 
-	m_platformMenu->addSeparator();
+	platformMenu->addSeparator();
 
-	QAction* actPlatformParams = m_platformMenu->addAction("参数设置…");
+	QAction* actPlatformParams = platformMenu->addAction("参数设置…");
 	connect(actPlatformParams, &QAction::triggered, this, [this]{
 		if (AuxDialogs::editPlatformParams(this, m_platformParams)) {
 			m_platformController->setUnitPowers(m_platformParams.unitXY, m_platformParams.unitD);
@@ -386,8 +324,19 @@ void MainWindow::InitialMenuConnect()
 	connect(actManualInt32, &QAction::triggered, this, &MainWindow::OnWriteAxisDoubleWord);
 }
 
-void MainWindow::InitialWindowConnect()
+void MainWindow::connectWindowSignals()
 {
+	// 主窗口状态变化 → 模拟平台跟随(仅主窗口显示时同步)
+	connect(windowHandle(), &QWindow::windowStateChanged, this, [this](Qt::WindowState state)
+			{
+        if (this->isVisible()) {
+            m_simulationPlatform->setWindowState(state);
+        } });
+
+	// 子窗口/平台窗口状态变化:用事件过滤器捕获(QWidget 级事件,不依赖原生句柄;逻辑见 eventFilter)
+	m_subWindow->installEventFilter(this);
+	m_simulationPlatform->installEventFilter(this);
+
 	// 连接小窗口的显示主窗口信号到主窗口的show()槽
 	connect(m_subWindow.get(), &QuickPanel::showMainWindow, this, &MainWindow::show);
 
@@ -421,7 +370,7 @@ void MainWindow::InitialWindowConnect()
 		} });
 }
 
-void MainWindow::InitialScriptConnect()
+void MainWindow::connectScript()
 {
 	// 连接脚本执行和编辑按钮
 	QPushButton* execBtns[6] = { ui->Btn_Execute_1, ui->Btn_Execute_2, ui->Btn_Execute_3,
@@ -475,7 +424,7 @@ QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 	         ui->edit_ScriptName_4, ui->edit_ScriptName_5, ui->edit_ScriptName_6 };
 }
 
-void MainWindow::InitialRegisterTableConnect()
+void MainWindow::connectRegisterTable()
 {
 	// 寄存器表格相关信号
 	{
@@ -588,9 +537,33 @@ void MainWindow::InitialRegisterTableConnect()
 		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
 				{ m_registerTableManager->updateTableInfo(ui->edit_RegisterAddr->text().toUInt()); });
 	}
+
+	// 表格事件过滤(供 eventFilter 处理)
+	ui->table_RegisterData->installEventFilter(this);
+
+	// 数据显示进制切换(DEC/HEX)
+	QButtonGroup *group1 = new QButtonGroup(this);
+	group1->addButton(ui->Radio_Data_DEC);
+	group1->addButton(ui->Radio_Data_HEX);
+	ui->Radio_Data_DEC->setChecked(true);
+	connect(group1, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
+			{
+		if (checked)
+		{
+			qDebug() << "组1中选中了:" << button->text();
+			if (button == ui->Radio_Data_DEC)
+			{
+				m_registerTableManager->setIntDisplayStat(0);
+			}
+			else if (button == ui->Radio_Data_HEX)
+			{
+				m_registerTableManager->setIntDisplayStat(1);
+			}
+			silentRefreshTable(ui->edit_RegisterAddr->text().toUInt());
+		} });
 }
 
-void MainWindow::InitialCommConnect()
+void MainWindow::connectComm()
 {
 	// 切换协议
 	connect(ui->cmbBox_ProtocolType, &QComboBox::currentIndexChanged, this, [this](int index)
@@ -657,11 +630,33 @@ void MainWindow::InitialCommConnect()
 		} });
 }
 
-void MainWindow::InitialLogConnect()
+void MainWindow::connectLog()
 {
 	// 点击清除日志
 	connect(ui->Btn_ClearCommLog, &QPushButton::clicked, this, [=]
 			{ ui->text_CommLog->clear(); });
+
+	// 日志显示进制切换(Ascii/HEX)
+	QButtonGroup *group2 = new QButtonGroup(this);
+	group2->addButton(ui->Radio_Log_Ascii);
+	group2->addButton(ui->Radio_Log_HEX);
+	ui->Radio_Log_Ascii->setChecked(true);
+	connect(group2, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
+			{
+		if (checked)
+		{
+
+			if (button == ui->Radio_Log_Ascii)
+			{
+				m_nLogStat = 0;
+			}
+			else if (button == ui->Radio_Log_HEX)
+			{
+				m_nLogStat = 1;
+			}
+
+			qDebug() << "日志组中选中了:" << button->text() << "m_nLogStat = " << m_nLogStat;
+		} });
 
 	// 主控类持有的通信实例信号转发
 	if (m_pWorkFlow != nullptr)
@@ -697,7 +692,7 @@ void MainWindow::InitialLogConnect()
 	}
 }
 
-void MainWindow::InitialLineEditValidator()
+void MainWindow::setupInputValidators()
 {
 	QIntValidator *PortValid = new QIntValidator(0, 65535, this);
 	QIntValidator *RegisterShowAddr = new QIntValidator(0,
@@ -772,13 +767,10 @@ void MainWindow::OnPlatformPoseChanged(Platform which, const Pose& pose)
 
     if (!axisStartAddrValid(startAddr)) return;
 
-    PlatformController::NumFormat fmt;
-    if (m_actFmtFloat->isChecked())
-        fmt = PlatformController::NumFormat::Float;
-    else if (m_actFmtInt32->isChecked())
-        fmt = PlatformController::NumFormat::Int32;
-    else
-        return; // 两者都未选中,不写
+    // fmtGroup 为 exclusive,两者必有其一选中,无需判"都未选"
+    PlatformController::NumFormat fmt = m_actFmtFloat->isChecked()
+        ? PlatformController::NumFormat::Float
+        : PlatformController::NumFormat::Int32;
 
     writeAxisPos(startAddr, fmt, which);
 }

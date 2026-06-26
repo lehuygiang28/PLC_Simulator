@@ -27,7 +27,6 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; };
 class QAction;
-class QActionGroup;
 class QTimer;
 class QLineEdit;
 class QLabel;
@@ -47,17 +46,22 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    // 初始化方法
-    void InitializeMember();
-    void InitialSignalConnect();
-    void InitialMenuConnect();
-    void InitialWindowConnect();
-    void InitialRegisterTableConnect();
-    void InitialCommConnect();
-    void InitialLogConnect();
-    void InitialScriptConnect();
-    void InitialLineEditValidator();
-    void InitialAllConfigs();
+    // 初始化阶段(构造函数按此顺序调用)
+    void createMembers();          // ① 创建所有成员对象
+    void setupUiContent();         // ② 填充静态 UI(下拉框 / 只读 / 状态栏)
+    void loadConfigs();            // ③ 读取持久化配置
+    void setupInputValidators();   // ④ 输入校验(须晚于 loadConfigs)
+    void applyThemePref();         // ⑤ 应用持久化主题(须先于建菜单)
+    void connectSignals();         // ⑥ 连接所有信号槽
+    void initialRefresh();         // ⑦ 首屏刷新表格
+
+    // 信号连接分组(由 connectSignals 调用)
+    void buildMenus();
+    void connectWindowSignals();
+    void connectRegisterTable();
+    void connectComm();
+    void connectLog();
+    void connectScript();
 
     // 协议相关
     void CreateCurrentProtocol();
@@ -91,20 +95,16 @@ private:
 
 private:
     Ui::MainWindow* ui;
-    QAction* m_actLightTheme = nullptr;
-    QAction* m_actDarkTheme = nullptr;
 
     // 平台控制:参数数据成员
-    QMenu* m_platformMenu = nullptr;
     AuxDialogs::PlatformParams m_platformParams{3, 3, 114, 120};
     QLabel* m_statusAddrLabel = nullptr;
 
-    // 平台菜单 actions
+    // 平台菜单 actions(跨槽访问的才做成员;仅菜单构建期用的为局部变量)
     QAction* m_actShowPlatform = nullptr;
     QAction* m_actAutoWrite = nullptr;
     QAction* m_actFmtFloat = nullptr;
     QAction* m_actFmtInt32 = nullptr;
-    QActionGroup* m_fmtGroup = nullptr;
 
     // 子窗口
     std::unique_ptr<QuickPanel> m_subWindow;
