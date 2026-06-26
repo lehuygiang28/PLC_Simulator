@@ -69,7 +69,7 @@ public:
     void setRegisterVals();
 
     // 更新单个单元格对应的寄存器值
-    void updateRegisterVals(QTableWidgetItem* pItem);
+    void updateRegisterVals(QTableWidgetItem* item);
 
     // 显示寄存器数据
     void displayRegisterVals();
@@ -79,42 +79,42 @@ public:
     RegisterDataType dataType() const { return m_currentType; }
 
     // 设置/获取起始地址(由 MainWindow 在地址框变化时推入)
-    void setStartAddr(int nStart) { m_startAddr = nStart; }
+    void setStartAddr(int startAddr) { m_startAddr = startAddr; }
     int startAddr() const { return m_startAddr; }
 
     // 设置整数显示状态(0=十进制, 1=十六进制)
-    void setIntDisplayStat(int stat) { m_nIntStat = stat; }
+    void setIntDisplayStat(int stat) { m_intStat = stat; }
 
     // 获取整数显示状态(0=十进制, 1=十六进制)
-    int intDisplayStat() const { return m_nIntStat; }
+    int intDisplayStat() const { return m_intStat; }
 
     // 设置是否允许闪烁效果
-    void setShouldFlash(bool enable) { m_bShouldFlash = enable; }
+    void setShouldFlash(bool enable) { m_shouldFlash = enable; }
 
     // 获取是否允许闪烁效果
-    bool shouldFlash() const { return m_bShouldFlash; }
+    bool shouldFlash() const { return m_shouldFlash; }
 
     // 获取寄存器数据缓存
-    std::vector<DataTypeConvert>& registerValCache() { return m_vecRegisterVal; }
+    std::vector<DataTypeConvert>& registerValCache() { return m_registerVals; }
 
 private:
     // 表格项变化 → 值列单元闪红提示(itemChanged 槽)
     void onItemChanged(QTableWidgetItem* item);
 
     // 检查输入合法性
-    bool checkInput(QTableWidgetItem* pItem);
+    bool checkInput(QTableWidgetItem* item);
 
     // 检查字符串输入
-    bool checkInput_str(QTableWidgetItem* pItem, const QString& text);
+    bool checkInput_str(QTableWidgetItem* item, const QString& text);
 
     // 检查整数输入
-    bool checkInput_int(QTableWidgetItem* pItem, const QString& text, int32_t minVal, int32_t maxVal);
+    bool checkInput_int(QTableWidgetItem* item, const QString& text, int32_t minVal, int32_t maxVal);
 
     // 检查浮点数输入(sigDigits: 规范化保留的有效数字位数,与显示一致)
-    bool checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal, int sigDigits);
+    bool checkInput_float(QTableWidgetItem* item, const QString& text, double minVal, double maxVal, int sigDigits);
 
     // 检查十六进制整数输入
-    bool checkInput_int_Hex(QTableWidgetItem* pItem, const RegisterDataType& type);
+    bool checkInput_int_Hex(QTableWidgetItem* item, const RegisterDataType& type);
 
     // 每值占几个 Int16 寄存器(Char8/Int16=1, Int32/Float=2, Double=4)
     int registersPerValue(RegisterDataType type) const;
@@ -134,11 +134,11 @@ private:
     RegisterDataType m_currentType;   // 当前数据类型(MainWindow 推入,不实时读控件)
     int m_startAddr;                  // 起始地址(MainWindow 推入,不实时读控件)
 
-    std::vector<DataTypeConvert> m_vecRegisterVal;  // 寄存器数据缓存
-    int m_nIntStat;                   // 整数显示状态 0=十进制, 1=十六进制
-    bool m_bShouldFlash;              // 是否允许闪烁效果
-    int m_nEditRow;                   // 当前正在编辑的行(-1 表示无),刷新时跳过保护
-    int m_nEditCol;                   // 当前正在编辑的列(-1 表示无),刷新时跳过保护
+    std::vector<DataTypeConvert> m_registerVals;  // 寄存器数据缓存
+    int m_intStat;                   // 整数显示状态 0=十进制, 1=十六进制
+    bool m_shouldFlash;              // 是否允许闪烁效果
+    int m_editRow;                   // 当前正在编辑的行(-1 表示无),刷新时跳过保护
+    int m_editCol;                   // 当前正在编辑的列(-1 表示无),刷新时跳过保护
 
     QMap<QTableWidgetItem*, QTimer*> m_animationTimers;   // 各单元的高亮恢复定时器
     QMap<QTableWidgetItem*, QString> m_lastTextValues;    // 各单元上次文本(判定真实变化)

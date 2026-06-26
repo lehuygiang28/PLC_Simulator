@@ -31,15 +31,15 @@ RegisterTableManager::RegisterTableManager(
     , m_layout{REGISTER_TABLE_ROW_COUNT, REGISTER_TABLE_COLUMN_COUNT}
     , m_currentType(RegisterDataType::eDataTypeChar8)  // 对齐下拉框初始 index 0
     , m_startAddr(0)
-    , m_nIntStat(0)
-    , m_bShouldFlash(true)
-    , m_nEditRow(-1)
-    , m_nEditCol(-1)
+    , m_intStat(0)
+    , m_shouldFlash(true)
+    , m_editRow(-1)
+    , m_editCol(-1)
 {
     // 初始化寄存器数据缓存
     int dataCellCount = REGISTER_TABLE_ROW_COUNT * (REGISTER_TABLE_COLUMN_COUNT / 2);
     int convertCount = (dataCellCount + 3) / 4;  // 向上取整到4的倍数
-    m_vecRegisterVal.resize(convertCount);
+    m_registerVals.resize(convertCount);
 
     // 值变化闪红提示:连接本表格的 itemChanged
     if (m_tableWidget)
@@ -53,32 +53,32 @@ void RegisterTableManager::initTable()
     m_tableWidget->setColumnCount(REGISTER_TABLE_COLUMN_COUNT);
     m_tableWidget->setRowCount(REGISTER_TABLE_ROW_COUNT);
 
-    QTableWidgetItem* Item;
-    QString strItemInfo;
+    QTableWidgetItem* item;
+    QString itemText;
     for (int i = 0; i < REGISTER_TABLE_COLUMN_COUNT; i++)
     {
-        strItemInfo = i % 2 ? "值" : "地址";
-        Item = new QTableWidgetItem(strItemInfo);
+        itemText = i % 2 ? "值" : "地址";
+        item = new QTableWidgetItem(itemText);
 
         m_tableWidget->setColumnWidth(i, 80);
-        m_tableWidget->setHorizontalHeaderItem(i, Item);
+        m_tableWidget->setHorizontalHeaderItem(i, item);
     }
 
     for (int i = 0; i < REGISTER_TABLE_ROW_COUNT; i++)
     {
-        strItemInfo = " ";
-        Item = new QTableWidgetItem(strItemInfo);
-        m_tableWidget->setVerticalHeaderItem(i, Item);
+        itemText = " ";
+        item = new QTableWidgetItem(itemText);
+        m_tableWidget->setVerticalHeaderItem(i, item);
     }
 
     for (int row = 0; row < REGISTER_TABLE_ROW_COUNT; ++row)
     {
         for (int col = 0; col < REGISTER_TABLE_COLUMN_COUNT; ++col)
         {
-            strItemInfo = "";
-            Item = new QTableWidgetItem(strItemInfo);
-            Item->setTextAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-            m_tableWidget->setItem(row, col, Item);
+            itemText = "";
+            item = new QTableWidgetItem(itemText);
+            item->setTextAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+            m_tableWidget->setItem(row, col, item);
         }
     }
 
@@ -122,7 +122,7 @@ void RegisterTableManager::refreshSilently()
 void RegisterTableManager::onItemChanged(QTableWidgetItem* item)
 {
     if (!item) return;
-    if (!m_bShouldFlash) return;
+    if (!m_shouldFlash) return;
 
     // 只处理值列(奇数列),跳过地址列(偶数列)
     if (item->column() % 2 == 0) return;
@@ -160,11 +160,11 @@ void RegisterTableManager::getRegisterVals()
 {
     if (!m_store) return;
 
-    for (size_t i = 0; i < m_vecRegisterVal.size(); i++)
+    for (size_t i = 0; i < m_registerVals.size(); i++)
     {
         for (int j = 0; j < 4; j++)
         {
-            m_vecRegisterVal[i].u_Int16[j] = m_store->cell(m_startAddr + i * 4 + j);
+            m_registerVals[i].u_Int16[j] = m_store->cell(m_startAddr + i * 4 + j);
         }
     }
 }
@@ -174,11 +174,11 @@ void RegisterTableManager::setRegisterVals()
 {
     if (!m_store) return;
 
-    for (size_t i = 0; i < m_vecRegisterVal.size(); i++)
+    for (size_t i = 0; i < m_registerVals.size(); i++)
     {
         for (int j = 0; j < 4; j++)
         {
-            m_store->setCell(m_startAddr + i * 4 + j, m_vecRegisterVal[i].u_Int16[j]);
+            m_store->setCell(m_startAddr + i * 4 + j, m_registerVals[i].u_Int16[j]);
         }
     }
 }
@@ -199,35 +199,35 @@ int RegisterTableManager::registersPerValue(RegisterDataType type) const
 
 void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString& text)
 {
-    DataTypeConvert& cell = m_vecRegisterVal[m_layout.cacheIndex(k)];
+    DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
     switch (type)
     {
     case RegisterDataType::eDataTypeChar8:
     {
         // 每个单元格写 2 个字符,字符下标 = Int16 子下标*2 + 字符序
-        int nCurChar = 0;
-        while (nCurChar < 2 && text.length() > nCurChar)
+        int curChar = 0;
+        while (curChar < 2 && text.length() > curChar)
         {
-            cell.u_chars[s * 2 + nCurChar] = text.at(nCurChar).toLatin1();
-            nCurChar++;
+            cell.u_chars[s * 2 + curChar] = text.at(curChar).toLatin1();
+            curChar++;
         }
         break;
     }
     case RegisterDataType::eDataTypeInt16:
     {
-        int16_t nVal;
-        if (m_nIntStat == 0) { nVal = text.toInt() & 0xFFFF; }
-        else { bool bOk = false; nVal = (text.toInt(&bOk, 16) & 0xFFFF); }
-        cell.u_Int16[s] = nVal;
+        int16_t val;
+        if (m_intStat == 0) { val = text.toInt() & 0xFFFF; }
+        else { bool ok = false; val = (text.toInt(&ok, 16) & 0xFFFF); }
+        cell.u_Int16[s] = val;
         break;
     }
     case RegisterDataType::eDataTypeInt32:
     {
-        int32_t nVal;
-        if (m_nIntStat == 0) { nVal = text.toInt(); }
-        else { bool bOk = false; nVal = text.toInt(&bOk, 16); }
-        cell.u_Int32[s / 2] = nVal;  // 每 Int32 占 2 个 Int16
+        int32_t val;
+        if (m_intStat == 0) { val = text.toInt(); }
+        else { bool ok = false; val = text.toInt(&ok, 16); }
+        cell.u_Int32[s / 2] = val;  // 每 Int32 占 2 个 Int16
         break;
     }
     case RegisterDataType::eDataTypeFloat:
@@ -241,27 +241,27 @@ void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString
     }
 }
 
-void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
+void RegisterTableManager::updateRegisterVals(QTableWidgetItem* item)
 {
-    if (!pItem || !m_tableWidget || !m_store) return;
+    if (!item || !m_tableWidget || !m_store) return;
 
-    checkInput(pItem);
+    checkInput(item);
 
-    int nRow = pItem->row();
-    int nCol = pItem->column();
-    if (nCol % 2 == 0) return;  // 偶数列为地址列,不处理
+    int row = item->row();
+    int col = item->column();
+    if (col % 2 == 0) return;  // 偶数列为地址列,不处理
 
     RegisterDataType type = m_currentType;
 
-    int nStart = m_startAddr;
-    int k = m_layout.linearIndex(nRow, nCol);
-    int addr = m_layout.registerAddr(k, nStart);
+    int startAddr = m_startAddr;
+    int k = m_layout.linearIndex(row, col);
+    int addr = m_layout.registerAddr(k, startAddr);
     int rpv = registersPerValue(type);
 
-    writeCell(type, k, pItem->text());
+    writeCell(type, k, item->text());
 
     // 统一回写:每值占 rpv 个 Int16,从 subIndex 起连续 rpv 个推入 store
-    const DataTypeConvert& cell = m_vecRegisterVal[m_layout.cacheIndex(k)];
+    const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
     for (int j = 0; j < rpv; ++j)
     {
@@ -269,54 +269,54 @@ void RegisterTableManager::updateRegisterVals(QTableWidgetItem* pItem)
     }
 }
 
-bool RegisterTableManager::checkInput(QTableWidgetItem* pItem)
+bool RegisterTableManager::checkInput(QTableWidgetItem* item)
 {
-    if (!pItem) return false;
+    if (!item) return false;
 
-    QString text = pItem->text().trimmed();
+    QString text = item->text().trimmed();
 
-    if (pItem->column() % 2 == 0) return true;
+    if (item->column() % 2 == 0) return true;
 
     RegisterDataType type = m_currentType;
 
-    if (m_nIntStat == 1 && (type == RegisterDataType::eDataTypeInt16 ||
+    if (m_intStat == 1 && (type == RegisterDataType::eDataTypeInt16 ||
         type == RegisterDataType::eDataTypeInt32))
     {
-        return checkInput_int_Hex(pItem, type);
+        return checkInput_int_Hex(item, type);
     }
 
     switch (type)
     {
     case RegisterDataType::eDataTypeChar8:
-        return checkInput_str(pItem, text);
+        return checkInput_str(item, text);
     case RegisterDataType::eDataTypeInt16:
-        return checkInput_int(pItem, text, INT16_MIN, INT16_MAX);
+        return checkInput_int(item, text, INT16_MIN, INT16_MAX);
     case RegisterDataType::eDataTypeInt32:
-        return checkInput_int(pItem, text, INT32_MIN, INT32_MAX);
+        return checkInput_int(item, text, INT32_MIN, INT32_MAX);
     case RegisterDataType::eDataTypeFloat:
-        return checkInput_float(pItem, text, -FLT_MAX, FLT_MAX, kFloatSigDigits);
+        return checkInput_float(item, text, -FLT_MAX, FLT_MAX, kFloatSigDigits);
     case RegisterDataType::eDataTypeDouble:
-        return checkInput_float(pItem, text, -DBL_MAX, DBL_MAX, kDoubleSigDigits);
+        return checkInput_float(item, text, -DBL_MAX, DBL_MAX, kDoubleSigDigits);
     default:
         return false;
     }
 }
 
-bool RegisterTableManager::checkInput_str(QTableWidgetItem* pItem, const QString& text)
+bool RegisterTableManager::checkInput_str(QTableWidgetItem* item, const QString& text)
 {
-    if (pItem->text().length() > 2)
+    if (item->text().length() > 2)
     {
         QMessageBox::warning(
             m_parentWidget,
             "输入截断",
             QString("输入值 %1 长度超过2,只保留前2位!").arg(text)
         );
-        pItem->setText(pItem->text().left(2));
+        item->setText(item->text().left(2));
     }
     return true;
 }
 
-bool RegisterTableManager::checkInput_int(QTableWidgetItem* pItem, const QString& text, int32_t minVal, int32_t maxVal)
+bool RegisterTableManager::checkInput_int(QTableWidgetItem* item, const QString& text, int32_t minVal, int32_t maxVal)
 {
     QRegularExpression regExp("^(0|-?[1-9]\\d*)$");
     QRegularExpressionMatch match = regExp.match(text);
@@ -328,7 +328,7 @@ bool RegisterTableManager::checkInput_int(QTableWidgetItem* pItem, const QString
             "输入非法",
             QString("输入值 %1 非整型数").arg(text)
         );
-        pItem->setText("0");
+        item->setText("0");
     }
     else
     {
@@ -343,15 +343,15 @@ bool RegisterTableManager::checkInput_int(QTableWidgetItem* pItem, const QString
                     .arg(minVal)
                     .arg(maxVal)
             );
-            pItem->setText("0");
+            item->setText("0");
             return true;
         }
-        pItem->setText(QString("%1").arg(tmp));
+        item->setText(QString("%1").arg(tmp));
     }
     return true;
 }
 
-bool RegisterTableManager::checkInput_float(QTableWidgetItem* pItem, const QString& text, double minVal, double maxVal, int sigDigits)
+bool RegisterTableManager::checkInput_float(QTableWidgetItem* item, const QString& text, double minVal, double maxVal, int sigDigits)
 {
     QRegularExpression regExp("^(?!-0(\\.0*)?$)-?\\d+(\\.\\d+)?$");
     QRegularExpressionMatch match = regExp.match(text);
@@ -363,7 +363,7 @@ bool RegisterTableManager::checkInput_float(QTableWidgetItem* pItem, const QStri
             "输入非法",
             QString("输入值 %1 非浮点数").arg(text)
         );
-        pItem->setText("0.0");
+        item->setText("0.0");
     }
     else
     {
@@ -375,28 +375,28 @@ bool RegisterTableManager::checkInput_float(QTableWidgetItem* pItem, const QStri
                 "输入重置",
                 QString("输入值 %1 超过浮点数范围,重置为0").arg(text)
             );
-            pItem->setText("0.0");
+            item->setText("0.0");
         }
-        pItem->setText(formatReal(tmp, sigDigits));
+        item->setText(formatReal(tmp, sigDigits));
     }
     return true;
 }
 
-bool RegisterTableManager::checkInput_int_Hex(QTableWidgetItem* pItem, const RegisterDataType& type)
+bool RegisterTableManager::checkInput_int_Hex(QTableWidgetItem* item, const RegisterDataType& type)
 {
-    if (!pItem) return false;
+    if (!item) return false;
 
-    int nMaxDigits = 0;
+    int maxDigits = 0;
     if (type == RegisterDataType::eDataTypeInt16)
     {
-        nMaxDigits = 4;
+        maxDigits = 4;
     }
     else if (type == RegisterDataType::eDataTypeInt32)
     {
-        nMaxDigits = 8;
+        maxDigits = 8;
     }
 
-    QString text = pItem->text().trimmed();
+    QString text = item->text().trimmed();
 
     QRegularExpression hexRegExp("^[0-9A-Fa-f]*$");
     if (!hexRegExp.match(text).hasMatch())
@@ -407,22 +407,22 @@ bool RegisterTableManager::checkInput_int_Hex(QTableWidgetItem* pItem, const Reg
             QString("输入值 %1 非十六进制数").arg(text)
         );
         QString tmp = "0";
-        pItem->setText(tmp.rightJustified(nMaxDigits, '0'));
+        item->setText(tmp.rightJustified(maxDigits, '0'));
         return true;
     }
 
-    if (text.length() > nMaxDigits)
+    if (text.length() > maxDigits)
     {
         QMessageBox::warning(
             m_parentWidget,
             "输入截断",
             QString("输入值 %1 超过范围,将截断输入数据!").arg(text)
         );
-        pItem->setText(text.left(nMaxDigits).toUpper());
+        item->setText(text.left(maxDigits).toUpper());
         return true;
     }
 
-    pItem->setText(text.toUpper().rightJustified(nMaxDigits, '0'));
+    item->setText(text.toUpper().rightJustified(maxDigits, '0'));
     return true;
 }
 
@@ -434,20 +434,20 @@ void RegisterTableManager::displayRegisterVals()
     // (写文本会触发 dataChanged -> setEditorData,把编辑器内容重置为最新值,导致输入被"复原")
     // QAbstractItemView::state() 为 protected,无法直接判断编辑态;
     // 编辑器打开时它是 viewport 的子控件且持有焦点,据此识别正在编辑的格
-    m_nEditRow = -1;
-    m_nEditCol = -1;
+    m_editRow = -1;
+    m_editCol = -1;
     QWidget* focusWidget = QApplication::focusWidget();
     if (focusWidget && m_tableWidget->viewport()->isAncestorOf(focusWidget))
     {
         QModelIndex editIndex = m_tableWidget->currentIndex();
-        m_nEditRow = editIndex.row();
-        m_nEditCol = editIndex.column();
+        m_editRow = editIndex.row();
+        m_editCol = editIndex.column();
     }
 
     // 保存调用方的闪烁意图:清空阶段一律不闪,填值阶段还原意图
     // (不写死 true,使 setShouldFlash(false) 的静默路径真正生效,无需 QSignalBlocker)
-    const bool flashIntent = m_bShouldFlash;
-    m_bShouldFlash = false;
+    const bool flashIntent = m_shouldFlash;
+    m_shouldFlash = false;
 
     const int rowCount = m_tableWidget->rowCount();
     const int colCount = m_tableWidget->columnCount();
@@ -457,7 +457,7 @@ void RegisterTableManager::displayRegisterVals()
     {
         for (int row = 0; row < rowCount; row++)
         {
-            if (row == m_nEditRow && col == m_nEditCol) continue;  // 跳过正在编辑的格
+            if (row == m_editRow && col == m_editCol) continue;  // 跳过正在编辑的格
 
             QTableWidgetItem* item = m_tableWidget->item(row, col);
             if (item)
@@ -468,7 +468,7 @@ void RegisterTableManager::displayRegisterVals()
         }
     }
 
-    m_bShouldFlash = flashIntent;
+    m_shouldFlash = flashIntent;
 
     RegisterDataType type = m_currentType;
     const int rpv = registersPerValue(type);
@@ -480,10 +480,10 @@ void RegisterTableManager::displayRegisterVals()
         for (int row = 0; row < rowCount; row++)
         {
             int k = m_layout.linearIndex(row, col);
-            if (m_layout.cacheIndex(k) >= static_cast<int>(m_vecRegisterVal.size()))
+            if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size()))
                 break;                                   // 越界保护(同原 break 语义)
             if (k % rpv != 0) continue;                  // 非锚点格留空
-            if (row == m_nEditRow && col == m_nEditCol) continue;  // 跳过正在编辑格
+            if (row == m_editRow && col == m_editCol) continue;  // 跳过正在编辑格
 
             QTableWidgetItem* item = m_tableWidget->item(row, col);
             if (!item) continue;
@@ -495,7 +495,7 @@ void RegisterTableManager::displayRegisterVals()
 
 QString RegisterTableManager::formatCell(RegisterDataType type, int k) const
 {
-    const DataTypeConvert& cell = m_vecRegisterVal[m_layout.cacheIndex(k)];
+    const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
     switch (type)
     {
@@ -504,11 +504,11 @@ QString RegisterTableManager::formatCell(RegisterDataType type, int k) const
             .arg(QChar(cell.u_chars[s * 2]))
             .arg(QChar(cell.u_chars[s * 2 + 1]));
     case RegisterDataType::eDataTypeInt16:
-        if (m_nIntStat == 1)
+        if (m_intStat == 1)
             return QString("%1").arg(QString::number(cell.u_Int16[s], 16), 4, '0').toUpper();
         return QString("%1").arg(cell.u_Int16[s]);
     case RegisterDataType::eDataTypeInt32:
-        if (m_nIntStat == 1)
+        if (m_intStat == 1)
             return QString("%1").arg(QString::number(cell.u_Int32[s / 2], 16), 8, '0').toUpper();
         return QString("%1").arg(cell.u_Int32[s / 2]);
     case RegisterDataType::eDataTypeFloat:
