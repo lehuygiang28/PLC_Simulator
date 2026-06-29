@@ -65,6 +65,7 @@ set(GUI_MAINWINDOW_SOURCES
     Gui/MainWindow/QuickPanel.cpp
     Gui/MainWindow/RegisterTableManager.cpp
     Gui/MainWindow/RegisterItemDelegate.cpp
+    Gui/MainWindow/RegisterTableModel.cpp
     Gui/MainWindow/ScriptManager.cpp
     Gui/MainWindow/PlatformController.cpp
     Gui/MainWindow/AuxDialogs.cpp
@@ -74,6 +75,8 @@ set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/MainWindow.h
     Gui/MainWindow/QuickPanel.h
     Gui/MainWindow/RegisterTableManager.h
+    Gui/MainWindow/RegisterTableModel.h
+    Gui/MainWindow/RegisterDataType.h
     Gui/MainWindow/RegisterCellLayout.h
     Gui/MainWindow/RegisterItemDelegate.h
     Gui/MainWindow/ScriptManager.h

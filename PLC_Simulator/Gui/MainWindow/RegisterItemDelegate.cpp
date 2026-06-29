@@ -7,31 +7,34 @@
  */
 
 #include "RegisterItemDelegate.h"
-#include "RegisterTableManager.h"
+#include "RegisterTableModel.h"
 
-#include <QLineEdit>
+#include <QColor>
 #include <QPainter>
 
-void RegisterItemDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
-                                        const QModelIndex& index) const
+QWidget* RegisterItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+                                            const QModelIndex& index) const
 {
-    // 不调用基类(基类会把原始文本写回模型),全权交给 commitEdit 决策写/不写
-    QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-    if (!lineEdit || !m_manager)
-    {
-        QStyledItemDelegate::setModelData(editor, model, index);
-        return;
-    }
-    m_manager->commitEdit(index.row(), index.column(), lineEdit->text());
+    QWidget* editor = QStyledItemDelegate::createEditor(parent, option, index);
+    if (m_model)
+        m_model->setEditingIndex(index);  // 编辑开始:上报真实编辑 index
+    return editor;
+}
+
+void RegisterItemDelegate::destroyEditor(QWidget* editor, const QModelIndex& index) const
+{
+    if (m_model)
+        m_model->clearEditingIndex();      // 编辑结束:解除保护
+    QStyledItemDelegate::destroyEditor(editor, index);
 }
 
 void RegisterItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                                  const QModelIndex& index) const
 {
-    QStyledItemDelegate::paint(painter, option, index);   // 正常底色 + 文字 + 选中态
-    if (!m_manager) return;
+    QStyledItemDelegate::paint(painter, option, index);  // 正常底色 + 文字 + 选中态
+    if (!m_model) return;
 
-    const QColor overlay = m_manager->flashOverlay(index.row(), index.column());
+    const QColor overlay = m_model->flashOverlay(index.row(), index.column());
     if (overlay.isValid())
         painter->fillRect(option.rect, overlay);          // 半透明叠加(alpha 已含衰减)
 }

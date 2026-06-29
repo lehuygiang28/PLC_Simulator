@@ -11,29 +11,29 @@
 
 #include <QStyledItemDelegate>
 
-class RegisterTableManager;
+class RegisterTableModel;
 
-// 寄存器表编辑委托:
-// - setModelData 用 Qt 设计的提交钩子处理单元格编辑,取代易出问题的 commitData 外部槽;
-//   校验/写回交给 RegisterTableManager::commitEdit(非法即不写入模型 → 单元格自动保留原值)。
-// - paint 在正常绘制之上叠加闪烁淡出色(由 RegisterTableManager::flashOverlay 提供)。
+// 寄存器表委托:
+// - createEditor/destroyEditor 向 model 上报「正在编辑的 index」,供刷新时跳过(编辑保护);
+//   提交走 QStyledItemDelegate 默认实现 → model::setData(校验/写回收敛在那里)。
+// - paint 在正常绘制之上叠加闪烁淡出色(由 RegisterTableModel::flashOverlay 提供)。
 class RegisterItemDelegate : public QStyledItemDelegate
 {
 public:
-    explicit RegisterItemDelegate(RegisterTableManager* manager, QObject* parent = nullptr)
+    explicit RegisterItemDelegate(RegisterTableModel* model, QObject* parent = nullptr)
         : QStyledItemDelegate(parent)
-        , m_manager(manager)
+        , m_model(model)
     {
     }
 
-    void setModelData(QWidget* editor, QAbstractItemModel* model,
-                      const QModelIndex& index) const override;
-
+    QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+                          const QModelIndex& index) const override;
+    void destroyEditor(QWidget* editor, const QModelIndex& index) const override;
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override;
 
 private:
-    RegisterTableManager* m_manager;
+    RegisterTableModel* m_model;
 };
 
 #endif // REGISTERITEMDELEGATE_H

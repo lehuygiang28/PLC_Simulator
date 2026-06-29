@@ -380,18 +380,12 @@
     <item>
      <layout class="QVBoxLayout" name="OperationLayout">
       <item>
-       <widget class="QTableWidget" name="table_RegisterData">
+       <widget class="QTableView" name="table_RegisterData">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
           <horstretch>0</horstretch>
           <verstretch>1</verstretch>
          </sizepolicy>
-        </property>
-        <property name="rowCount">
-         <number>20</number>
-        </property>
-        <property name="columnCount">
-         <number>10</number>
         </property>
         <attribute name="verticalHeaderVisible">
          <bool>true</bool>
@@ -399,36 +393,6 @@
         <attribute name="verticalHeaderHighlightSections">
          <bool>true</bool>
         </attribute>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <row/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
-        <column/>
        </widget>
       </item>
       <item>
