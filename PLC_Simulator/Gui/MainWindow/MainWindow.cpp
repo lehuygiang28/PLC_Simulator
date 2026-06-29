@@ -14,6 +14,7 @@
 #include "Comm/Socket/CommSocket.h"
 #include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
+#include "RegisterItemDelegate.h"
 #include "version.h"
 #include <QWindow>
 #include <QVariantMap>
@@ -151,6 +152,9 @@ void MainWindow::createMembers()
 		m_pWorkFlow->registerStore(),
 		this);
 	m_registerTableManager->initTable();
+	// 编辑提交走自定义委托(setModelData),取代 commitData 外部槽
+	ui->table_RegisterData->setItemDelegate(
+		new RegisterItemDelegate(m_registerTableManager.get(), ui->table_RegisterData));
 
 	// 脚本管理器
 	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
@@ -421,15 +425,6 @@ QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 
 void MainWindow::connectRegisterTable()
 {
-	// 单元格输入完成 → 写回寄存器(闪烁逻辑已下沉至 RegisterTableManager)
-	QAbstractItemDelegate *delegate = ui->table_RegisterData->itemDelegate();
-	connect(delegate, &QAbstractItemDelegate::commitData, this, [this](QWidget *editor)
-			{
-		QModelIndex currentIndex = ui->table_RegisterData->currentIndex();
-		QTableWidgetItem* currentItem = ui->table_RegisterData->item(currentIndex.row(), currentIndex.column());
-		if (currentItem != nullptr)
-			m_registerTableManager->updateRegisterVals(currentItem);
-			});
 
 	// 点击清除寄存器:归零;经 dataChanged 闪红提示"已全清"
 	connect(ui->Btn_ClearRegister, &QPushButton::clicked, this, [=]

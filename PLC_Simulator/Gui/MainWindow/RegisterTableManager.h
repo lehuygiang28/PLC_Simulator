@@ -68,8 +68,9 @@ public:
     // 将数据写入工作流(读持有的起始地址 m_startAddr)
     void setRegisterVals();
 
-    // 更新单个单元格对应的寄存器值
-    void updateRegisterVals(QTableWidgetItem* item);
+    // 提交单元格编辑(由 RegisterItemDelegate::setModelData 调用):
+    // 校验→合法则规范化写入单元格+回写 store;非法则不写(单元格自动保留原值)+延迟弹框
+    void commitEdit(int row, int col, const QString& text);
 
     // 显示寄存器数据
     void displayRegisterVals();
@@ -100,21 +101,6 @@ public:
 private:
     // 表格项变化 → 值列单元闪红提示(itemChanged 槽)
     void onItemChanged(QTableWidgetItem* item);
-
-    // 检查输入合法性
-    bool checkInput(QTableWidgetItem* item);
-
-    // 检查字符串输入
-    bool checkInput_str(QTableWidgetItem* item, const QString& text);
-
-    // 检查整数输入
-    bool checkInput_int(QTableWidgetItem* item, const QString& text, int32_t minVal, int32_t maxVal);
-
-    // 检查浮点数输入(sigDigits: 规范化保留的有效数字位数,与显示一致)
-    bool checkInput_float(QTableWidgetItem* item, const QString& text, double minVal, double maxVal, int sigDigits);
-
-    // 检查十六进制整数输入
-    bool checkInput_int_Hex(QTableWidgetItem* item, const RegisterDataType& type);
 
     // 每值占几个 Int16 寄存器(Char8/Int16=1, Int32/Float=2, Double=4)
     int registersPerValue(RegisterDataType type) const;

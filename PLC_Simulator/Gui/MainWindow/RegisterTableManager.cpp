@@ -5,6 +5,7 @@
 #include <QBrush>
 #include <QMessageBox>
 #include <QRegularExpression>
+#include <QTimer>
 #include <cfloat>
 
 namespace
@@ -17,6 +18,109 @@ constexpr int kDoubleSigDigits = 15;  // double 约 15-16 位,取 15
 QString formatReal(double value, int sigDigits)
 {
     return QString::number(value, 'g', sigDigits);
+}
+
+// 类型特征:把每种数据类型的属性集中到一处(单一真相源)。
+// format/parse/validate 按 family 分派 + 读本表参数,联合体槽位再按 registersPerValue 推导。
+struct TypeTrait
+{
+    int registersPerValue;                       // 每值占几个 Int16(1/1/2/2/4)
+    enum Family { Char, Integer, Real } family;   // 三大族,决定 format/parse/validate 走向
+    long long intMin, intMax;                     // Integer 族取值范围
+    int hexDigits;                                // Integer 族十六进制位宽(4/8)
+    double realMin, realMax;                      // Real 族取值范围
+    int sigDigits;                                // Real 族有效数字位数
+};
+
+const TypeTrait& traitOf(RegisterDataType type)
+{
+    static const TypeTrait kChar8 { 1, TypeTrait::Char,    0, 0, 0, 0.0, 0.0, 0 };
+    static const TypeTrait kInt16 { 1, TypeTrait::Integer, INT16_MIN, INT16_MAX, 4, 0.0, 0.0, 0 };
+    static const TypeTrait kInt32 { 2, TypeTrait::Integer, INT32_MIN, INT32_MAX, 8, 0.0, 0.0, 0 };
+    static const TypeTrait kFloat { 2, TypeTrait::Real,    0, 0, 0, -FLT_MAX, FLT_MAX, kFloatSigDigits };
+    static const TypeTrait kDouble{ 4, TypeTrait::Real,    0, 0, 0, -DBL_MAX, DBL_MAX, kDoubleSigDigits };
+    switch (type)
+    {
+    case RegisterDataType::eDataTypeInt16:  return kInt16;
+    case RegisterDataType::eDataTypeInt32:  return kInt32;
+    case RegisterDataType::eDataTypeFloat:  return kFloat;
+    case RegisterDataType::eDataTypeDouble: return kDouble;
+    default:                                return kChar8;  // Char8
+    }
+}
+
+// 校验结果(纯数据):ok=能否写入;normalized=规范化后的文本;title/msg 非空则需提示。
+// 注:title 非空但 ok=true 表示"截断后接受"——既写入也提示。
+struct ValidationResult
+{
+    bool ok;
+    QString normalized;
+    QString title;
+    QString msg;
+};
+
+// 以下校验为纯函数:只判定/规范化,不弹框、不改单元格。提示与写入由 commitEdit 决策。
+ValidationResult validateChar(const QString& text)
+{
+    if (text.length() > 2)
+        return { true, text.left(2), QStringLiteral("输入截断"),
+                 QString("输入值 %1 长度超过2,只保留前2位!").arg(text) };
+    return { true, text, QString(), QString() };
+}
+
+ValidationResult validateInteger(const QString& text, const TypeTrait& t, int intStat)
+{
+    const QString s = text.trimmed();
+    if (intStat == 1)  // 十六进制
+    {
+        QRegularExpression hexRe("^[0-9A-Fa-f]*$");
+        if (!hexRe.match(s).hasMatch())
+            return { false, QString(), QStringLiteral("输入非法"),
+                     QString("输入值 %1 非十六进制数").arg(s) };
+        if (s.length() > t.hexDigits)  // 超位宽:截断后接受
+            return { true, s.left(t.hexDigits).toUpper(), QStringLiteral("输入截断"),
+                     QString("输入值 %1 超过范围,将截断输入数据!").arg(s) };
+        return { true, s.toUpper().rightJustified(t.hexDigits, '0'), QString(), QString() };
+    }
+
+    // 十进制(#4 放宽:接受前导零/正号)
+    QRegularExpression decRe("^[+-]?\\d+$");
+    if (!decRe.match(s).hasMatch())
+        return { false, QString(), QStringLiteral("输入非法"),
+                 QString("输入值 %1 非整型数").arg(s) };
+    bool ok = false;
+    long long v = s.toLongLong(&ok);  // #3:超 long long 也会 !ok → 判超范围
+    if (!ok || v < t.intMin || v > t.intMax)
+        return { false, QString(), QStringLiteral("输入超范围"),
+                 QString("输入值 %1 超过范围(%2 ~ %3)").arg(s).arg(t.intMin).arg(t.intMax) };
+    return { true, QString::number(v), QString(), QString() };  // 规范化(去前导零/正号)
+}
+
+ValidationResult validateReal(const QString& text, const TypeTrait& t)
+{
+    const QString s = text.trimmed();
+    // #4 放宽:接受前导零/正号/.5/5.;不含科学计数法
+    QRegularExpression re("^[+-]?(\\d+\\.?\\d*|\\.\\d+)$");
+    if (!re.match(s).hasMatch())
+        return { false, QString(), QStringLiteral("输入非法"),
+                 QString("输入值 %1 非浮点数").arg(s) };
+    double v = s.toDouble();
+    if (v < t.realMin || v > t.realMax)
+        return { false, QString(), QStringLiteral("输入超范围"),
+                 QString("输入值 %1 超过浮点数范围").arg(s) };
+    return { true, formatReal(v, t.sigDigits), QString(), QString() };
+}
+
+ValidationResult validateInput(const QString& text, RegisterDataType type, int intStat)
+{
+    const TypeTrait& t = traitOf(type);
+    switch (t.family)
+    {
+    case TypeTrait::Char:    return validateChar(text);
+    case TypeTrait::Integer: return validateInteger(text, t, intStat);
+    case TypeTrait::Real:    return validateReal(text, t);
+    }
+    return { false, QString(), QString(), QString() };
 }
 }
 
@@ -185,25 +289,17 @@ void RegisterTableManager::setRegisterVals()
 
 int RegisterTableManager::registersPerValue(RegisterDataType type) const
 {
-    switch (type)
-    {
-    case RegisterDataType::eDataTypeInt32:
-    case RegisterDataType::eDataTypeFloat:
-        return 2;
-    case RegisterDataType::eDataTypeDouble:
-        return 4;
-    default:  // Char8 / Int16
-        return 1;
-    }
+    return traitOf(type).registersPerValue;
 }
 
 void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString& text)
 {
+    const TypeTrait& t = traitOf(type);
     DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
-    switch (type)
+    switch (t.family)
     {
-    case RegisterDataType::eDataTypeChar8:
+    case TypeTrait::Char:
     {
         // 每个单元格写 2 个字符,字符下标 = Int16 子下标*2 + 字符序
         int curChar = 0;
@@ -214,216 +310,62 @@ void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString
         }
         break;
     }
-    case RegisterDataType::eDataTypeInt16:
+    case TypeTrait::Integer:
     {
-        int16_t val;
-        if (m_intStat == 0) { val = text.toInt() & 0xFFFF; }
-        else { bool ok = false; val = (text.toInt(&ok, 16) & 0xFFFF); }
-        cell.u_Int16[s] = val;
-        break;
-    }
-    case RegisterDataType::eDataTypeInt32:
-    {
-        int32_t val;
+        int val;
         if (m_intStat == 0) { val = text.toInt(); }
         else { bool ok = false; val = text.toInt(&ok, 16); }
-        cell.u_Int32[s / 2] = val;  // 每 Int32 占 2 个 Int16
+        if (t.registersPerValue == 1)
+            cell.u_Int16[s] = val & 0xFFFF;      // Int16
+        else
+            cell.u_Int32[s / 2] = val;           // Int32(占 2 个 Int16)
         break;
     }
-    case RegisterDataType::eDataTypeFloat:
-        cell.u_float[s / 2] = text.toFloat();  // 每 float 占 2 个 Int16
-        break;
-    case RegisterDataType::eDataTypeDouble:
-        cell.u_double = text.toDouble();
-        break;
-    default:
+    case TypeTrait::Real:
+        if (t.registersPerValue == 2)
+            cell.u_float[s / 2] = text.toFloat();  // float(占 2 个 Int16)
+        else
+            cell.u_double = text.toDouble();       // double(占 4 个 Int16)
         break;
     }
 }
 
-void RegisterTableManager::updateRegisterVals(QTableWidgetItem* item)
+void RegisterTableManager::commitEdit(int row, int col, const QString& text)
 {
-    if (!item || !m_tableWidget || !m_store) return;
+    if (!m_tableWidget || !m_store) return;
+    if (col % 2 == 0) return;  // 地址列不可编辑(防御)
 
-    checkInput(item);
+    const ValidationResult r = validateInput(text, m_currentType, m_intStat);
 
-    int row = item->row();
-    int col = item->column();
-    if (col % 2 == 0) return;  // 偶数列为地址列,不处理
+    // 有提示则延迟弹框:此刻编辑器仍存活,同步弹模态框会夺焦重入导致崩溃;
+    // 推到事件循环下一拍(编辑器已关闭)再弹。
+    if (!r.title.isEmpty())
+    {
+        const QString title = r.title;
+        const QString msg = r.msg;
+        QTimer::singleShot(0, this, [this, title, msg]
+        {
+            QMessageBox::warning(m_parentWidget, title, msg);
+        });
+    }
 
-    RegisterDataType type = m_currentType;
+    if (!r.ok) return;  // 非法:不写入模型(单元格自动保留库里原值)
 
-    int startAddr = m_startAddr;
-    int k = m_layout.linearIndex(row, col);
-    int addr = m_layout.registerAddr(k, startAddr);
-    int rpv = registersPerValue(type);
+    const int k = m_layout.linearIndex(row, col);
+    if (QTableWidgetItem* item = m_tableWidget->item(row, col))
+        item->setText(r.normalized);  // 写规范化值(触发闪红=编辑提示)
 
-    writeCell(type, k, item->text());
+    writeCell(m_currentType, k, r.normalized);
 
     // 统一回写:每值占 rpv 个 Int16,从 subIndex 起连续 rpv 个推入 store
+    const int addr = m_layout.registerAddr(k, m_startAddr);
+    const int rpv = registersPerValue(m_currentType);
     const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
     for (int j = 0; j < rpv; ++j)
     {
         m_store->setCell(addr + j, cell.u_Int16[s + j]);
     }
-}
-
-bool RegisterTableManager::checkInput(QTableWidgetItem* item)
-{
-    if (!item) return false;
-
-    QString text = item->text().trimmed();
-
-    if (item->column() % 2 == 0) return true;
-
-    RegisterDataType type = m_currentType;
-
-    if (m_intStat == 1 && (type == RegisterDataType::eDataTypeInt16 ||
-        type == RegisterDataType::eDataTypeInt32))
-    {
-        return checkInput_int_Hex(item, type);
-    }
-
-    switch (type)
-    {
-    case RegisterDataType::eDataTypeChar8:
-        return checkInput_str(item, text);
-    case RegisterDataType::eDataTypeInt16:
-        return checkInput_int(item, text, INT16_MIN, INT16_MAX);
-    case RegisterDataType::eDataTypeInt32:
-        return checkInput_int(item, text, INT32_MIN, INT32_MAX);
-    case RegisterDataType::eDataTypeFloat:
-        return checkInput_float(item, text, -FLT_MAX, FLT_MAX, kFloatSigDigits);
-    case RegisterDataType::eDataTypeDouble:
-        return checkInput_float(item, text, -DBL_MAX, DBL_MAX, kDoubleSigDigits);
-    default:
-        return false;
-    }
-}
-
-bool RegisterTableManager::checkInput_str(QTableWidgetItem* item, const QString& text)
-{
-    if (item->text().length() > 2)
-    {
-        QMessageBox::warning(
-            m_parentWidget,
-            "输入截断",
-            QString("输入值 %1 长度超过2,只保留前2位!").arg(text)
-        );
-        item->setText(item->text().left(2));
-    }
-    return true;
-}
-
-bool RegisterTableManager::checkInput_int(QTableWidgetItem* item, const QString& text, int32_t minVal, int32_t maxVal)
-{
-    QRegularExpression regExp("^(0|-?[1-9]\\d*)$");
-    QRegularExpressionMatch match = regExp.match(text);
-
-    if (!match.hasMatch())
-    {
-        QMessageBox::warning(
-            m_parentWidget,
-            "输入非法",
-            QString("输入值 %1 非整型数").arg(text)
-        );
-        item->setText("0");
-    }
-    else
-    {
-        int tmp = text.toInt();
-        if (tmp > maxVal || tmp < minVal)
-        {
-            QMessageBox::warning(
-                m_parentWidget,
-                "输入重置",
-                QString("输入值 %1 超过整数范围(%2-%3),重置为0")
-                    .arg(text)
-                    .arg(minVal)
-                    .arg(maxVal)
-            );
-            item->setText("0");
-            return true;
-        }
-        item->setText(QString("%1").arg(tmp));
-    }
-    return true;
-}
-
-bool RegisterTableManager::checkInput_float(QTableWidgetItem* item, const QString& text, double minVal, double maxVal, int sigDigits)
-{
-    QRegularExpression regExp("^(?!-0(\\.0*)?$)-?\\d+(\\.\\d+)?$");
-    QRegularExpressionMatch match = regExp.match(text);
-
-    if (!match.hasMatch())
-    {
-        QMessageBox::warning(
-            m_parentWidget,
-            "输入非法",
-            QString("输入值 %1 非浮点数").arg(text)
-        );
-        item->setText("0.0");
-    }
-    else
-    {
-        double tmp = text.toDouble();
-        if (tmp > maxVal || tmp < minVal)
-        {
-            QMessageBox::warning(
-                m_parentWidget,
-                "输入重置",
-                QString("输入值 %1 超过浮点数范围,重置为0").arg(text)
-            );
-            item->setText("0.0");
-        }
-        item->setText(formatReal(tmp, sigDigits));
-    }
-    return true;
-}
-
-bool RegisterTableManager::checkInput_int_Hex(QTableWidgetItem* item, const RegisterDataType& type)
-{
-    if (!item) return false;
-
-    int maxDigits = 0;
-    if (type == RegisterDataType::eDataTypeInt16)
-    {
-        maxDigits = 4;
-    }
-    else if (type == RegisterDataType::eDataTypeInt32)
-    {
-        maxDigits = 8;
-    }
-
-    QString text = item->text().trimmed();
-
-    QRegularExpression hexRegExp("^[0-9A-Fa-f]*$");
-    if (!hexRegExp.match(text).hasMatch())
-    {
-        QMessageBox::warning(
-            m_parentWidget,
-            "输入非法",
-            QString("输入值 %1 非十六进制数").arg(text)
-        );
-        QString tmp = "0";
-        item->setText(tmp.rightJustified(maxDigits, '0'));
-        return true;
-    }
-
-    if (text.length() > maxDigits)
-    {
-        QMessageBox::warning(
-            m_parentWidget,
-            "输入截断",
-            QString("输入值 %1 超过范围,将截断输入数据!").arg(text)
-        );
-        item->setText(text.left(maxDigits).toUpper());
-        return true;
-    }
-
-    item->setText(text.toUpper().rightJustified(maxDigits, '0'));
-    return true;
 }
 
 void RegisterTableManager::displayRegisterVals()
@@ -495,27 +437,27 @@ void RegisterTableManager::displayRegisterVals()
 
 QString RegisterTableManager::formatCell(RegisterDataType type, int k) const
 {
+    const TypeTrait& t = traitOf(type);
     const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
-    switch (type)
+    switch (t.family)
     {
-    case RegisterDataType::eDataTypeChar8:
+    case TypeTrait::Char:
         return QString("%1%2")
             .arg(QChar(cell.u_chars[s * 2]))
             .arg(QChar(cell.u_chars[s * 2 + 1]));
-    case RegisterDataType::eDataTypeInt16:
+    case TypeTrait::Integer:
+    {
+        long long v = (t.registersPerValue == 1) ? cell.u_Int16[s] : cell.u_Int32[s / 2];
         if (m_intStat == 1)
-            return QString("%1").arg(QString::number(cell.u_Int16[s], 16), 4, '0').toUpper();
-        return QString("%1").arg(cell.u_Int16[s]);
-    case RegisterDataType::eDataTypeInt32:
-        if (m_intStat == 1)
-            return QString("%1").arg(QString::number(cell.u_Int32[s / 2], 16), 8, '0').toUpper();
-        return QString("%1").arg(cell.u_Int32[s / 2]);
-    case RegisterDataType::eDataTypeFloat:
-        return formatReal(cell.u_float[s / 2], kFloatSigDigits);
-    case RegisterDataType::eDataTypeDouble:
-        return formatReal(cell.u_double, kDoubleSigDigits);
-    default:
-        return QString();
+            return QString("%1").arg(QString::number(v, 16), t.hexDigits, '0').toUpper();
+        return QString("%1").arg(v);
     }
+    case TypeTrait::Real:
+    {
+        double v = (t.registersPerValue == 2) ? cell.u_float[s / 2] : cell.u_double;
+        return formatReal(v, t.sigDigits);
+    }
+    }
+    return QString();
 }
