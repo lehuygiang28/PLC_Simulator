@@ -74,7 +74,7 @@ ValidationResult validateInteger(const QString& text, const TypeTrait& t, int in
     const QString s = text.trimmed();
     if (intStat == 1)  // 十六进制
     {
-        QRegularExpression hexRe("^[0-9A-Fa-f]*$");
+        QRegularExpression hexRe("^[0-9A-Fa-f]+$");  // 至少一位:空串落入非法→拒写保留原值(与 dec/real 一致)
         if (!hexRe.match(s).hasMatch())
             return { false, QString(), QStringLiteral("输入非法"),
                      QString("输入值 %1 非十六进制数").arg(s) };
@@ -134,7 +134,7 @@ RegisterTableManager::RegisterTableManager(
     , m_store(store)
     , m_parentWidget(parent)
     , m_layout{0, 0}                                   // 真实维度由 initTable 注入
-    , m_currentType(RegisterDataType::eDataTypeChar8)  // 对齐下拉框初始 index 0
+    , m_currentType(RegisterDataType::eDataTypeInt16)  // 默认值;实际由 MainWindow 在 initTable 后 setDataType 推入
     , m_startAddr(0)
     , m_intStat(0)
     , m_shouldFlash(true)
@@ -151,11 +151,19 @@ void RegisterTableManager::initTable(int rowCount, int colCount)
     if (!m_tableWidget) return;
     Q_ASSERT(colCount % 2 == 0);  // 列须成对(地址列/值列)
 
-    // 维度入参 → 单一真相源 m_layout;据此分配缓存
+    // 重入防御(动态行列场景):重建表格会析构旧 item,先停所有恢复定时器并清空
+    // 以 item 指针为键的快照,避免悬挂键/UAF。首次调用时两容器为空,此处为空操作。
+    for (auto it = m_animationTimers.begin(); it != m_animationTimers.end(); ++it)
+    {
+        it.value()->stop();
+        it.value()->deleteLater();
+    }
+    m_animationTimers.clear();
+    m_lastTextValues.clear();
+
+    // 维度入参 → 单一真相源 m_layout;容量推导内收到 layout
     m_layout = { rowCount, colCount };
-    const int dataCellCount = rowCount * (colCount / 2);
-    const int convertCount = (dataCellCount + 3) / 4;  // 向上取整到 4 的倍数
-    m_registerVals.assign(convertCount, DataTypeConvert());
+    m_registerVals.assign(m_layout.convertCount(), DataTypeConvert());
 
     m_tableWidget->setColumnCount(colCount);
     m_tableWidget->setRowCount(rowCount);
@@ -164,7 +172,7 @@ void RegisterTableManager::initTable(int rowCount, int colCount)
     QString itemText;
     for (int i = 0; i < colCount; i++)
     {
-        itemText = i % 2 ? "值" : "地址";
+        itemText = m_layout.isValueColumn(i) ? "值" : "地址";
         item = new QTableWidgetItem(itemText);
 
         m_tableWidget->setColumnWidth(i, 80);
@@ -192,9 +200,11 @@ void RegisterTableManager::initTable(int rowCount, int colCount)
     m_tableWidget->setAlternatingRowColors(true);
     // 表格外观由全局主题样式表(ThemeManager)统一控制,此处不再设置局部样式
 
-    // 自订阅数据源:store 数据变更 → 刷新(走闪烁路径)。信号若带参,Qt 自动丢弃多余参
+    // 自订阅数据源:store 数据变更 → 刷新(走闪烁路径)。信号若带参,Qt 自动丢弃多余参。
+    // UniqueConnection:initTable 若重入也不会重复连接
     if (m_store)
-        connect(m_store, &RegisterStore::dataChanged, this, &RegisterTableManager::updateTableInfo);
+        connect(m_store, &RegisterStore::dataChanged, this, &RegisterTableManager::updateTableInfo,
+                Qt::UniqueConnection);
 
     // 自装编辑委托(取代 commitData 外部槽);委托在 setModelData 回调 commitEdit
     m_tableWidget->setItemDelegate(new RegisterItemDelegate(this, m_tableWidget));
@@ -216,8 +226,7 @@ void RegisterTableManager::updateTableInfo()
             int addrNum = m_layout.registerAddr(m_layout.linearIndex(row, col), m_startAddr);
             item->setText(QString("D%1").arg(addrNum, 5, 10, QChar('0')));
             item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-
-            m_tableWidget->setItem(row, col, item);
+            // 就地修改已有 item,无需 setItem 回插(同指针回插冗余,易误读为所有权转移)
         }
     }
 
@@ -238,8 +247,8 @@ void RegisterTableManager::onItemChanged(QTableWidgetItem* item)
     if (!item) return;
     if (!m_shouldFlash) return;
 
-    // 只处理值列(奇数列),跳过地址列(偶数列)
-    if (item->column() % 2 == 0) return;
+    // 只处理值列,跳过地址列
+    if (!m_layout.isValueColumn(item->column())) return;
 
     // 文本未实际变化则忽略
     const QString currentText = item->text();
@@ -298,6 +307,9 @@ void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString
     case TypeTrait::Char:
     {
         // 每个单元格写 2 个字符,字符下标 = Int16 子下标*2 + 字符序
+        // 写前清两字节:单字符录入须清掉同格旧高字节(否则 'AB'→'C' 残留显示成 'CB')
+        cell.u_chars[s * 2] = 0;
+        cell.u_chars[s * 2 + 1] = 0;
         int curChar = 0;
         while (curChar < 2 && text.length() > curChar)
         {
@@ -309,8 +321,11 @@ void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString
     case TypeTrait::Integer:
     {
         int val;
-        if (m_intStat == 0) { val = text.toInt(); }
-        else { bool ok = false; val = text.toInt(&ok, 16); }
+        if (m_intStat == 0)
+            val = text.toInt();
+        else
+            // 十六进制按无符号解析:FFFFFFFF/80000000 等高位值不会溢出归零(toInt 上限仅 INT_MAX)
+            val = static_cast<int>(text.toUInt(nullptr, 16));
         if (t.registersPerValue == 1)
             cell.u_Int16[s] = val & 0xFFFF;      // Int16
         else
@@ -329,7 +344,7 @@ void RegisterTableManager::writeCell(RegisterDataType type, int k, const QString
 void RegisterTableManager::commitEdit(int row, int col, const QString& text)
 {
     if (!m_tableWidget || !m_store) return;
-    if (col % 2 == 0) return;  // 地址列不可编辑(防御)
+    if (!m_layout.isValueColumn(col)) return;  // 地址列不可编辑(防御)
 
     const ValidationResult r = validateInput(text, m_currentType, m_intStat);
 
@@ -419,7 +434,7 @@ void RegisterTableManager::displayRegisterVals()
         {
             int k = m_layout.linearIndex(row, col);
             if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size()))
-                break;                                   // 越界保护(同原 break 语义)
+                continue;                                // 越界防御:缓存按维度精确分配,正常配置不可达
             if (k % rpv != 0) continue;                  // 非锚点格留空
             if (row == m_editRow && col == m_editCol) continue;  // 跳过正在编辑格
 
@@ -427,6 +442,9 @@ void RegisterTableManager::displayRegisterVals()
             if (!item) continue;
             item->setText(formatCell(type, k));
             item->setFlags(item->flags() | Qt::ItemIsEditable);
+            // 同步快照:静默刷新时 onItemChanged 提前返回不更新此表,需在此回灌,
+            // 使 m_lastTextValues 始终等于最近显示文本,避免下次正常刷新对未变值误闪
+            m_lastTextValues[item] = item->text();
         }
     }
 }
@@ -444,9 +462,15 @@ QString RegisterTableManager::formatCell(RegisterDataType type, int k) const
             .arg(QChar(cell.u_chars[s * 2 + 1]));
     case TypeTrait::Integer:
     {
-        long long v = (t.registersPerValue == 1) ? cell.u_Int16[s] : cell.u_Int32[s / 2];
         if (m_intStat == 1)
-            return QString("%1").arg(QString::number(v, 16), t.hexDigits, '0').toUpper();
+        {
+            // 十六进制按无符号位模式显示,保证 0xFFFF/0xFFFFFFFF 与录入往返(有符号会显示成 '-1'→'00-1')
+            unsigned long long bits = (t.registersPerValue == 1)
+                ? static_cast<unsigned long long>(static_cast<uint16_t>(cell.u_Int16[s]))
+                : static_cast<unsigned long long>(static_cast<uint32_t>(cell.u_Int32[s / 2]));
+            return QString("%1").arg(QString::number(bits, 16), t.hexDigits, QChar('0')).toUpper();
+        }
+        long long v = (t.registersPerValue == 1) ? cell.u_Int16[s] : cell.u_Int32[s / 2];
         return QString("%1").arg(v);
     }
     case TypeTrait::Real:

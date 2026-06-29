@@ -26,6 +26,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QLineEdit>
+#include <QComboBox>
 #include <QIntValidator>
 #include <QTextDocument>
 
@@ -235,7 +236,9 @@ void MainWindow::applyThemePref()
 
 void MainWindow::initialRefresh()
 {
-	m_registerTableManager->setStartAddr(ui->edit_RegisterAddr->text().toUInt());  // 内部自动刷新
+	// 三条视图状态统一显式首推(与 setDataType 对齐),不依赖 setChecked 副作用
+	m_registerTableManager->setStartAddr(ui->edit_RegisterAddr->text().toInt());  // 内部自动刷新
+	m_registerTableManager->setNumberBase(ui->Radio_Data_HEX->isChecked());
 }
 
 void MainWindow::connectSignals()
@@ -426,7 +429,6 @@ QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 
 void MainWindow::connectRegisterTable()
 {
-
 	// 点击清除寄存器:归零;经 dataChanged 闪红提示"已全清"
 	connect(ui->Btn_ClearRegister, &QPushButton::clicked, this, [=]
 			{

@@ -32,6 +32,9 @@ struct RegisterCellLayout
     // 值单元格总数
     int valueCellCount() const { return (colCount / 2) * rowCount; }
 
+    // 容纳全部值格所需的联合体个数(每联合体 4 个 Int16,向上取整)
+    int convertCount() const { return (valueCellCount() + 3) / 4; }
+
     // 奇数列为值列
     static bool isValueColumn(int col) { return col % 2 == 1; }
 };
