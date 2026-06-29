@@ -12,8 +12,9 @@
 #include <QObject>
 #include <QTableWidget>
 #include <QTableWidgetItem>
-#include <QMap>
 #include <QTimer>
+#include <QElapsedTimer>
+#include <QColor>
 #include <vector>
 
 #include "Core/DataTypeConvert.h"
@@ -61,9 +62,15 @@ public:
     void setStartAddr(int startAddr) { m_startAddr = startAddr; refreshSilently(); }
     void setNumberBase(bool hex) { m_intStat = hex ? 1 : 0; refreshSilently(); }
 
+    // 取某格当前的闪烁叠加色(供 RegisterItemDelegate::paint 调用):
+    // 未闪/已过期返回无效 QColor;否则返回主题色 + 按 elapsed 线性衰减的 alpha
+    QColor flashOverlay(int row, int col) const;
+
 private:
-    // 表格项变化 → 值列单元闪红提示(itemChanged 槽)
-    void onItemChanged(QTableWidgetItem* item);
+    // 给某格打闪烁时间戳并懒启动重绘定时器
+    void stampFlash(int row, int col);
+    // 重绘定时器槽:刷新 viewport、清过期时间戳、无活跃则停表
+    void onFlashTick();
 
     // 刷新表格(填地址列 + 取数 + 显示);由 store 数据变更与各 setter 内部触发
     void updateTableInfo();
@@ -94,12 +101,16 @@ private:
 
     std::vector<DataTypeConvert> m_registerVals;  // 寄存器数据缓存
     int m_intStat;                   // 整数显示状态 0=十进制, 1=十六进制
-    bool m_shouldFlash;              // 是否允许闪烁效果
+    bool m_shouldFlash;              // 刷新是否触发闪烁(静默刷新为 false)
     int m_editRow;                   // 当前正在编辑的行(-1 表示无),刷新时跳过保护
     int m_editCol;                   // 当前正在编辑的列(-1 表示无),刷新时跳过保护
 
-    QMap<QTableWidgetItem*, QTimer*> m_animationTimers;   // 各单元的高亮恢复定时器
-    QMap<QTableWidgetItem*, QString> m_lastTextValues;    // 各单元上次文本(判定真实变化)
+    // 闪烁高亮(淡出):单个共享定时器 + 每格闪起时刻,委托按时间戳绘制衰减叠加色
+    std::vector<qint64> m_flashStartMs;  // 每格闪起时刻(m_clock 毫秒,0=不闪);索引 row*m_flashCols+col
+    QElapsedTimer m_clock;               // 单调时钟
+    QTimer* m_flashTimer;                // 单个共享重绘定时器(父=this)
+    QColor m_flashColor;                 // 缓存 @flashBg,随 themeChanged 刷新
+    int m_flashCols;                     // 缓存列数,供 m_flashStartMs 索引换算
 };
 
 #endif // REGISTERTABLEMANAGER_H

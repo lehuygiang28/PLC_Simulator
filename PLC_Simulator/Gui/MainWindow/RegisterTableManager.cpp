@@ -1,9 +1,9 @@
 #include "RegisterTableManager.h"
 #include "RegisterItemDelegate.h"
 #include "Core/RegisterStore.h"
+#include "Theme/ThemeManager.h"
 #include <QApplication>
 #include <QColor>
-#include <QBrush>
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QTimer>
@@ -14,6 +14,11 @@ namespace
 // 浮点显示/录入的有效数字位数:贴近各自类型真实精度,受列宽约束做的折中
 constexpr int kFloatSigDigits = 7;    // float 约 7 位有效数字
 constexpr int kDoubleSigDigits = 15;  // double 约 15-16 位,取 15
+
+// 闪烁淡出参数
+constexpr int kFlashDurationMs = 400;  // 淡出总时长
+constexpr int kFlashPeakAlpha  = 140;  // 峰值不透明度(0~255)
+constexpr int kFlashTickMs     = 30;   // 重绘步进
 
 // 浮点统一格式化:'g' 按有效数字。录入规范化与显示共用,保证录完刷新不变样
 QString formatReal(double value, int sigDigits)
@@ -140,10 +145,23 @@ RegisterTableManager::RegisterTableManager(
     , m_shouldFlash(true)
     , m_editRow(-1)
     , m_editCol(-1)
+    , m_flashTimer(nullptr)
+    , m_flashCols(0)
 {
-    // 值变化闪红提示:连接本表格的 itemChanged
-    if (m_tableWidget)
-        connect(m_tableWidget, &QTableWidget::itemChanged, this, &RegisterTableManager::onItemChanged);
+    m_clock.start();
+
+    // 单个共享重绘定时器:驱动闪烁淡出(替代每格一个 QTimer)
+    m_flashTimer = new QTimer(this);
+    m_flashTimer->setInterval(kFlashTickMs);
+    connect(m_flashTimer, &QTimer::timeout, this, &RegisterTableManager::onFlashTick);
+
+    // 高亮色从主题取,随主题切换刷新并重绘
+    m_flashColor = ThemeManager::instance().color("@flashBg");
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this]
+    {
+        m_flashColor = ThemeManager::instance().color("@flashBg");
+        if (m_tableWidget) m_tableWidget->viewport()->update();
+    });
 }
 
 void RegisterTableManager::initTable(int rowCount, int colCount)
@@ -151,15 +169,10 @@ void RegisterTableManager::initTable(int rowCount, int colCount)
     if (!m_tableWidget) return;
     Q_ASSERT(colCount % 2 == 0);  // 列须成对(地址列/值列)
 
-    // 重入防御(动态行列场景):重建表格会析构旧 item,先停所有恢复定时器并清空
-    // 以 item 指针为键的快照,避免悬挂键/UAF。首次调用时两容器为空,此处为空操作。
-    for (auto it = m_animationTimers.begin(); it != m_animationTimers.end(); ++it)
-    {
-        it.value()->stop();
-        it.value()->deleteLater();
-    }
-    m_animationTimers.clear();
-    m_lastTextValues.clear();
+    // 重入防御(动态行列场景):重置闪烁状态(按 row*colCount+col 索引,随表重建)
+    if (m_flashTimer->isActive()) m_flashTimer->stop();
+    m_flashStartMs.assign(rowCount * colCount, 0);
+    m_flashCols = colCount;
 
     // 维度入参 → 单一真相源 m_layout;容量推导内收到 layout
     m_layout = { rowCount, colCount };
@@ -242,41 +255,43 @@ void RegisterTableManager::refreshSilently()
     m_shouldFlash = true;
 }
 
-void RegisterTableManager::onItemChanged(QTableWidgetItem* item)
+void RegisterTableManager::stampFlash(int row, int col)
 {
-    if (!item) return;
-    if (!m_shouldFlash) return;
+    if (m_flashCols <= 0) return;
+    const int idx = row * m_flashCols + col;
+    if (idx < 0 || idx >= static_cast<int>(m_flashStartMs.size())) return;
+    m_flashStartMs[idx] = m_clock.elapsed();
+    if (!m_flashTimer->isActive()) m_flashTimer->start();
+}
 
-    // 只处理值列,跳过地址列
-    if (!m_layout.isValueColumn(item->column())) return;
+QColor RegisterTableManager::flashOverlay(int row, int col) const
+{
+    if (m_flashCols <= 0) return QColor();
+    const int idx = row * m_flashCols + col;
+    if (idx < 0 || idx >= static_cast<int>(m_flashStartMs.size())) return QColor();
+    const qint64 start = m_flashStartMs[idx];
+    if (start == 0) return QColor();
+    const qint64 elapsed = m_clock.elapsed() - start;
+    if (elapsed < 0 || elapsed >= kFlashDurationMs) return QColor();
 
-    // 文本未实际变化则忽略
-    const QString currentText = item->text();
-    if (currentText == m_lastTextValues.value(item)) return;
-    m_lastTextValues[item] = currentText;
+    QColor c = m_flashColor;
+    c.setAlpha(static_cast<int>(kFlashPeakAlpha * (kFlashDurationMs - elapsed) / kFlashDurationMs));
+    return c;
+}
 
-    // 取消该 item 可能存在的未完成恢复动画
-    if (m_animationTimers.contains(item))
+void RegisterTableManager::onFlashTick()
+{
+    if (m_tableWidget) m_tableWidget->viewport()->update();
+
+    const qint64 now = m_clock.elapsed();
+    bool anyActive = false;
+    for (qint64& start : m_flashStartMs)
     {
-        QTimer* existing = m_animationTimers.value(item);
-        existing->stop();
-        existing->deleteLater();
-        m_animationTimers.remove(item);
+        if (start == 0) continue;
+        if (now - start >= kFlashDurationMs) start = 0;  // 过期清零
+        else anyActive = true;
     }
-
-    // 高亮 + 400ms 后恢复
-    item->setBackground(QColor(255, 100, 100));
-
-    QTimer* restoreTimer = new QTimer(this);
-    restoreTimer->setSingleShot(true);
-    connect(restoreTimer, &QTimer::timeout, this, [this, item, restoreTimer]()
-    {
-        if (item) item->setBackground(QBrush());
-        m_animationTimers.remove(item);
-        restoreTimer->deleteLater();
-    });
-    m_animationTimers[item] = restoreTimer;
-    restoreTimer->start(400);  // 400ms 后恢复
+    if (!anyActive) m_flashTimer->stop();
 }
 
 void RegisterTableManager::getRegisterVals()
@@ -364,7 +379,7 @@ void RegisterTableManager::commitEdit(int row, int col, const QString& text)
 
     const int k = m_layout.linearIndex(row, col);
     if (QTableWidgetItem* item = m_tableWidget->item(row, col))
-        item->setText(r.normalized);  // 写规范化值(触发闪红=编辑提示)
+        item->setText(r.normalized);  // 写规范化值
 
     writeCell(m_currentType, k, r.normalized);
 
@@ -377,6 +392,8 @@ void RegisterTableManager::commitEdit(int row, int col, const QString& text)
     {
         m_store->setCell(addr + j, cell.u_Int16[s + j]);
     }
+
+    stampFlash(row, col);  // 编辑提交反馈:该格闪烁
 }
 
 void RegisterTableManager::displayRegisterVals()
@@ -397,54 +414,38 @@ void RegisterTableManager::displayRegisterVals()
         m_editCol = editIndex.column();
     }
 
-    // 保存调用方的闪烁意图:清空阶段一律不闪,填值阶段还原意图
-    // (不写死 true,使 setShouldFlash(false) 的静默路径真正生效,无需 QSignalBlocker)
+    // 闪烁意图:静默刷新(改类型/地址/进制)为 false → 不打时间戳、不闪
     const bool flashIntent = m_shouldFlash;
-    m_shouldFlash = false;
 
     const int rowCount = m_tableWidget->rowCount();
     const int colCount = m_tableWidget->columnCount();
 
-    // 先将数据列清空
-    for (int col = 1; col < colCount; col += 2)
-    {
-        for (int row = 0; row < rowCount; row++)
-        {
-            if (row == m_editRow && col == m_editCol) continue;  // 跳过正在编辑的格
-
-            QTableWidgetItem* item = m_tableWidget->item(row, col);
-            if (item)
-            {
-                item->setText("");
-                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-            }
-        }
-    }
-
-    m_shouldFlash = flashIntent;
-
-    RegisterDataType type = m_currentType;
+    const RegisterDataType type = m_currentType;
     const int rpv = registersPerValue(type);
 
-    // 单循环填值:每个值格锚定线性下标 k,仅在 k % rpv == 0 的锚点格写值,
-    // 非锚点格保持清空阶段的空白(复现原 Char8/Int16 每格、Int32/Float 隔格、Double 每 4 格)
+    // 单遍:对每个值格算出目标文本,与当前文本不同才写;变化即「文本不等」,
+    // 据此切换可编辑态并(非静默时)打闪烁时间戳。空文本=非锚点/越界格。
     for (int col = 1; col < colCount; col += 2)
     {
         for (int row = 0; row < rowCount; row++)
         {
-            int k = m_layout.linearIndex(row, col);
-            if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size()))
-                continue;                                // 越界防御:缓存按维度精确分配,正常配置不可达
-            if (k % rpv != 0) continue;                  // 非锚点格留空
             if (row == m_editRow && col == m_editCol) continue;  // 跳过正在编辑格
+
+            const int k = m_layout.linearIndex(row, col);
+            QString target;  // 默认空
+            if (m_layout.cacheIndex(k) < static_cast<int>(m_registerVals.size()) && k % rpv == 0)
+                target = formatCell(type, k);
 
             QTableWidgetItem* item = m_tableWidget->item(row, col);
             if (!item) continue;
-            item->setText(formatCell(type, k));
-            item->setFlags(item->flags() | Qt::ItemIsEditable);
-            // 同步快照:静默刷新时 onItemChanged 提前返回不更新此表,需在此回灌,
-            // 使 m_lastTextValues 始终等于最近显示文本,避免下次正常刷新对未变值误闪
-            m_lastTextValues[item] = item->text();
+            if (item->text() == target) continue;        // 未变:不写、不闪
+
+            item->setText(target);
+            if (target.isEmpty())
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            else
+                item->setFlags(item->flags() | Qt::ItemIsEditable);
+            if (flashIntent) stampFlash(row, col);
         }
     }
 }
