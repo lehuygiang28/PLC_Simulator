@@ -1,4 +1,5 @@
 #include "RegisterTableManager.h"
+#include "RegisterItemDelegate.h"
 #include "Core/RegisterStore.h"
 #include <QApplication>
 #include <QColor>
@@ -132,7 +133,7 @@ RegisterTableManager::RegisterTableManager(
     , m_tableWidget(tableWidget)
     , m_store(store)
     , m_parentWidget(parent)
-    , m_layout{REGISTER_TABLE_ROW_COUNT, REGISTER_TABLE_COLUMN_COUNT}
+    , m_layout{0, 0}                                   // 真实维度由 initTable 注入
     , m_currentType(RegisterDataType::eDataTypeChar8)  // 对齐下拉框初始 index 0
     , m_startAddr(0)
     , m_intStat(0)
@@ -140,26 +141,28 @@ RegisterTableManager::RegisterTableManager(
     , m_editRow(-1)
     , m_editCol(-1)
 {
-    // 初始化寄存器数据缓存
-    int dataCellCount = REGISTER_TABLE_ROW_COUNT * (REGISTER_TABLE_COLUMN_COUNT / 2);
-    int convertCount = (dataCellCount + 3) / 4;  // 向上取整到4的倍数
-    m_registerVals.resize(convertCount);
-
     // 值变化闪红提示:连接本表格的 itemChanged
     if (m_tableWidget)
         connect(m_tableWidget, &QTableWidget::itemChanged, this, &RegisterTableManager::onItemChanged);
 }
 
-void RegisterTableManager::initTable()
+void RegisterTableManager::initTable(int rowCount, int colCount)
 {
     if (!m_tableWidget) return;
+    Q_ASSERT(colCount % 2 == 0);  // 列须成对(地址列/值列)
 
-    m_tableWidget->setColumnCount(REGISTER_TABLE_COLUMN_COUNT);
-    m_tableWidget->setRowCount(REGISTER_TABLE_ROW_COUNT);
+    // 维度入参 → 单一真相源 m_layout;据此分配缓存
+    m_layout = { rowCount, colCount };
+    const int dataCellCount = rowCount * (colCount / 2);
+    const int convertCount = (dataCellCount + 3) / 4;  // 向上取整到 4 的倍数
+    m_registerVals.assign(convertCount, DataTypeConvert());
+
+    m_tableWidget->setColumnCount(colCount);
+    m_tableWidget->setRowCount(rowCount);
 
     QTableWidgetItem* item;
     QString itemText;
-    for (int i = 0; i < REGISTER_TABLE_COLUMN_COUNT; i++)
+    for (int i = 0; i < colCount; i++)
     {
         itemText = i % 2 ? "值" : "地址";
         item = new QTableWidgetItem(itemText);
@@ -168,16 +171,16 @@ void RegisterTableManager::initTable()
         m_tableWidget->setHorizontalHeaderItem(i, item);
     }
 
-    for (int i = 0; i < REGISTER_TABLE_ROW_COUNT; i++)
+    for (int i = 0; i < rowCount; i++)
     {
         itemText = " ";
         item = new QTableWidgetItem(itemText);
         m_tableWidget->setVerticalHeaderItem(i, item);
     }
 
-    for (int row = 0; row < REGISTER_TABLE_ROW_COUNT; ++row)
+    for (int row = 0; row < rowCount; ++row)
     {
-        for (int col = 0; col < REGISTER_TABLE_COLUMN_COUNT; ++col)
+        for (int col = 0; col < colCount; ++col)
         {
             itemText = "";
             item = new QTableWidgetItem(itemText);
@@ -188,6 +191,13 @@ void RegisterTableManager::initTable()
 
     m_tableWidget->setAlternatingRowColors(true);
     // 表格外观由全局主题样式表(ThemeManager)统一控制,此处不再设置局部样式
+
+    // 自订阅数据源:store 数据变更 → 刷新(走闪烁路径)。信号若带参,Qt 自动丢弃多余参
+    if (m_store)
+        connect(m_store, &RegisterStore::dataChanged, this, &RegisterTableManager::updateTableInfo);
+
+    // 自装编辑委托(取代 commitData 外部槽);委托在 setModelData 回调 commitEdit
+    m_tableWidget->setItemDelegate(new RegisterItemDelegate(this, m_tableWidget));
 }
 
 void RegisterTableManager::updateTableInfo()
@@ -218,9 +228,9 @@ void RegisterTableManager::updateTableInfo()
 void RegisterTableManager::refreshSilently()
 {
     // 静默刷新:关闭闪烁意图 → updateTableInfo 全程不闪(无需 QSignalBlocker)
-    setShouldFlash(false);
+    m_shouldFlash = false;
     updateTableInfo();
-    setShouldFlash(true);
+    m_shouldFlash = true;
 }
 
 void RegisterTableManager::onItemChanged(QTableWidgetItem* item)
@@ -269,20 +279,6 @@ void RegisterTableManager::getRegisterVals()
         for (int j = 0; j < 4; j++)
         {
             m_registerVals[i].u_Int16[j] = m_store->cell(m_startAddr + i * 4 + j);
-        }
-    }
-}
-
-// 注:setRegisterVals 当前全工程无调用点,保留以备整批写回场景
-void RegisterTableManager::setRegisterVals()
-{
-    if (!m_store) return;
-
-    for (size_t i = 0; i < m_registerVals.size(); i++)
-    {
-        for (int j = 0; j < 4; j++)
-        {
-            m_store->setCell(m_startAddr + i * 4 + j, m_registerVals[i].u_Int16[j]);
         }
     }
 }

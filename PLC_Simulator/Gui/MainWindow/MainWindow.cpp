@@ -14,7 +14,6 @@
 #include "Comm/Socket/CommSocket.h"
 #include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
-#include "RegisterItemDelegate.h"
 #include "version.h"
 #include <QWindow>
 #include <QVariantMap>
@@ -29,7 +28,13 @@
 #include <QLineEdit>
 #include <QIntValidator>
 #include <QTextDocument>
-#include <QAbstractItemDelegate>
+
+namespace
+{
+// 寄存器表维度(地址/值成对,列须偶数)。原为 RegisterTableManager.h 内的宏,本处统一持有。
+constexpr int kRegRows = 21;
+constexpr int kRegCols = 10;
+}
 
 void MainWindow::refreshAxisAddrStatus()
 {
@@ -151,10 +156,7 @@ void MainWindow::createMembers()
 		ui->table_RegisterData,
 		m_pWorkFlow->registerStore(),
 		this);
-	m_registerTableManager->initTable();
-	// 编辑提交走自定义委托(setModelData),取代 commitData 外部槽
-	ui->table_RegisterData->setItemDelegate(
-		new RegisterItemDelegate(m_registerTableManager.get(), ui->table_RegisterData));
+	m_registerTableManager->initTable(kRegRows, kRegCols);  // 内部自连 store、自装编辑委托
 
 	// 脚本管理器
 	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkFlow->scriptHost(), this);
@@ -233,8 +235,7 @@ void MainWindow::applyThemePref()
 
 void MainWindow::initialRefresh()
 {
-	m_registerTableManager->setStartAddr(ui->edit_RegisterAddr->text().toUInt());
-	m_registerTableManager->updateTableInfo();
+	m_registerTableManager->setStartAddr(ui->edit_RegisterAddr->text().toUInt());  // 内部自动刷新
 }
 
 void MainWindow::connectSignals()
@@ -432,7 +433,7 @@ void MainWindow::connectRegisterTable()
 		if (m_pWorkFlow == nullptr) return;
 		m_pWorkFlow->registerStore()->resetAll(0); });
 
-	// 修改显示寄存器地址(推入地址后静默刷新)
+	// 修改显示寄存器地址(推入即自动刷新)
 	connect(ui->edit_RegisterAddr, &QLineEdit::textChanged, this, [=](const QString &text)
 			{
 				if (text == "")
@@ -441,26 +442,16 @@ void MainWindow::connectRegisterTable()
 				if (nAddr < 0)
 					return;
 				m_registerTableManager->setStartAddr(nAddr);
-				m_registerTableManager->getRegisterVals();
-				m_registerTableManager->refreshSilently();
 			});
 
-	// 修改显示寄存器数据类型(推入类型后静默刷新)
+	// 修改显示寄存器数据类型(推入即自动刷新)
 	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
 			{
 				m_registerTableManager->setDataType(
 					ui->cmbBox_DataType->currentData().value<RegisterDataType>());
-				m_registerTableManager->refreshSilently();
 			});
 
-	// 寄存器数据改变(实时闪红)
-	if (m_pWorkFlow != nullptr)
-	{
-		connect(m_pWorkFlow->registerStore(), &RegisterStore::dataChanged, this, [=]
-				{ m_registerTableManager->updateTableInfo(); });
-	}
-
-	// 数据显示进制切换(DEC/HEX,静默刷新)
+	// 数据显示进制切换(DEC/HEX,推入即自动刷新)
 	QButtonGroup *group1 = new QButtonGroup(this);
 	group1->addButton(ui->Radio_Data_DEC);
 	group1->addButton(ui->Radio_Data_HEX);
@@ -468,13 +459,8 @@ void MainWindow::connectRegisterTable()
 	connect(group1, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
 			{
 		if (checked)
-		{
-			if (button == ui->Radio_Data_DEC)
-				m_registerTableManager->setIntDisplayStat(0);
-			else if (button == ui->Radio_Data_HEX)
-				m_registerTableManager->setIntDisplayStat(1);
-			m_registerTableManager->refreshSilently();
-		} });
+			m_registerTableManager->setNumberBase(button == ui->Radio_Data_HEX);
+			});
 }
 
 void MainWindow::connectComm()
@@ -610,7 +596,7 @@ void MainWindow::setupInputValidators()
 {
 	QIntValidator *PortValid = new QIntValidator(0, 65535, this);
 	QIntValidator *RegisterShowAddr = new QIntValidator(0,
-														REGISTER_VAL_NUM - 1 - REGISTER_TABLE_COLUMN_COUNT * REGISTER_TABLE_ROW_COUNT / 2, this);
+														REGISTER_VAL_NUM - 1 - kRegCols * kRegRows / 2, this);
 
 	// 只能输入整型数
 	ui->edit_Port->setValidator(PortValid);

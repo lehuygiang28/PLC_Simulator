@@ -32,10 +32,6 @@ enum class RegisterDataType
 
 class RegisterStore;
 
-// 表格常量定义
-#define REGISTER_TABLE_COLUMN_COUNT 10
-#define REGISTER_TABLE_ROW_COUNT    21
-
 // 寄存器表格管理器:负责寄存器数据的显示、编辑和验证。
 // 20251225 wm 从 MainWindow.cpp 拆分,专注表格相关逻辑。
 class RegisterTableManager : public QObject
@@ -53,54 +49,30 @@ public:
 
     ~RegisterTableManager() override = default;
 
-    // 初始化寄存器表格
-    void initTable();
-
-    // 更新表格信息(读持有的起始地址 m_startAddr)
-    void updateTableInfo();
-
-    // 静默刷新(不闪烁):用于视图刷新(改地址/类型/进制)
-    void refreshSilently();
-
-    // 从工作流获取寄存器数据(读持有的起始地址 m_startAddr)
-    void getRegisterVals();
-
-    // 将数据写入工作流(读持有的起始地址 m_startAddr)
-    void setRegisterVals();
+    // 初始化寄存器表格(rowCount 行, colCount 列;colCount 须为偶数=地址/值成对)
+    void initTable(int rowCount, int colCount);
 
     // 提交单元格编辑(由 RegisterItemDelegate::setModelData 调用):
     // 校验→合法则规范化写入单元格+回写 store;非法则不写(单元格自动保留原值)+延迟弹框
     void commitEdit(int row, int col, const QString& text);
 
-    // 显示寄存器数据
-    void displayRegisterVals();
-
-    // 设置/获取当前数据类型(由 MainWindow 在下拉框变化时推入)
-    void setDataType(RegisterDataType type) { m_currentType = type; }
-    RegisterDataType dataType() const { return m_currentType; }
-
-    // 设置/获取起始地址(由 MainWindow 在地址框变化时推入)
-    void setStartAddr(int startAddr) { m_startAddr = startAddr; }
-    int startAddr() const { return m_startAddr; }
-
-    // 设置整数显示状态(0=十进制, 1=十六进制)
-    void setIntDisplayStat(int stat) { m_intStat = stat; }
-
-    // 获取整数显示状态(0=十进制, 1=十六进制)
-    int intDisplayStat() const { return m_intStat; }
-
-    // 设置是否允许闪烁效果
-    void setShouldFlash(bool enable) { m_shouldFlash = enable; }
-
-    // 获取是否允许闪烁效果
-    bool shouldFlash() const { return m_shouldFlash; }
-
-    // 获取寄存器数据缓存
-    std::vector<DataTypeConvert>& registerValCache() { return m_registerVals; }
+    // 三个语义 setter:由 MainWindow 在对应控件变化时推入,内部自动静默刷新
+    void setDataType(RegisterDataType type) { m_currentType = type; refreshSilently(); }
+    void setStartAddr(int startAddr) { m_startAddr = startAddr; refreshSilently(); }
+    void setNumberBase(bool hex) { m_intStat = hex ? 1 : 0; refreshSilently(); }
 
 private:
     // 表格项变化 → 值列单元闪红提示(itemChanged 槽)
     void onItemChanged(QTableWidgetItem* item);
+
+    // 刷新表格(填地址列 + 取数 + 显示);由 store 数据变更与各 setter 内部触发
+    void updateTableInfo();
+    // 静默刷新(不闪烁):视图变更(地址/类型/进制)
+    void refreshSilently();
+    // 从 store 读入当前缓存(读 m_startAddr)
+    void getRegisterVals();
+    // 按当前类型/进制把缓存渲染到值列
+    void displayRegisterVals();
 
     // 每值占几个 Int16 寄存器(Char8/Int16=1, Int32/Float=2, Double=4)
     int registersPerValue(RegisterDataType type) const;
