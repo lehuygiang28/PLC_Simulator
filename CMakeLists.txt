@@ -89,4 +89,4 @@ endif()
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PLC_Simulator)
 
 # 添加子项目
-add_subdirectory(PLC_Simulator)
+add_subdirectory(src)
