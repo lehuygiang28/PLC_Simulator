@@ -28,6 +28,10 @@ enum class RegisterDataType
 // 值列(奇数列)与地址列(偶数列)同组共用 col/2,故 linearIndex 对两类列都成立。
 struct RegisterCellLayout
 {
+    // 每个缓存联合体(DataTypeConvert)含的 Int16 个数,等于 DataTypeConvert::u_Int16[4] 的宽度。
+    // cacheIndex/subIndex/convertCount 及 model 侧的窗口重读均以此为单一来源,避免裸 4 散落。
+    static constexpr int kInt16PerUnion = 4;
+
     int rowCount;   // 表格行数
     int colCount;   // 表格列数(含地址列与值列)
 
@@ -37,17 +41,17 @@ struct RegisterCellLayout
     // 第 k 个寄存器的地址
     int registerAddr(int k, int nStart) const { return nStart + k; }
 
-    // k 对应的缓存联合体下标(每联合体含 4 个 Int16)
-    int cacheIndex(int k) const { return k / 4; }
+    // k 对应的缓存联合体下标(每联合体含 kInt16PerUnion 个 Int16)
+    int cacheIndex(int k) const { return k / kInt16PerUnion; }
 
     // k 在联合体内的 Int16 子下标
-    int subIndex(int k) const { return k % 4; }
+    int subIndex(int k) const { return k % kInt16PerUnion; }
 
     // 值单元格总数
     int valueCellCount() const { return (colCount / 2) * rowCount; }
 
-    // 容纳全部值格所需的联合体个数(每联合体 4 个 Int16,向上取整)
-    int convertCount() const { return (valueCellCount() + 3) / 4; }
+    // 容纳全部值格所需的联合体个数(每联合体 kInt16PerUnion 个 Int16,向上取整)
+    int convertCount() const { return (valueCellCount() + kInt16PerUnion - 1) / kInt16PerUnion; }
 
     // 奇数列为值列
     static bool isValueColumn(int col) { return col % 2 == 1; }

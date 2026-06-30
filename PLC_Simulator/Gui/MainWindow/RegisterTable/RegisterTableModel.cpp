@@ -202,9 +202,7 @@ QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
     const int k = m_layout.linearIndex(index.row(), index.column());
     if (m_layout.isValueColumn(index.column()))
     {
-        if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size()))
-            return QString();
-        if (k % registersPerValue(m_currentType) != 0)  // 非锚点格留空
+        if (!isAnchorValueCell(index.row(), index.column()))  // 越界/非锚点格留空
             return QString();
         return formatCell(m_currentType, k);
     }
@@ -227,13 +225,8 @@ Qt::ItemFlags RegisterTableModel::flags(const QModelIndex& index) const
     if (!index.isValid()) return Qt::NoItemFlags;
 
     Qt::ItemFlags f = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-    if (m_layout.isValueColumn(index.column()))
-    {
-        const int k = m_layout.linearIndex(index.row(), index.column());
-        if (m_layout.cacheIndex(k) < static_cast<int>(m_registerVals.size())
-            && k % registersPerValue(m_currentType) == 0)
-            f |= Qt::ItemIsEditable;
-    }
+    if (isAnchorValueCell(index.row(), index.column()))
+        f |= Qt::ItemIsEditable;
     return f;
 }
 
@@ -293,10 +286,8 @@ void RegisterTableModel::setNumberBase(bool hex)
 
 QColor RegisterTableModel::flashOverlay(int row, int col) const
 {
-    const int cols = m_layout.colCount;
-    if (cols <= 0) return QColor();
-    const int idx = row * cols + col;
-    if (idx < 0 || idx >= static_cast<int>(m_flashStartMs.size())) return QColor();
+    const int idx = flashIndex(row, col);
+    if (idx < 0) return QColor();
     const qint64 start = m_flashStartMs[idx];
     if (start == 0) return QColor();
     const qint64 elapsed = m_clock.elapsed() - start;
@@ -309,12 +300,19 @@ QColor RegisterTableModel::flashOverlay(int row, int col) const
 
 void RegisterTableModel::stampFlash(int row, int col)
 {
-    const int cols = m_layout.colCount;
-    if (cols <= 0) return;
-    const int idx = row * cols + col;
-    if (idx < 0 || idx >= static_cast<int>(m_flashStartMs.size())) return;
+    const int idx = flashIndex(row, col);
+    if (idx < 0) return;
     m_flashStartMs[idx] = m_clock.elapsed();
     if (!m_flashTimer->isActive()) m_flashTimer->start();
+}
+
+int RegisterTableModel::flashIndex(int row, int col) const
+{
+    const int cols = m_layout.colCount;
+    if (cols <= 0) return -1;
+    const int idx = row * cols + col;
+    if (idx < 0 || idx >= static_cast<int>(m_flashStartMs.size())) return -1;
+    return idx;
 }
 
 void RegisterTableModel::setEditingIndex(const QModelIndex& index)
@@ -334,27 +332,25 @@ void RegisterTableModel::onStoreChanged()
 {
     if (m_layout.colCount <= 0) return;
 
-    const std::vector<DataTypeConvert> old = m_registerVals;  // 差异基线
+    m_prevVals = m_registerVals;  // 差异基线:复用成员缓冲,容量足够时不再每拍堆分配
     refreshSnapshot();
 
     const int rows = m_layout.rowCount;
     const int cols = m_layout.colCount;
     const int rpv = registersPerValue(m_currentType);
-    const int sz = static_cast<int>(m_registerVals.size());
 
     for (int col = 1; col < cols; col += 2)  // 值列(奇)
     {
         for (int row = 0; row < rows; ++row)
         {
+            if (!isAnchorValueCell(row, col)) continue;  // 仅范围内锚点格
+
             const int k = m_layout.linearIndex(row, col);
             const int ci = m_layout.cacheIndex(k);
-            if (ci >= sz) continue;
-            if (k % rpv != 0) continue;  // 仅锚点格
-
             const int s = m_layout.subIndex(k);
             bool changed = false;
             for (int j = 0; j < rpv; ++j)
-                if (old[ci].u_Int16[s + j] != m_registerVals[ci].u_Int16[s + j]) { changed = true; break; }
+                if (m_prevVals[ci].u_Int16[s + j] != m_registerVals[ci].u_Int16[s + j]) { changed = true; break; }
             if (!changed) continue;
 
             const QModelIndex idx = index(row, col);
@@ -383,9 +379,10 @@ void RegisterTableModel::onFlashTick()
 void RegisterTableModel::refreshSnapshot()
 {
     if (!m_store) return;
+    constexpr int kPerUnion = RegisterCellLayout::kInt16PerUnion;
     for (size_t i = 0; i < m_registerVals.size(); ++i)
-        for (int j = 0; j < 4; ++j)
-            m_registerVals[i].u_Int16[j] = m_store->cell(m_startAddr + static_cast<int>(i) * 4 + j);
+        for (int j = 0; j < kPerUnion; ++j)
+            m_registerVals[i].u_Int16[j] = m_store->cell(m_startAddr + static_cast<int>(i) * kPerUnion + j);
 }
 
 void RegisterTableModel::refreshAll()
@@ -398,6 +395,14 @@ void RegisterTableModel::refreshAll()
 int RegisterTableModel::registersPerValue(RegisterDataType type) const
 {
     return traitOf(type).registersPerValue;
+}
+
+bool RegisterTableModel::isAnchorValueCell(int row, int col) const
+{
+    if (!m_layout.isValueColumn(col)) return false;
+    const int k = m_layout.linearIndex(row, col);
+    if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size())) return false;
+    return k % registersPerValue(m_currentType) == 0;
 }
 
 void RegisterTableModel::writeCell(RegisterDataType type, int k, const QString& text)

@@ -70,6 +70,9 @@ private:
     void writeCell(RegisterDataType type, int k, const QString& text);  // 解析文本写回缓存联合体
     int registersPerValue(RegisterDataType type) const;      // 每值占几个 Int16
     void stampFlash(int row, int col);                       // 打闪烁时间戳并懒启动定时器
+    int flashIndex(int row, int col) const;                  // (row,col)→m_flashStartMs 线性下标;越界/无列返回 -1
+    // 值锚点格判定(data/flags/onStoreChanged 共用):值列 && 在快照范围内 && 落在锚点(k%rpv==0)
+    bool isAnchorValueCell(int row, int col) const;
 
     RegisterStore* m_store;           // 数据源
     QWidget* m_dialogParent;          // 校验弹框父窗口
@@ -79,6 +82,7 @@ private:
     int m_startAddr;                  // 起始地址
     int m_intStat;                    // 整数显示状态 0=十进制, 1=十六进制
     std::vector<DataTypeConvert> m_registerVals;  // 窗口快照(差异基线 + data() 取数源)
+    std::vector<DataTypeConvert> m_prevVals;      // onStoreChanged 差异基线的复用缓冲(避免每拍堆分配)
 
     std::vector<qint64> m_flashStartMs;  // 每格闪起时刻(m_clock 毫秒,0=不闪);索引 row*colCount+col
     QElapsedTimer m_clock;               // 单调时钟
