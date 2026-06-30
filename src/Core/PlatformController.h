@@ -9,6 +9,7 @@
 #define PLATFORMCONTROLLER_H
 
 #include <QObject>
+#include <QMutex>
 #include "Core/PlatformTypes.h"   // Pose / Platform
 
 class RegisterStore;
@@ -41,10 +42,17 @@ public:
                          NumFormat fmt, Platform which = Platform::Live);
 
 private:
-    // 真正干活,均在 GUI 线程执行
-    void doMoveAbsolute(int xAddr, int yAddr, int aAddr, NumFormat fmt);
-    void doMoveRelative(int xAddr, int yAddr, int aAddr, NumFormat fmt);
-    void doWriteCurrentPos(int xAddr, int yAddr, int aAddr, NumFormat fmt, Platform which);
+    // 场景 poseChanged → 同步进镜像(GUI 线程执行)
+    void onPoseChanged(Platform which, const Pose& pose);
+
+    // 在调用线程从 store 解析三地址为 Pose(Int32 则 ÷幂次)
+    Pose readPose(int xAddr, int yAddr, int aAddr, NumFormat fmt) const;
+
+    // 把已解析的 Pose 编组到 GUI 线程渲染(GUI 线程直执行;其它线程 Queued)
+    void renderMoveAbsolute(const Pose& target);
+    void renderMoveRelative(const Pose& delta);
+
+    static int idx(Platform which) { return which == Platform::Base ? 0 : 1; }
 
     double divisorXY() const;   // 10^m_powerXY
     double divisorD()  const;   // 10^m_powerD
@@ -53,6 +61,11 @@ private:
     SimulationPlatform* m_platform;
     int                 m_powerXY;
     int                 m_powerD;
+
+    // 线程安全位姿镜像:场景为唯一真相源,经 poseChanged 同步;
+    // 控制器自身发起的 move 在调用线程同步预更新(保 Move→Write 时序)。
+    mutable QMutex      m_poseMutex;
+    Pose                m_poseMirror[2];   // [0]=Base, [1]=Live
 };
 
 #endif // PLATFORMCONTROLLER_H

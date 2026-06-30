@@ -17,7 +17,6 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QRunnable>
-#include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QDebug>
 
@@ -47,13 +46,10 @@ ScriptEngineHost::~ScriptEngineHost()
     for (auto& e : m_engines)
         if (e) e->SetLoopValid(false);
 
-    // 边处理事件边等池任务结束:在途的 BlockingQueuedConnection 调用(如 Lua WriteCurrentPos
-    // 编组回 GUI 线程)得以被派发执行并返回,从而解开"池线程阻塞 vs GUI 阻塞 waitForDone"的互等死锁。
     if (m_threadPool) {
         QElapsedTimer drainTimer; drainTimer.start();
         bool warned = false;
         while (!m_threadPool->waitForDone(50)) {
-            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
             if (!warned && drainTimer.elapsed() > 3000) {
                 qWarning() << "ScriptEngineHost: 池任务 drain 超过 3s,可能有脚本未检查 IsLoopValid 而无法退出";
                 warned = true;

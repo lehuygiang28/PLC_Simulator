@@ -11,6 +11,7 @@
 #include "SimulationPlatform.h"
 #include <QThread>
 #include <QMetaObject>
+#include <QMutexLocker>
 #include <cmath>
 
 PlatformController::PlatformController(RegisterStore* store,
@@ -21,6 +22,13 @@ PlatformController::PlatformController(RegisterStore* store,
     : QObject(parent), m_store(store), m_platform(platform),
       m_powerXY(powerXY), m_powerD(powerD)
 {
+    if (m_platform) {
+        // seed 初值;之后任何来源改场景位姿都经 poseChanged 同步进镜像
+        m_poseMirror[idx(Platform::Base)] = m_platform->pose(Platform::Base);
+        m_poseMirror[idx(Platform::Live)] = m_platform->pose(Platform::Live);
+        connect(m_platform, &SimulationPlatform::poseChanged,
+                this, &PlatformController::onPoseChanged);
+    }
 }
 
 void PlatformController::setUnitPowers(int powerXY, int powerD)
@@ -39,62 +47,59 @@ double PlatformController::divisorD() const
     return std::pow(10.0, m_powerD);
 }
 
+void PlatformController::onPoseChanged(Platform which, const Pose& pose)
+{
+    QMutexLocker lk(&m_poseMutex);
+    m_poseMirror[idx(which)] = pose;
+}
+
+Pose PlatformController::readPose(int xAddr, int yAddr, int aAddr, NumFormat fmt) const
+{
+    Pose p;
+    if (fmt == NumFormat::Int32) {
+        const double dXY = divisorXY(), dD = divisorD();
+        p.x        = static_cast<double>(m_store->GetInt32(xAddr)) / dXY;
+        p.y        = static_cast<double>(m_store->GetInt32(yAddr)) / dXY;
+        p.angleDeg = static_cast<double>(m_store->GetInt32(aAddr)) / dD;
+    } else {
+        p.x        = m_store->GetFloat(xAddr);
+        p.y        = m_store->GetFloat(yAddr);
+        p.angleDeg = m_store->GetFloat(aAddr);
+    }
+    return p;
+}
+
 void PlatformController::moveAbsolute(int xAddr, int yAddr, int aAddr, NumFormat fmt)
 {
-    if (QThread::currentThread() == this->thread()) { doMoveAbsolute(xAddr, yAddr, aAddr, fmt); return; }
-    QMetaObject::invokeMethod(this, [=]{ doMoveAbsolute(xAddr, yAddr, aAddr, fmt); }, Qt::QueuedConnection);
+    if (!m_store || !m_platform) return;
+    const Pose target = readPose(xAddr, yAddr, aAddr, fmt);   // 调用线程解析
+    {
+        QMutexLocker lk(&m_poseMutex);
+        m_poseMirror[idx(Platform::Live)] = target;          // 同步预更新(保 Move→Write 时序)
+    }
+    renderMoveAbsolute(target);                              // 编组到 GUI 渲染
 }
 
 void PlatformController::moveRelative(int xAddr, int yAddr, int aAddr, NumFormat fmt)
 {
-    if (QThread::currentThread() == this->thread()) { doMoveRelative(xAddr, yAddr, aAddr, fmt); return; }
-    QMetaObject::invokeMethod(this, [=]{ doMoveRelative(xAddr, yAddr, aAddr, fmt); }, Qt::QueuedConnection);
+    if (!m_store || !m_platform) return;
+    const Pose delta = readPose(xAddr, yAddr, aAddr, fmt);
+    {
+        QMutexLocker lk(&m_poseMutex);
+        Pose& live = m_poseMirror[idx(Platform::Live)];
+        live.x += delta.x; live.y += delta.y; live.angleDeg += delta.angleDeg;
+    }
+    renderMoveRelative(delta);
 }
 
 void PlatformController::writeCurrentPos(int xAddr, int yAddr, int aAddr, NumFormat fmt, Platform which)
 {
-    if (QThread::currentThread() == this->thread()) { doWriteCurrentPos(xAddr, yAddr, aAddr, fmt, which); return; }
-    QMetaObject::invokeMethod(this, [=]{ doWriteCurrentPos(xAddr, yAddr, aAddr, fmt, which); }, Qt::BlockingQueuedConnection);
-}
-
-void PlatformController::doMoveAbsolute(int xAddr, int yAddr, int aAddr, NumFormat fmt)
-{
-    if (!m_store || !m_platform) return;
-    Pose target;
-    if (fmt == NumFormat::Int32) {
-        const double dXY = divisorXY(), dD = divisorD();
-        target.x = static_cast<double>(m_store->GetInt32(xAddr)) / dXY;
-        target.y = static_cast<double>(m_store->GetInt32(yAddr)) / dXY;
-        target.angleDeg = static_cast<double>(m_store->GetInt32(aAddr)) / dD;
-    } else {
-        target.x = m_store->GetFloat(xAddr);
-        target.y = m_store->GetFloat(yAddr);
-        target.angleDeg = m_store->GetFloat(aAddr);
+    if (!m_store) return;
+    Pose p;
+    {
+        QMutexLocker lk(&m_poseMutex);
+        p = m_poseMirror[idx(which)];      // 读镜像,任意线程,不再编组/阻塞
     }
-    m_platform->moveAbsolute(target);
-}
-
-void PlatformController::doMoveRelative(int xAddr, int yAddr, int aAddr, NumFormat fmt)
-{
-    if (!m_store || !m_platform) return;
-    Pose delta;
-    if (fmt == NumFormat::Int32) {
-        const double dXY = divisorXY(), dD = divisorD();
-        delta.x = static_cast<double>(m_store->GetInt32(xAddr)) / dXY;
-        delta.y = static_cast<double>(m_store->GetInt32(yAddr)) / dXY;
-        delta.angleDeg = static_cast<double>(m_store->GetInt32(aAddr)) / dD;
-    } else {
-        delta.x = m_store->GetFloat(xAddr);
-        delta.y = m_store->GetFloat(yAddr);
-        delta.angleDeg = m_store->GetFloat(aAddr);
-    }
-    m_platform->moveRelative(delta);
-}
-
-void PlatformController::doWriteCurrentPos(int xAddr, int yAddr, int aAddr, NumFormat fmt, Platform which)
-{
-    if (!m_store || !m_platform) return;
-    const Pose p = m_platform->pose(which);
     if (fmt == NumFormat::Int32) {
         const double dXY = divisorXY(), dD = divisorD();
         m_store->SetInt32(xAddr, static_cast<int32_t>(p.x * dXY));
@@ -105,4 +110,16 @@ void PlatformController::doWriteCurrentPos(int xAddr, int yAddr, int aAddr, NumF
         m_store->SetFloat(yAddr, static_cast<float>(p.y));
         m_store->SetFloat(aAddr, static_cast<float>(p.angleDeg));
     }
+}
+
+void PlatformController::renderMoveAbsolute(const Pose& target)
+{
+    if (QThread::currentThread() == this->thread()) { m_platform->moveAbsolute(target); return; }
+    QMetaObject::invokeMethod(this, [this, target]{ m_platform->moveAbsolute(target); }, Qt::QueuedConnection);
+}
+
+void PlatformController::renderMoveRelative(const Pose& delta)
+{
+    if (QThread::currentThread() == this->thread()) { m_platform->moveRelative(delta); return; }
+    QMetaObject::invokeMethod(this, [this, delta]{ m_platform->moveRelative(delta); }, Qt::QueuedConnection);
 }
