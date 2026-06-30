@@ -25,17 +25,10 @@ SOFTWARE.
 #include "MainWindow.h"
 #include "version.h"
 #include <QtWidgets/QApplication>
-#include <QStyleFactory>
 
 #include <QMessageBox>
 #include <QSharedMemory>
 #include <QSystemSemaphore>
-
-#ifdef _WIN32
-#ifdef _DEBUG
-#include "MemoryLeakDetector.h"
-#endif
-#endif
 
 #ifdef VLD_ENABLED
 #define VLD_FORCE_ENABLE
@@ -47,26 +40,6 @@ const QString SEMAPHORE_KEY = "PLC_Simulation_Semaphore";
 
 int main(int argc, char *argv[])
 {
-
-#ifndef VLD_ENABLED
-	// 如果没有启用VLD，则使用CRT内存检测
-	#ifdef _WIN32
-	#ifdef _DEBUG
-		// 启用内存泄漏检测
-		MemoryLeakDetector::EnableMemoryLeakChecks();
-
-		// 创建初始内存快照(在创建任何对象之前)
-		_CrtMemState memStateStart;
-		_CrtMemCheckpoint(&memStateStart);
-
-		// 设置断点在第一个泄漏的内存分配上
-		// 从最新的泄漏报告中选择最早的泄漏块编号
-		//MemoryLeakDetector::SetBreakAlloc(178);
-	#endif
-	#endif
-#endif
-
-    //int* testLeak = new int(42);  // 故意制造内存泄漏以测试检测功能
     QApplication app(argc, argv);
 
     // 设置应用程序元信息（用于 Qt 内部及系统集成）
@@ -74,8 +47,6 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationVersion(APP_VERSION);
     QCoreApplication::setOrganizationName(APP_ORGANIZATION);
     QCoreApplication::setOrganizationDomain(APP_DOMAIN);
-
-    //app.setStyle(QStyleFactory::create("Fusion"));
 
     // 步骤1：创建系统信号量（防止多实例同时检查共享内存）
     QSystemSemaphore semaphore(SEMAPHORE_KEY, 1);
@@ -103,35 +74,14 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    // 作用域块:让 MainWindow 先于 QApplication 析构
     int result = 0;
     {
         MainWindow window;
         window.show();
 
         result = app.exec();
-
-        // window析构发生在这里
     }
-
-    // 确保QApplication完全清理
-    // app析构将在return之前发生
-
-#ifndef VLD_ENABLED
-	// 如果没有启用VLD，则使用CRT内存检测
-	#ifdef _WIN32
-	#ifdef _DEBUG
-		// 创建结束内存快照
-		_CrtMemState memStateEnd, memStateDiff;
-		_CrtMemCheckpoint(&memStateEnd);
-
-		// 比较开始和结束的内存状态,只报告差异
-		if (_CrtMemDifference(&memStateDiff, &memStateStart, &memStateEnd))
-		{
-			_CrtMemDumpStatistics(&memStateDiff);
-		}
-	#endif
-	#endif
-#endif
 
     return result;
 }

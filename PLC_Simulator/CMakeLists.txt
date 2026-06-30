@@ -10,7 +10,6 @@ set(SOURCE_FILES
 
 # 根目录工具头文件
 set(ROOT_HEADERS
-    MemoryLeakDetector.h
 )
 
 set(RESOURCE_FILES
@@ -63,9 +62,9 @@ set(GUI_MAINWINDOW_SOURCES
     Gui/MainWindow/MainWindow.cpp
     Gui/MainWindow/MainWindow.ui
     Gui/MainWindow/QuickPanel.cpp
-    Gui/MainWindow/RegisterTableManager.cpp
-    Gui/MainWindow/RegisterItemDelegate.cpp
-    Gui/MainWindow/RegisterTableModel.cpp
+    Gui/MainWindow/RegisterTable/RegisterTableManager.cpp
+    Gui/MainWindow/RegisterTable/RegisterItemDelegate.cpp
+    Gui/MainWindow/RegisterTable/RegisterTableModel.cpp
     Gui/MainWindow/ScriptManager.cpp
     Gui/MainWindow/PlatformController.cpp
     Gui/MainWindow/AuxDialogs.cpp
@@ -74,11 +73,10 @@ set(GUI_MAINWINDOW_SOURCES
 set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/MainWindow.h
     Gui/MainWindow/QuickPanel.h
-    Gui/MainWindow/RegisterTableManager.h
-    Gui/MainWindow/RegisterTableModel.h
-    Gui/MainWindow/RegisterDataType.h
-    Gui/MainWindow/RegisterCellLayout.h
-    Gui/MainWindow/RegisterItemDelegate.h
+    Gui/MainWindow/RegisterTable/RegisterTableManager.h
+    Gui/MainWindow/RegisterTable/RegisterTableModel.h
+    Gui/MainWindow/RegisterTable/RegisterTableTypes.h
+    Gui/MainWindow/RegisterTable/RegisterItemDelegate.h
     Gui/MainWindow/ScriptManager.h
     Gui/MainWindow/PlatformController.h
     Gui/MainWindow/AuxDialogs.h
@@ -327,6 +325,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 	${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/MainWindow
+    ${CMAKE_CURRENT_SOURCE_DIR}/Gui/MainWindow/RegisterTable
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/ScriptEditor

@@ -18,13 +18,6 @@
 #include "Core/RegisterStore.h"
 #include "ScriptEngineHost.h"
 
-
-#ifdef _WIN32
-#ifdef _DEBUG
-#include "MemoryLeakDetector.h"
-#endif
-#endif
-
 #include <memory>
 #include <atomic>
 #include <vector>

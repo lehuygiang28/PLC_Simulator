@@ -11,7 +11,7 @@
 
 #include <QObject>
 
-#include "RegisterDataType.h"
+#include "RegisterTableTypes.h"
 
 class QTableView;
 class RegisterStore;

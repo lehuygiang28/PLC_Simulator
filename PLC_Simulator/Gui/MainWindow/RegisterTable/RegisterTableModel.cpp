@@ -75,6 +75,9 @@ struct ValidationResult
 // 以下校验为纯函数:只判定/规范化,不弹框、不改单元格。提示与写入由 setData 决策。
 ValidationResult validateChar(const QString& text)
 {
+    if (text.isEmpty())  // 空串:拒写保留原值(与 integer/real 一致;空格是合法字符故不 trim)
+        return { false, QString(), QStringLiteral("输入非法"),
+                 QStringLiteral("输入为空,已保留原值!") };
     if (text.length() > 2)
         return { true, text.left(2), QStringLiteral("输入截断"),
                  QString("输入值 %1 长度超过2,只保留前2位!").arg(text) };

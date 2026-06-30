@@ -6,8 +6,22 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 
-#ifndef REGISTERCELLLAYOUT_H
-#define REGISTERCELLLAYOUT_H
+#ifndef REGISTERTABLETYPES_H
+#define REGISTERTABLETYPES_H
+
+// 寄存器表的纯值类型(零依赖叶子头):数据类型枚举 + cell↔寄存器映射结构。
+// 独立成头,供 RegisterTableManager / RegisterTableModel 共用,避免控制器与模型互相 include 成环。
+
+// 数据类型枚举
+enum class RegisterDataType
+{
+    eDataTypeUnkown = -1,
+    eDataTypeInt16,
+    eDataTypeInt32,
+    eDataTypeFloat,
+    eDataTypeDouble,
+    eDataTypeChar8,
+};
 
 // 寄存器表 cell <-> 寄存器映射的单一真相源。
 // 纯结构,零 Qt 控件依赖、无状态;给定行列即可独立验算。
@@ -39,4 +53,4 @@ struct RegisterCellLayout
     static bool isValueColumn(int col) { return col % 2 == 1; }
 };
 
-#endif // REGISTERCELLLAYOUT_H
+#endif // REGISTERTABLETYPES_H

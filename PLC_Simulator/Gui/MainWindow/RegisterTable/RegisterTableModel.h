@@ -17,8 +17,7 @@
 #include <vector>
 
 #include "Core/DataTypeConvert.h"
-#include "RegisterCellLayout.h"
-#include "RegisterDataType.h"
+#include "RegisterTableTypes.h"
 
 class RegisterStore;
 
