@@ -2,12 +2,6 @@
 #include <QCoreApplication>
 #include <QFrame>
 
-#ifdef _WIN32
-#ifdef _DEBUG
-#include "MemoryLeakDetector.h"
-#endif
-#endif
-
 QuickPanel::QuickPanel(QWidget* parent)
     : QDialog(parent)
 {

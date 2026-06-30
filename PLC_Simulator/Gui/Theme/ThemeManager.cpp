@@ -48,7 +48,7 @@ ThemeManager::ThemeManager(QObject* parent)
         {"@text",          "#e3e5e8"}, {"@text2",     "#9aa0a6"}, {"@accent",   "#4ca3e0"},
         {"@accentHover",   "#5fb0e8"}, {"@accentDark","#2e7ba8"}, {"@thBg",     "#313337"},
         {"@altRow",        "#26282b"}, {"@addrBg",    "#2f3338"}, {"@disabledText", "#6b6f74"},
-        {"@disabledBg",    "#2a2c2f"}
+        {"@disabledBg",    "#2a2c2f"}, {"@flashBg",   "#ff6b6b"}   // 闪烁高亮(饱和红,叠加在深背景上可见)
     };
     // 浅色主题颜色表
     m_light = {
@@ -57,7 +57,7 @@ ThemeManager::ThemeManager(QObject* parent)
         {"@text",          "#1f2329"}, {"@text2",     "#6b7280"}, {"@accent",   "#2f80ed"},
         {"@accentHover",   "#4a93f0"}, {"@accentDark","#1c66cc"}, {"@thBg",     "#eceef1"},
         {"@altRow",        "#f6f7f9"}, {"@addrBg",    "#f0f2f5"}, {"@disabledText", "#a0a4ab"},
-        {"@disabledBg",    "#eef0f2"}
+        {"@disabledBg",    "#eef0f2"}, {"@flashBg",   "#e23b3b"}   // 闪烁高亮(深红,叠加在浅背景上可见)
     };
 
     // 安装应用级事件过滤器:任意顶层窗口显示时统一设置标题栏深浅,

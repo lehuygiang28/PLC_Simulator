@@ -137,7 +137,7 @@ QTextEdit, QPlainTextEdit {
 }
 
 /* 表格 */
-QTableWidget {
+QTableView {
     background-color: @surface;
     alternate-background-color: @altRow;
     gridline-color: @divider;
@@ -145,8 +145,8 @@ QTableWidget {
     border-radius: 8px;
     outline: none;
 }
-QTableWidget::item { padding: 2px; color: @text; }
-QTableWidget::item:selected { background-color: @accent; color: #ffffff; }
+QTableView::item { padding: 2px; color: @text; }
+QTableView::item:selected { background-color: @accent; color: #ffffff; }
 QHeaderView::section {
     background-color: @thBg;
     color: @text;
