@@ -207,8 +207,10 @@ QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
         return formatCell(m_currentType, k);
     }
 
-    // 地址列
+    // 地址列:地址越过 store 容量则留空(窗口可大于寄存器空间)
     const int addr = m_layout.registerAddr(k, m_startAddr);
+    if (m_store && addr >= m_store->size())
+        return QString();
     return QString("D%1").arg(addr, 5, 10, QChar('0'));
 }
 
@@ -326,6 +328,7 @@ void RegisterTableModel::clearEditingIndex()
     m_editIndex = QPersistentModelIndex();
     if (idx.isValid())
         emit dataChanged(idx, idx);  // 编辑结束:把该格刷到当前快照值
+    emit editingFinished();          // 解除编辑保护后补齐编辑期被跳过的维度自适应
 }
 
 void RegisterTableModel::onStoreChanged()
@@ -402,7 +405,15 @@ bool RegisterTableModel::isAnchorValueCell(int row, int col) const
     if (!m_layout.isValueColumn(col)) return false;
     const int k = m_layout.linearIndex(row, col);
     if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size())) return false;
-    return k % registersPerValue(m_currentType) == 0;
+    if (k % registersPerValue(m_currentType) != 0) return false;
+    // 值占 rpv 个连续寄存器,整段须落在 store 容量内,否则该值格越界→留空/只读
+    if (m_store)
+    {
+        const int rpv = registersPerValue(m_currentType);
+        if (m_layout.registerAddr(k, m_startAddr) + rpv - 1 >= m_store->size())
+            return false;
+    }
+    return true;
 }
 
 void RegisterTableModel::writeCell(RegisterDataType type, int k, const QString& text)

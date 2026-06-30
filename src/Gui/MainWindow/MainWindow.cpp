@@ -16,6 +16,7 @@
 #include "PlatformBinding.h"
 #include "version.h"
 #include <QWindow>
+#include <QScreen>
 #include <QVariantMap>
 #include <QMap>
 #include <QButtonGroup>
@@ -50,6 +51,20 @@ MainWindow::MainWindow(QWidget *parent)
 {
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(APP_NAME).arg(APP_VERSION));
+
+	// 启动尺寸:取当前屏可用区的 80%,且不超过 .ui 设计尺寸(1350x971),再居中。
+	// 固定像素尺寸在低逻辑分辨率显示器上会溢出屏幕(高度被任务栏/标题栏切掉),
+	// 故按屏比例自适应;上限钳到设计尺寸,避免在高分屏上被撑得过大、布局发散。
+	if (QScreen* scr = screen())
+	{
+		constexpr double kScreenFraction = 0.8;
+		const QRect avail = scr->availableGeometry();
+		const int w = qMin(width(),  qRound(avail.width()  * kScreenFraction));
+		const int h = qMin(height(), qRound(avail.height() * kScreenFraction));
+		resize(w, h);
+		move(avail.x() + (avail.width()  - w) / 2,
+		     avail.y() + (avail.height() - h) / 2);
+	}
 
 	createMembers();          // ① 创建所有成员对象(按依赖顺序)
 	setupUiContent();         // ② 填充静态 UI(下拉框 / 只读 / 状态栏初值)
@@ -597,8 +612,7 @@ void MainWindow::connectLog()
 void MainWindow::setupInputValidators()
 {
 	QIntValidator *PortValid = new QIntValidator(0, 65535, this);
-	QIntValidator *RegisterShowAddr = new QIntValidator(0,
-														REGISTER_VAL_NUM - 1 - kRegCols * kRegRows / 2, this);
+	QIntValidator *RegisterShowAddr = new QIntValidator(0, REGISTER_VAL_NUM - 1, this);
 
 	// 只能输入整型数
 	ui->edit_Port->setValidator(PortValid);

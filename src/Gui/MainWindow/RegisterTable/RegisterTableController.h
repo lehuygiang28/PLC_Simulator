@@ -37,7 +37,15 @@ public:
     void setStartAddr(int startAddr);
     void setNumberBase(bool hex);
 
+protected:
+    // 监听视图视口 resize → 按窗口尺寸重算行列
+    bool eventFilter(QObject* obj, QEvent* ev) override;
+
 private:
+    void applyViewportDimensions();   // 据视口尺寸算行列,变化且非编辑中才重置 model
+
+    static constexpr int kCellWidth = 80;   // 单元格列宽(行列反推与列默认段宽共用)
+
     QTableView* m_view;             // 寄存器表视图
     RegisterStore* m_store;         // 寄存器数据存储
     QWidget* m_parentWidget;        // 父窗口(弹框父)
