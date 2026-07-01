@@ -11,6 +11,7 @@
 
 #include <QString>
 #include <QSize>
+#include <QVariantMap>
 
 class QWidget;
 
@@ -28,6 +29,10 @@ public:
         int unitD;    ///< D轴单位幂(10^n)
         int objAddr;  ///< 对象平台轴位置起始寄存器地址
         int tgtAddr;  ///< 目标平台轴位置起始寄存器地址
+
+        /// 持久化自序列化(键自描述);fromVariantMap 缺字段回退当前值
+        QVariantMap toVariantMap() const;
+        void fromVariantMap(const QVariantMap& m);
     };
 
     /// 关于对话框(图标/版本/作者/描述 + 第三方许可子弹窗)

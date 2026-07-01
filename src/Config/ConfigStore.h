@@ -66,6 +66,22 @@ public:
     // 加载模拟平台参数(不透明字典)
     bool LoadSimulationPlatformParams(QVariantMap& params) const;
 
+    // ==================== 平台/轴写入参数(参数设置对话框)====================
+
+    // 保存轴写入参数(不透明字典,字段由 AuxDialogs::PlatformParams 自描述)
+    bool SaveAxisWriteParams(const QVariantMap& params);
+
+    // 加载轴写入参数(不透明字典)
+    bool LoadAxisWriteParams(QVariantMap& params) const;
+
+    // ==================== 寄存器表显示设置 ====================
+
+    // 保存寄存器表显示设置(起始地址 / 数据类型 / 进制)
+    bool SaveRegisterView(const QVariantMap& params);
+
+    // 加载寄存器表显示设置
+    bool LoadRegisterView(QVariantMap& params) const;
+
 private:
     // 配置文件路径 + 内存事实源
     QString m_configDirPath;

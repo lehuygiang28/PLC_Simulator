@@ -30,6 +30,7 @@
 #include <QComboBox>
 #include <QIntValidator>
 #include <QTextDocument>
+#include <QSignalBlocker>
 
 namespace
 {
@@ -43,6 +44,14 @@ void MainWindow::refreshAxisAddrStatus()
 	// 轴写入地址并入平台段悬停详情,随平台参数变更推入状态栏控制器
 	if (m_statusBarController)
 		m_statusBarController->setPlatformParams(m_platformParams);
+}
+
+void MainWindow::applyPlatformParams()
+{
+	// 把 m_platformParams 应用到控制器(单位幂)与状态栏(供加载/编辑复用)
+	if (m_platformController)
+		m_platformController->setUnitPowers(m_platformParams.unitXY, m_platformParams.unitD);
+	refreshAxisAddrStatus();
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -137,6 +146,15 @@ void MainWindow::loadConfigs()
 		if (m_configStore->LoadSimulationPlatformParams(platformParams) && m_simulationPlatform != nullptr)
 		{
 			m_simulationPlatform->setSceneParamsFromMap(platformParams);
+		}
+
+		// 加载平台/轴写入参数(单位幂 + 对象/目标轴地址);须重新 apply,
+		// 因 createMembers 已用默认值构造过 PlatformController
+		QVariantMap axisParams;
+		if (m_configStore->LoadAxisWriteParams(axisParams))
+		{
+			m_platformParams.fromVariantMap(axisParams);
+			applyPlatformParams();
 		}
 	}
 }
@@ -249,9 +267,52 @@ void MainWindow::applyThemePref()
 
 void MainWindow::initialRefresh()
 {
-	// 三条视图状态统一显式首推(与 setDataType 对齐),不依赖 setChecked 副作用
+	// 恢复寄存器表显示设置:信号屏蔽下设控件,避免触发 change 槽造成载入即回存/重复推送
+	QVariantMap rv;
+	if (m_configStore && m_configStore->LoadRegisterView(rv))
+	{
+		{
+			QSignalBlocker blocker(ui->edit_RegisterAddr);
+			ui->edit_RegisterAddr->setText(
+				QString::number(rv.value("startAddr", ui->edit_RegisterAddr->text().toInt()).toInt()));
+		}
+		{
+			const int savedType = rv.value("dataType", -1).toInt();
+			for (int i = 0; i < ui->cmbBox_DataType->count(); ++i)
+			{
+				if (static_cast<int>(ui->cmbBox_DataType->itemData(i).value<RegisterDataType>()) == savedType)
+				{
+					QSignalBlocker blocker(ui->cmbBox_DataType);
+					ui->cmbBox_DataType->setCurrentIndex(i);
+					break;
+				}
+			}
+		}
+		{
+			const bool hex = rv.value("numberBaseHex", false).toBool();
+			QSignalBlocker b1(ui->Radio_Data_HEX);
+			QSignalBlocker b2(ui->Radio_Data_DEC);
+			ui->Radio_Data_HEX->setChecked(hex);
+			ui->Radio_Data_DEC->setChecked(!hex);
+		}
+	}
+
+	// 三条视图状态统一显式首推(不依赖 setChecked 副作用;载入后为载入值,否则默认值)
 	m_registerTableController->setStartAddr(ui->edit_RegisterAddr->text().toInt());  // 内部自动刷新
+	m_registerTableController->setDataType(ui->cmbBox_DataType->currentData().value<RegisterDataType>());
 	m_registerTableController->setNumberBase(ui->Radio_Data_HEX->isChecked());
+
+	m_uiReady = true;   // 启动完成:此后寄存器视图控件的用户变更才落盘
+}
+
+void MainWindow::saveRegisterView()
+{
+	if (!m_uiReady || !m_configStore) return;   // 屏蔽启动期控件初值触发
+	QVariantMap m;
+	m["startAddr"]     = ui->edit_RegisterAddr->text().toInt();
+	m["dataType"]      = static_cast<int>(ui->cmbBox_DataType->currentData().value<RegisterDataType>());
+	m["numberBaseHex"] = ui->Radio_Data_HEX->isChecked();
+	m_configStore->SaveRegisterView(m);
 }
 
 void MainWindow::connectSignals()
@@ -334,8 +395,9 @@ void MainWindow::buildMenus()
 	QAction* actPlatformParams = platformMenu->addAction("参数设置…");
 	connect(actPlatformParams, &QAction::triggered, this, [this]{
 		if (AuxDialogs::editPlatformParams(this, m_platformParams)) {
-			m_platformController->setUnitPowers(m_platformParams.unitXY, m_platformParams.unitD);
-			refreshAxisAddrStatus();
+			applyPlatformParams();
+			if (m_configStore)
+				m_configStore->SaveAxisWriteParams(m_platformParams.toVariantMap());
 		}
 	});
 
@@ -458,6 +520,7 @@ void MainWindow::connectRegisterTable()
 				if (nAddr < 0)
 					return;
 				m_registerTableController->setStartAddr(nAddr);
+				saveRegisterView();
 			});
 
 	// 修改显示寄存器数据类型(推入即自动刷新)
@@ -465,6 +528,7 @@ void MainWindow::connectRegisterTable()
 			{
 				m_registerTableController->setDataType(
 					ui->cmbBox_DataType->currentData().value<RegisterDataType>());
+				saveRegisterView();
 			});
 
 	// 数据显示进制切换(DEC/HEX,推入即自动刷新)
@@ -475,7 +539,10 @@ void MainWindow::connectRegisterTable()
 	connect(group1, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
 			{
 		if (checked)
+		{
 			m_registerTableController->setNumberBase(button == ui->Radio_Data_HEX);
+			saveRegisterView();
+		}
 			});
 }
 

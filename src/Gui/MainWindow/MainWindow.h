@@ -80,6 +80,10 @@ private:
 
     // 平台参数相关
     void refreshAxisAddrStatus();
+    void applyPlatformParams();    // 把 m_platformParams 应用到控制器+状态栏(加载/编辑复用)
+
+    // 寄存器表显示设置持久化(起始地址 / 数据类型 / 进制)
+    void saveRegisterView();
 
     // 菜单栏相关
     void OnThemeSelected(Theme theme);
@@ -123,6 +127,9 @@ private:
     // 状态栏控制器
     std::unique_ptr<StatusBarController> m_statusBarController;
 
+
+    // UI 就绪标志:startup 期间控件初值变更不落盘,initialRefresh 末尾置真
+    bool m_uiReady = false;
 
     // 日志显示状态
     int m_nLogStat;

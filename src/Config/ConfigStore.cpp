@@ -15,6 +15,8 @@ constexpr auto kProtocolType       = "protocol_type";
 constexpr auto kTheme              = "theme";
 constexpr auto kScriptNames        = "script_names";
 constexpr auto kSimulationPlatform = "simulation_platform";
+constexpr auto kAxisWriteParams    = "axis_write_params";
+constexpr auto kRegisterView       = "register_view";
 }
 
 ConfigStore::ConfigStore(QObject* parent)
@@ -145,5 +147,29 @@ bool ConfigStore::LoadSimulationPlatformParams(QVariantMap& params) const
 {
     if (!m_root.contains(kSimulationPlatform)) return false;
     params = Get(kSimulationPlatform).toObject().toVariantMap();
+    return true;
+}
+
+bool ConfigStore::SaveAxisWriteParams(const QVariantMap& params)
+{
+    return Set(kAxisWriteParams, QJsonObject::fromVariantMap(params));
+}
+
+bool ConfigStore::LoadAxisWriteParams(QVariantMap& params) const
+{
+    if (!m_root.contains(kAxisWriteParams)) return false;
+    params = Get(kAxisWriteParams).toObject().toVariantMap();
+    return true;
+}
+
+bool ConfigStore::SaveRegisterView(const QVariantMap& params)
+{
+    return Set(kRegisterView, QJsonObject::fromVariantMap(params));
+}
+
+bool ConfigStore::LoadRegisterView(QVariantMap& params) const
+{
+    if (!m_root.contains(kRegisterView)) return false;
+    params = Get(kRegisterView).toObject().toVariantMap();
     return true;
 }

@@ -168,6 +168,33 @@ bool AuxDialogs::editPlatformParams(QWidget* parent, PlatformParams& params)
     return true;
 }
 
+namespace {
+// PlatformParams 持久化键(单一来源,to/from 共用)
+constexpr auto kUnitXY  = "unitXY";
+constexpr auto kUnitD   = "unitD";
+constexpr auto kObjAddr = "objAddr";
+constexpr auto kTgtAddr = "tgtAddr";
+} // namespace
+
+QVariantMap AuxDialogs::PlatformParams::toVariantMap() const
+{
+    QVariantMap m;
+    m[kUnitXY]  = unitXY;
+    m[kUnitD]   = unitD;
+    m[kObjAddr] = objAddr;
+    m[kTgtAddr] = tgtAddr;
+    return m;
+}
+
+void AuxDialogs::PlatformParams::fromVariantMap(const QVariantMap& m)
+{
+    // 缺字段回退当前值(= 默认 {3,3,114,120})
+    unitXY  = m.value(kUnitXY,  unitXY).toInt();
+    unitD   = m.value(kUnitD,   unitD).toInt();
+    objAddr = m.value(kObjAddr, objAddr).toInt();
+    tgtAddr = m.value(kTgtAddr, tgtAddr).toInt();
+}
+
 void AuxDialogs::showTextFileDialog(QWidget* parent, const QString& title,
                                      const QString& filePath, const QString& fallbackText,
                                      const QSize& size)
