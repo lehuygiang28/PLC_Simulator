@@ -129,6 +129,9 @@ private:
     // 脚本管理器
     std::unique_ptr<ScriptManager> m_scriptManager;
 
+    // 脚本名称编辑框缓存(运行期不变,scriptNameEdits() 首次发现后填充)
+    mutable QVector<QLineEdit*> m_scriptNameEdits;
+
     // 状态栏控制器
     std::unique_ptr<StatusBarController> m_statusBarController;
 

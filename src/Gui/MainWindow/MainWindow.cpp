@@ -37,6 +37,14 @@ namespace
 // 寄存器表维度(地址/值成对,列须偶数)。原为 RegisterTableController.h 内的宏,本处统一持有。
 constexpr int kRegRows = 21;
 constexpr int kRegCols = 10;
+
+// 通信日志最大行数,超出即整体清空
+constexpr int kMaxLogLines = 5000;
+
+// 单个平台位姿占用的寄存器数(X/Y/Z 三段,每段 kAxisFieldStride 个)
+constexpr int kAxisRegSpan = 6;
+// 位姿字段步长(每轴占 2 个寄存器,X 起址、Y=起址+步长、Z=起址+2*步长)
+constexpr int kAxisFieldStride = 2;
 }
 
 void MainWindow::refreshAxisAddrStatus()
@@ -492,15 +500,18 @@ void MainWindow::connectScript()
 
 QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 {
+	// 脚本名称编辑框在运行期不变,首次发现后缓存,避免每次全树 findChild 扫描。
 	// 数量由 UI 推导:edit_ScriptName_{i} 找不到即停
-	QVector<QLineEdit*> edits;
-	for (int i = 1; ; ++i)
+	if (m_scriptNameEdits.isEmpty())
 	{
-		auto* edit = findChild<QLineEdit*>(QString("edit_ScriptName_%1").arg(i));
-		if (!edit) break;
-		edits << edit;
+		for (int i = 1; ; ++i)
+		{
+			auto* edit = findChild<QLineEdit*>(QString("edit_ScriptName_%1").arg(i));
+			if (!edit) break;
+			m_scriptNameEdits << edit;
+		}
 	}
-	return edits;
+	return m_scriptNameEdits;
 }
 
 void MainWindow::connectRegisterTable()
@@ -646,13 +657,11 @@ void MainWindow::connectLog()
 	// 主控类持有的通信实例信号转发
 	if (m_pWorkflow != nullptr)
 	{
-		// 通信日志记录
-		connect(m_pWorkflow, &MainWorkflow::logRecord, this, [=](QString strLogInfo)
-				{ UpdateLogDisplay(strLogInfo); });
+		// 通信日志记录(纯转发,直连槽)
+		connect(m_pWorkflow, &MainWorkflow::logRecord, this, &MainWindow::UpdateLogDisplay);
 
-		// Lua 脚本日志转发
-		connect(m_pWorkflow->scriptHost(), &ScriptEngineHost::scriptLog, this,
-				[=](QString strLogInfo){ UpdateLogDisplay(strLogInfo); });
+		// Lua 脚本日志转发(纯转发,直连槽)
+		connect(m_pWorkflow->scriptHost(), &ScriptEngineHost::scriptLog, this, &MainWindow::UpdateLogDisplay);
 
 		// 通信事件(收/发统一) — 单点接收,含前缀拼接与重复帧过滤
 		connect(m_pWorkflow, &MainWorkflow::commEvent, this, [=](CommEvent ev)
@@ -738,12 +747,17 @@ void MainWindow::CreateCurrentProtocol()
 
 bool MainWindow::axisStartAddrValid(int addr) const
 {
-    return addr < REGISTER_VAL_NUM - 6;
+    // 起址须非负,且留足一整段位姿(kAxisRegSpan 个寄存器)不越界
+    return addr >= 0 && addr < REGISTER_VAL_NUM - kAxisRegSpan;
 }
 
 void MainWindow::writeAxisPos(int startAddr, PlatformController::NumFormat fmt, Platform which)
 {
-    m_platformController->writeCurrentPos(startAddr, startAddr + 2, startAddr + 4, fmt, which);
+    m_platformController->writeCurrentPos(
+        startAddr,
+        startAddr + kAxisFieldStride,
+        startAddr + 2 * kAxisFieldStride,
+        fmt, which);
 }
 
 void MainWindow::writeAxisManual(PlatformController::NumFormat fmt)
@@ -827,11 +841,9 @@ void MainWindow::UpdateLogDisplay(QString strNewLog)
 {
 	QTextDocument *document = ui->text_CommLog->document();
 
-	// 获取当前行数
+	// 获取当前行数;超过最大限制则整体清空
 	int lineCount = document->blockCount();
-	// 如果行数超过最大限制，则清空
-	int nMaxLogLines = 5000;
-	if (lineCount > nMaxLogLines)
+	if (lineCount > kMaxLogLines)
 	{
 		ui->text_CommLog->clear();
 	}
