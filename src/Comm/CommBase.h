@@ -19,6 +19,7 @@
 #include <QMap>
 #include <QByteArray>
 #include <QString>
+#include <QStringList>
 #include <QVariantMap>
 #include <functional>
 #include <QRunnable>
@@ -31,6 +32,11 @@ class CommBase : public QObject
 signals:
 	void logRecord(const QString& text);        // 日志信号
 	void commEvent(const CommEvent& ev);        // 结构化通信事件(收/发统一)
+
+	// 状态栏用:连接状态、客户端快照、请求超时(最小结构化信号,不含调度器细节)
+	void connectionStateChanged(bool listening);        // 服务器监听 开/关
+	void clientsChanged(const QStringList& clientIds);  // 已连接客户端快照(IP:Port 列表)
+	void commTimeout(const QString& endpointId);        // 请求超时
 
 	void dataSendRequest(const QString& endpointId, const QByteArray& data);	//发送请求信号
 public:

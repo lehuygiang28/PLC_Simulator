@@ -44,6 +44,7 @@ void ScriptManager::runScript(int index)
     }
 
     // 异步投递执行;运行结果(成功/失败)经 scriptFinished → scriptLog 反馈到日志
+    emit scriptStarted(index);   // 状态栏:进入运行中
     m_host->runScript(index, path);
 }
 

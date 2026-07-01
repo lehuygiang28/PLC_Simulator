@@ -40,10 +40,9 @@ constexpr int kRegCols = 10;
 
 void MainWindow::refreshAxisAddrStatus()
 {
-	m_statusAddrLabel->setText(
-		QString("对象轴写入:D%1;目标轴写入:D%2")
-			.arg(m_platformParams.objAddr)
-			.arg(m_platformParams.tgtAddr));
+	// 轴写入地址并入平台段悬停详情,随平台参数变更推入状态栏控制器
+	if (m_statusBarController)
+		m_statusBarController->setPlatformParams(m_platformParams);
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -183,9 +182,8 @@ void MainWindow::createMembers()
 		m_simulationPlatform,
 		m_platformParams.unitXY, m_platformParams.unitD, nullptr);
 
-	// 状态栏:常显轴写入目标地址
-	m_statusAddrLabel = new QLabel(this);
-	ui->statusBar->addPermanentWidget(m_statusAddrLabel);
+	// 状态栏控制器:5 段运行态信息(通信/客户端/健康/脚本/平台)
+	m_statusBarController = std::make_unique<StatusBarController>(ui->statusBar, this);
 }
 
 void MainWindow::setupUiContent()
@@ -264,6 +262,7 @@ void MainWindow::connectSignals()
 	connectComm();
 	connectLog();
 	connectScript();
+	connectStatusBar();
 
 	// 平台绑定 + 位姿自动写入(workflow 实际恒非空,守卫仅为防御)
 	if (m_pWorkflow)
@@ -523,6 +522,11 @@ void MainWindow::connectComm()
 			CommBase::CommInfoBase* infoView = info.get();
 			m_pWorkflow->SetCommInfo(std::move(info));
 
+			// 状态栏:开连接前注入通信配置,使随后的连接状态信号已有上下文
+			if (m_statusBarController)
+				m_statusBarController->setCommConfig(ui->cmbBox_ProtocolType->currentText(),
+					ui->edit_IP->text(), ui->edit_Port->text().toUShort(), true);
+
 			if (!m_pWorkflow->OpenComm())
 			{
 				UpdateLogDisplay("打开连接失败!");
@@ -607,6 +611,36 @@ void MainWindow::connectLog()
 					UpdateLogDisplay(QString("%1:[%2]:").arg(pfx, ev.endpointId) + body);
 				});
 	}
+}
+
+void MainWindow::connectStatusBar()
+{
+	if (!m_statusBarController) return;
+	StatusBarController* sc = m_statusBarController.get();
+
+	// 通信:连接状态 / 客户端快照 / 收发事件 / 超时(经工作流转发,跨线程自动 Queued)
+	if (m_pWorkflow)
+	{
+		connect(m_pWorkflow, &MainWorkflow::connectionStateChanged, sc, &StatusBarController::onConnectionStateChanged);
+		connect(m_pWorkflow, &MainWorkflow::clientsChanged,         sc, &StatusBarController::onClientsChanged);
+		connect(m_pWorkflow, &MainWorkflow::commEvent,             sc, &StatusBarController::onCommEvent);
+		connect(m_pWorkflow, &MainWorkflow::commTimeout,           sc, &StatusBarController::onCommTimeout);
+		connect(m_pWorkflow->scriptHost(), &ScriptEngineHost::scriptFinished, sc, &StatusBarController::onScriptFinished);
+	}
+
+	// 脚本开始(补齐 scriptFinished 的另一端)
+	if (m_scriptManager)
+		connect(m_scriptManager.get(), &ScriptManager::scriptStarted, sc, &StatusBarController::onScriptStarted);
+
+	// 脚本悬浮显示名称框内容(惰性读取,运行中改名亦实时);空名回退 "脚本 #N"
+	sc->setScriptNameProvider([this](int i) {
+		const QVector<QLineEdit*> edits = scriptNameEdits();
+		return (i >= 0 && i < edits.size()) ? edits[i]->text() : QString();
+	});
+
+	// 平台位姿(独立于自动写入开关,单独一份连接)
+	if (m_simulationPlatform)
+		connect(m_simulationPlatform, &SimulationPlatform::poseChanged, sc, &StatusBarController::onPoseChanged);
 }
 
 void MainWindow::setupInputValidators()

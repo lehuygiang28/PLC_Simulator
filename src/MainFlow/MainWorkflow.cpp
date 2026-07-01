@@ -125,6 +125,15 @@ bool MainWorkflow::OpenComm()
 			connect(m_pComm, &CommBase::commEvent, this, [this](const CommEvent& ev) {
 				emit commEvent(ev);
 			});
+			connect(m_pComm, &CommBase::connectionStateChanged, this, [this](bool listening) {
+				emit connectionStateChanged(listening);
+			});
+			connect(m_pComm, &CommBase::clientsChanged, this, [this](const QStringList& ids) {
+				emit clientsChanged(ids);
+			});
+			connect(m_pComm, &CommBase::commTimeout, this, [this](const QString& ep) {
+				emit commTimeout(ep);
+			});
 		}
 
 		m_bValidComm = m_pComm->Open(m_pCommInfo.get());

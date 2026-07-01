@@ -55,6 +55,7 @@ void CommBase::ProcessNextForEndpoint(const QString& endpointId)
 	// 超时检查
 	if (request.timestamp.msecsTo(QDateTime::currentDateTime()) > request.timeoutMs) {
 		emit logRecord(QString("请求超时，跳过: %1").arg(endpointId));
+		emit commTimeout(endpointId);	//状态栏:超时计数
 		QMetaObject::invokeMethod(this, "OnTaskFinished", Qt::QueuedConnection, Q_ARG(QString, endpointId));
 		return;
 	}

@@ -71,6 +71,7 @@ bool CommSocket::initializeServer()
 
 
 	m_bConnected = true;	//置位标志符
+	emit connectionStateChanged(true);	//状态栏:服务器已监听
 
 	//连接新的连接请求槽
 	connect(m_Server, &QTcpServer::newConnection, this, [=] {
@@ -87,6 +88,7 @@ bool CommSocket::initializeServer()
 			emit logRecord(QString("[%1:%2] 新客户端链接")
 				.arg(Cursocket->peerAddress().toString())
 				.arg(Cursocket->peerPort()));
+			emit clientsChanged(m_ClientMap.keys());	//状态栏:客户端快照
 
 			//接收到数据时的操作
 			connect(Cursocket, &QTcpSocket::readyRead, this, [=] {
@@ -117,6 +119,7 @@ bool CommSocket::initializeServer()
 				emit logRecord(QString("[%1]:客户端断开链接").arg(GetClientId(Cursocket)));
 
 				m_ClientMap.remove(GetClientId(Cursocket));
+				emit clientsChanged(m_ClientMap.keys());	//状态栏:客户端快照
 
 
 				});
@@ -162,6 +165,9 @@ void CommSocket::Cleanup()
 	}
 
 	m_ClientMap.clear();
+	m_bConnected = false;
+	emit clientsChanged(m_ClientMap.keys());	//状态栏:清空客户端
+	emit connectionStateChanged(false);			//状态栏:服务器已关闭
 
 	// 清理客户端socket
 	if (m_Client) {
