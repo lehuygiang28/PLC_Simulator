@@ -8,24 +8,27 @@
 
 #include "StatusBarController.h"
 #include "StatusSegment.h"
+#include "ThemeManager.h"
 
 #include <QStatusBar>
 #include <QList>
+#include <QColor>
 #include <algorithm>
 
 namespace {
-constexpr auto kGreen = "#22c55e";   // 连接指示(监听中)
-constexpr auto kGrey  = "#9ca3af";   // 灰显 / 次要文本 / 详情键
-constexpr auto kTx    = "#2563eb";   // 发送(TX)
-constexpr auto kRx    = "#16a34a";   // 接收(RX)
-constexpr auto kText  = "#e5e7eb";   // 详情值 / 列表项
-constexpr auto kTitle = "#ffffff";   // 列表标题
+// 语义状态色:跨主题恒定(绿=连接、蓝=TX、绿=RX)
+constexpr auto kGreen = "#22c55e";
+constexpr auto kTx    = "#2563eb";
+constexpr auto kRx    = "#16a34a";
 
-// 悬停详情:两列对齐表(键灰左、值右成列)
+// 中性色跟随主题:运行时取当前主题 token 的实际色值(@text 值/标题,@text2 键/灰显)
+QString themed(const char* token) { return ThemeManager::instance().color(token).name(); }
+
+// 悬停详情:两列对齐表(键次要色左、值主色右)
 QString kvRow(const QString& key, const QString& value)
 {
     return QString("<tr><td style='color:%1;padding-right:16px'>%2</td>"
-                   "<td style='color:%3'>%4</td></tr>").arg(kGrey, key, kText, value);
+                   "<td style='color:%3'>%4</td></tr>").arg(themed("@text2"), key, themed("@text"), value);
 }
 QString kvTable(const QString& rows)
 {
@@ -34,9 +37,9 @@ QString kvTable(const QString& rows)
 // 列表类详情:加粗标题 + 每行一项
 QString titledList(const QString& title, const QStringList& items)
 {
-    QString s = QString("<b style='color:%1'>%2</b>").arg(kTitle, title);
+    QString s = QString("<b style='color:%1'>%2</b>").arg(themed("@text"), title);
     for (const QString& it : items)
-        s += QString("<div style='color:%1;padding-top:2px'>%2</div>").arg(kText, it);
+        s += QString("<div style='color:%1;padding-top:2px'>%2</div>").arg(themed("@text"), it);
     return s;
 }
 }
@@ -57,6 +60,25 @@ StatusBarController::StatusBarController(QStatusBar* bar, QObject* parent)
     bar->addWidget(m_segScript);
     bar->addPermanentWidget(m_segPlatform);
 
+    // 详情惰性构建:各段装一次 provider,悬浮时才读实时状态拼 HTML。
+    // QPointer 守卫控制器已析构但段仍在的极端窗口(实测销毁期无悬浮,纯防御)。
+    m_segConn->setDetailProvider    ([self = QPointer<StatusBarController>(this)]{ return self ? self->buildConnDetail()     : QString(); });
+    m_segClients->setDetailProvider ([self = QPointer<StatusBarController>(this)]{ return self ? self->buildClientsDetail()  : QString(); });
+    m_segHealth->setDetailProvider  ([self = QPointer<StatusBarController>(this)]{ return self ? self->buildHealthDetail()   : QString(); });
+    m_segScript->setDetailProvider  ([self = QPointer<StatusBarController>(this)]{ return self ? self->buildScriptDetail()   : QString(); });
+    m_segPlatform->setDetailProvider([self = QPointer<StatusBarController>(this)]{ return self ? self->buildPlatformDetail() : QString(); });
+
+    refreshAll();
+
+    // 主题切换:重刷各段可见值,使内联中性色按新主题 token 取色(语义状态色不变;
+    // tooltip 详情因悬浮时才取色,天然已随主题)。
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this] {
+        refreshAll();
+    });
+}
+
+void StatusBarController::refreshAll()
+{
     refreshConnection();
     refreshClients();
     refreshHealth();
@@ -165,31 +187,17 @@ void StatusBarController::setScriptNameProvider(std::function<QString(int)> prov
 
 void StatusBarController::refreshConnection()
 {
-    // 协议/角色/地址/端口 两分支共用;仅角色文案(监听中)与末尾"状态"行有差异
-    const QString roleDetail = m_isServer
-        ? (m_listening ? QStringLiteral("服务器(监听中)") : QStringLiteral("服务器"))
-        : QStringLiteral("客户端");
-    QString rows = kvRow(QStringLiteral("协议"), m_protocol)
-                 + kvRow(QStringLiteral("角色"), roleDetail)
-                 + kvRow(QStringLiteral("地址"), m_ip)
-                 + kvRow(QStringLiteral("端口"), QString::number(m_port));
-    if (!m_listening)
-        rows += kvRow(QStringLiteral("状态"), QStringLiteral("未监听"));
-
     if (m_listening)
     {
         const QString dot  = QString("<span style='color:%1'>●</span>").arg(kGreen);
         const QString role = m_isServer ? QStringLiteral("服务器") : QStringLiteral("客户端");
-        m_segConn->set(
-            QString("%1 %2 %3:%4").arg(dot, role, m_ip).arg(m_port),
-            kvTable(rows));
+        m_segConn->setValue(QString("%1 %2 %3:%4").arg(dot, role, m_ip).arg(m_port));
     }
     else
     {
-        const QString dot = QString("<span style='color:%1'>○</span>").arg(kGrey);
-        m_segConn->set(
-            QString("%1 <span style='color:%2'>未连接</span>").arg(dot, kGrey),
-            m_protocol.isEmpty() ? QString() : kvTable(rows));
+        const QString grey = themed("@text2");
+        const QString dot  = QString("<span style='color:%1'>○</span>").arg(grey);
+        m_segConn->setValue(QString("%1 <span style='color:%2'>未连接</span>").arg(dot, grey));
     }
 }
 
@@ -197,17 +205,10 @@ void StatusBarController::refreshClients()
 {
     if (!m_listening || !m_isServer)
     {
-        m_segClients->set(QString("客户端: <span style='color:%1'>—</span>").arg(kGrey));
+        m_segClients->setValue(QString("客户端: <span style='color:%1'>—</span>").arg(themed("@text2")));
         return;
     }
-    if (m_clients.isEmpty())
-    {
-        m_segClients->set(QStringLiteral("客户端: 0"));
-        return;
-    }
-    m_segClients->set(
-        QString("客户端: %1").arg(m_clients.size()),
-        titledList(QString("已连接客户端 (%1)").arg(m_clients.size()), m_clients));
+    m_segClients->setValue(QString("客户端: %1").arg(m_clients.size()));
 }
 
 void StatusBarController::refreshHealth()
@@ -219,23 +220,67 @@ void StatusBarController::refreshHealth()
                     .arg(kRx, kTx).arg(m_rxFrames).arg(m_txFrames);
     else
         value = QString("<span style='color:%1'><span style='font-size:16px'>⇅</span> RX TX 收%2/发%3</span>")
-                    .arg(kGrey).arg(m_rxFrames).arg(m_txFrames);
-
-    QString rows = kvRow(QStringLiteral("收 / 发 帧"), QString("%1 / %2").arg(m_rxFrames).arg(m_txFrames))
-                 + kvRow(QStringLiteral("收 / 发 字节"), QString("%1 / %2").arg(formatBytes(m_rxBytes), formatBytes(m_txBytes)))
-                 + kvRow(QStringLiteral("超时"), QString::number(m_timeouts));
-    if (!m_lastActivity.isEmpty())
-        rows += kvRow(QStringLiteral("最近"), m_lastActivity);
-    m_segHealth->set(value, kvTable(rows));
+                    .arg(themed("@text2")).arg(m_rxFrames).arg(m_txFrames);
+    m_segHealth->setValue(value);
 }
 
 void StatusBarController::refreshScript()
 {
     if (m_running.isEmpty())
     {
-        m_segScript->set(QString("脚本: <span style='color:%1'>空闲</span>").arg(kGrey));
+        m_segScript->setValue(QString("脚本: <span style='color:%1'>空闲</span>").arg(themed("@text2")));
         return;
     }
+    m_segScript->setValue(QString("脚本: %1 运行中").arg(m_running.size()));
+}
+
+void StatusBarController::refreshPlatform()
+{
+    m_segPlatform->setValue(
+        QString("平台 X:%1 Y:%2 θ:%3")
+            .arg(m_live.x, 0, 'f', 2).arg(m_live.y, 0, 'f', 2).arg(m_live.angleDeg, 0, 'f', 1));
+}
+
+// ---- 详情惰性构建(悬浮时调用,读实时状态)----
+
+QString StatusBarController::buildConnDetail() const
+{
+    if (!m_listening && m_protocol.isEmpty())
+        return QString();   // 未连接且未配过通信:无详情
+    // 协议/角色/地址/端口 两态共用;仅角色文案(监听中)与末尾"状态"行有差异
+    const QString roleDetail = m_isServer
+        ? (m_listening ? QStringLiteral("服务器(监听中)") : QStringLiteral("服务器"))
+        : QStringLiteral("客户端");
+    QString rows = kvRow(QStringLiteral("协议"), m_protocol)
+                 + kvRow(QStringLiteral("角色"), roleDetail)
+                 + kvRow(QStringLiteral("地址"), m_ip)
+                 + kvRow(QStringLiteral("端口"), QString::number(m_port));
+    if (!m_listening)
+        rows += kvRow(QStringLiteral("状态"), QStringLiteral("未监听"));
+    return kvTable(rows);
+}
+
+QString StatusBarController::buildClientsDetail() const
+{
+    if (!m_listening || !m_isServer || m_clients.isEmpty())
+        return QString();
+    return titledList(QString("已连接客户端 (%1)").arg(m_clients.size()), m_clients);
+}
+
+QString StatusBarController::buildHealthDetail() const
+{
+    QString rows = kvRow(QStringLiteral("收 / 发 帧"), QString("%1 / %2").arg(m_rxFrames).arg(m_txFrames))
+                 + kvRow(QStringLiteral("收 / 发 字节"), QString("%1 / %2").arg(formatBytes(m_rxBytes), formatBytes(m_txBytes)))
+                 + kvRow(QStringLiteral("超时"), QString::number(m_timeouts));
+    if (!m_lastActivity.isEmpty())
+        rows += kvRow(QStringLiteral("最近"), m_lastActivity);
+    return kvTable(rows);
+}
+
+QString StatusBarController::buildScriptDetail() const
+{
+    if (m_running.isEmpty())
+        return QString();
     QList<int> idxs = m_running.keys();   // 运行中脚本 index(值为次数,此处只取键)
     std::sort(idxs.begin(), idxs.end());
     QStringList items;
@@ -245,25 +290,20 @@ void StatusBarController::refreshScript()
         items << (name.isEmpty() ? QString("脚本 #%1").arg(i + 1)   // 空名回退到 LuaFile{index+1}
                                  : name.toHtmlEscaped());           // 用户文本,转义防破坏 HTML 悬浮
     }
-    m_segScript->set(
-        QString("脚本: %1 运行中").arg(idxs.size()),
-        titledList(QString("运行中脚本 (%1)").arg(idxs.size()), items));
+    return titledList(QString("运行中脚本 (%1)").arg(idxs.size()), items);
 }
 
-void StatusBarController::refreshPlatform()
+QString StatusBarController::buildPlatformDetail() const
 {
     auto poseStr = [](const Pose& p) {
         return QString("X %1  Y %2  θ %3°")
             .arg(p.x, 0, 'f', 2).arg(p.y, 0, 'f', 2).arg(p.angleDeg, 0, 'f', 1);
     };
-    m_segPlatform->set(
-        QString("平台 X:%1 Y:%2 θ:%3")
-            .arg(m_live.x, 0, 'f', 2).arg(m_live.y, 0, 'f', 2).arg(m_live.angleDeg, 0, 'f', 1),
-        kvTable(kvRow(QStringLiteral("Live 位姿"), poseStr(m_live))
-              + kvRow(QStringLiteral("Base 位姿"), poseStr(m_base))
-              + kvRow(QStringLiteral("单位幂 XY / D"), QString("10^%1 / 10^%2").arg(m_params.unitXY).arg(m_params.unitD))
-              + kvRow(QStringLiteral("对象轴写入"), QString("D%1").arg(m_params.objAddr))
-              + kvRow(QStringLiteral("目标轴写入"), QString("D%1").arg(m_params.tgtAddr))));
+    return kvTable(kvRow(QStringLiteral("Live 位姿"), poseStr(m_live))
+                 + kvRow(QStringLiteral("Base 位姿"), poseStr(m_base))
+                 + kvRow(QStringLiteral("单位幂 XY / D"), QString("10^%1 / 10^%2").arg(m_params.unitXY).arg(m_params.unitD))
+                 + kvRow(QStringLiteral("对象轴写入"), QString("D%1").arg(m_params.objAddr))
+                 + kvRow(QStringLiteral("目标轴写入"), QString("D%1").arg(m_params.tgtAddr)));
 }
 
 QString StatusBarController::formatBytes(quint64 n)

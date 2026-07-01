@@ -12,6 +12,7 @@
 #include <QObject>
 #include <QHash>
 #include <QStringList>
+#include <QPointer>
 #include <functional>
 
 #include "Comm/CommEvent.h"          // CommEvent / CommDirection
@@ -48,11 +49,21 @@ public:
     void setScriptNameProvider(std::function<QString(int)> provider);
 
 private:
+    void refreshAll();
+
+    // 刷新可见值(热路径,仅算紧凑串 + setValue)
     void refreshConnection();
     void refreshClients();
     void refreshHealth();
     void refreshScript();
     void refreshPlatform();
+
+    // 详情惰性构建(仅悬浮时调用,读实时状态;返回空则不显示 tooltip)
+    QString buildConnDetail() const;
+    QString buildClientsDetail() const;
+    QString buildHealthDetail() const;
+    QString buildScriptDetail() const;
+    QString buildPlatformDetail() const;
 
     static QString formatBytes(quint64 n);
 
