@@ -618,19 +618,19 @@ void MainWindow::connectStatusBar()
 	if (!m_statusBarController) return;
 	StatusBarController* sc = m_statusBarController.get();
 
-	// 通信:连接状态 / 客户端快照 / 收发事件 / 超时(经工作流转发,跨线程自动 Queued)
+	// 通信:连接状态 / 客户端快照 / 收发事件 / 超时(经工作流转发)。
+	// 这些信号当前均在 GUI 线程发出(Comm 实例以工作流为父、居 GUI 线程),故为直连;
+	// 仅 scriptFinished 来自脚本线程池,为跨线程 Queued。
 	if (m_pWorkflow)
 	{
 		connect(m_pWorkflow, &MainWorkflow::connectionStateChanged, sc, &StatusBarController::onConnectionStateChanged);
 		connect(m_pWorkflow, &MainWorkflow::clientsChanged,         sc, &StatusBarController::onClientsChanged);
 		connect(m_pWorkflow, &MainWorkflow::commEvent,             sc, &StatusBarController::onCommEvent);
 		connect(m_pWorkflow, &MainWorkflow::commTimeout,           sc, &StatusBarController::onCommTimeout);
+		// 脚本运行态:started/finished 均由 ScriptEngineHost 在唯一执行咽喉发出,严格 1:1 配对
+		connect(m_pWorkflow->scriptHost(), &ScriptEngineHost::scriptStarted,  sc, &StatusBarController::onScriptStarted);
 		connect(m_pWorkflow->scriptHost(), &ScriptEngineHost::scriptFinished, sc, &StatusBarController::onScriptFinished);
 	}
-
-	// 脚本开始(补齐 scriptFinished 的另一端)
-	if (m_scriptManager)
-		connect(m_scriptManager.get(), &ScriptManager::scriptStarted, sc, &StatusBarController::onScriptStarted);
 
 	// 脚本悬浮显示名称框内容(惰性读取,运行中改名亦实时);空名回退 "脚本 #N"
 	sc->setScriptNameProvider([this](int i) {

@@ -14,16 +14,18 @@
 #include <algorithm>
 
 namespace {
-constexpr auto kGreen = "#22c55e";
-constexpr auto kGrey  = "#9ca3af";
-constexpr auto kTx    = "#2563eb";
-constexpr auto kRx    = "#16a34a";
+constexpr auto kGreen = "#22c55e";   // 连接指示(监听中)
+constexpr auto kGrey  = "#9ca3af";   // 灰显 / 次要文本 / 详情键
+constexpr auto kTx    = "#2563eb";   // 发送(TX)
+constexpr auto kRx    = "#16a34a";   // 接收(RX)
+constexpr auto kText  = "#e5e7eb";   // 详情值 / 列表项
+constexpr auto kTitle = "#ffffff";   // 列表标题
 
 // 悬停详情:两列对齐表(键灰左、值右成列)
 QString kvRow(const QString& key, const QString& value)
 {
-    return QString("<tr><td style='color:#9ca3af;padding-right:16px'>%1</td>"
-                   "<td style='color:#e5e7eb'>%2</td></tr>").arg(key, value);
+    return QString("<tr><td style='color:%1;padding-right:16px'>%2</td>"
+                   "<td style='color:%3'>%4</td></tr>").arg(kGrey, key, kText, value);
 }
 QString kvTable(const QString& rows)
 {
@@ -32,9 +34,9 @@ QString kvTable(const QString& rows)
 // 列表类详情:加粗标题 + 每行一项
 QString titledList(const QString& title, const QStringList& items)
 {
-    QString s = QString("<b style='color:#ffffff'>%1</b>").arg(title);
+    QString s = QString("<b style='color:%1'>%2</b>").arg(kTitle, title);
     for (const QString& it : items)
-        s += QString("<div style='color:#e5e7eb;padding-top:2px'>%1</div>").arg(it);
+        s += QString("<div style='color:%1;padding-top:2px'>%2</div>").arg(kText, it);
     return s;
 }
 }
@@ -116,13 +118,15 @@ void StatusBarController::onCommTimeout(const QString& /*endpointId*/)
 
 void StatusBarController::onScriptStarted(int index)
 {
-    m_running.insert(index);
+    ++m_running[index];   // 同 index 并发时累加运行次数
     refreshScript();
 }
 
 void StatusBarController::onScriptFinished(int index, bool /*ok*/, const QString& /*err*/)
 {
-    m_running.remove(index);
+    auto it = m_running.find(index);
+    if (it != m_running.end() && --it.value() <= 0)   // 减到 0 才移出,容忍成对乱序保护
+        m_running.erase(it);
     refreshScript();
 }
 
@@ -161,29 +165,31 @@ void StatusBarController::setScriptNameProvider(std::function<QString(int)> prov
 
 void StatusBarController::refreshConnection()
 {
+    // 协议/角色/地址/端口 两分支共用;仅角色文案(监听中)与末尾"状态"行有差异
+    const QString roleDetail = m_isServer
+        ? (m_listening ? QStringLiteral("服务器(监听中)") : QStringLiteral("服务器"))
+        : QStringLiteral("客户端");
+    QString rows = kvRow(QStringLiteral("协议"), m_protocol)
+                 + kvRow(QStringLiteral("角色"), roleDetail)
+                 + kvRow(QStringLiteral("地址"), m_ip)
+                 + kvRow(QStringLiteral("端口"), QString::number(m_port));
+    if (!m_listening)
+        rows += kvRow(QStringLiteral("状态"), QStringLiteral("未监听"));
+
     if (m_listening)
     {
         const QString dot  = QString("<span style='color:%1'>●</span>").arg(kGreen);
         const QString role = m_isServer ? QStringLiteral("服务器") : QStringLiteral("客户端");
         m_segConn->set(
             QString("%1 %2 %3:%4").arg(dot, role, m_ip).arg(m_port),
-            kvTable(kvRow(QStringLiteral("协议"), m_protocol)
-                  + kvRow(QStringLiteral("角色"), m_isServer ? QStringLiteral("服务器(监听中)") : QStringLiteral("客户端"))
-                  + kvRow(QStringLiteral("地址"), m_ip)
-                  + kvRow(QStringLiteral("端口"), QString::number(m_port))));
+            kvTable(rows));
     }
     else
     {
         const QString dot = QString("<span style='color:%1'>○</span>").arg(kGrey);
         m_segConn->set(
             QString("%1 <span style='color:%2'>未连接</span>").arg(dot, kGrey),
-            m_protocol.isEmpty()
-                ? QString()
-                : kvTable(kvRow(QStringLiteral("协议"), m_protocol)
-                        + kvRow(QStringLiteral("角色"), m_isServer ? QStringLiteral("服务器") : QStringLiteral("客户端"))
-                        + kvRow(QStringLiteral("地址"), m_ip)
-                        + kvRow(QStringLiteral("端口"), QString::number(m_port))
-                        + kvRow(QStringLiteral("状态"), QStringLiteral("未监听"))));
+            m_protocol.isEmpty() ? QString() : kvTable(rows));
     }
 }
 
@@ -208,10 +214,11 @@ void StatusBarController::refreshHealth()
 {
     QString value;
     if (m_listening)
-        value = QString("<span style='font-size:16px'>⇅</span> <span style='color:%1'>TX</span> <span style='color:%2'>RX</span> 收%3/发%4")
-                    .arg(kTx, kRx).arg(m_rxFrames).arg(m_txFrames);
+        // 标签序 RX TX 与其后"收/发"数字一一对齐(RX=收=绿, TX=发=蓝)
+        value = QString("<span style='font-size:16px'>⇅</span> <span style='color:%1'>RX</span> <span style='color:%2'>TX</span> 收%3/发%4")
+                    .arg(kRx, kTx).arg(m_rxFrames).arg(m_txFrames);
     else
-        value = QString("<span style='color:%1'><span style='font-size:16px'>⇅</span> TX RX 收%2/发%3</span>")
+        value = QString("<span style='color:%1'><span style='font-size:16px'>⇅</span> RX TX 收%2/发%3</span>")
                     .arg(kGrey).arg(m_rxFrames).arg(m_txFrames);
 
     QString rows = kvRow(QStringLiteral("收 / 发 帧"), QString("%1 / %2").arg(m_rxFrames).arg(m_txFrames))
@@ -229,7 +236,7 @@ void StatusBarController::refreshScript()
         m_segScript->set(QString("脚本: <span style='color:%1'>空闲</span>").arg(kGrey));
         return;
     }
-    QList<int> idxs = m_running.values();
+    QList<int> idxs = m_running.keys();   // 运行中脚本 index(值为次数,此处只取键)
     std::sort(idxs.begin(), idxs.end());
     QStringList items;
     for (int i : idxs)
@@ -265,6 +272,6 @@ QString StatusBarController::formatBytes(quint64 n)
         return QString("%1 B").arg(n);
     const double kb = n / 1024.0;
     if (kb < 1024.0)
-        return QString("%1K").arg(kb, 0, 'f', 1);
-    return QString("%1M").arg(kb / 1024.0, 0, 'f', 1);
+        return QString("%1 KB").arg(kb, 0, 'f', 1);
+    return QString("%1 MB").arg(kb / 1024.0, 0, 'f', 1);
 }

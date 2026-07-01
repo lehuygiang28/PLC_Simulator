@@ -166,8 +166,7 @@ void CommSocket::Cleanup()
 
 	m_ClientMap.clear();
 	m_bConnected = false;
-	emit clientsChanged(m_ClientMap.keys());	//状态栏:清空客户端
-	emit connectionStateChanged(false);			//状态栏:服务器已关闭
+	emit connectionStateChanged(false);
 
 	// 清理客户端socket
 	if (m_Client) {

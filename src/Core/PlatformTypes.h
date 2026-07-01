@@ -8,6 +8,8 @@
 #ifndef PLATFORMTYPES_H
 #define PLATFORMTYPES_H
 
+#include <QMetaType>
+
 // 位姿:位置(mm) + 朝向(度)
 struct Pose {
     double x = 0.0;
@@ -36,5 +38,9 @@ constexpr double MARK_RECT_WIDTH = 3.0;
 constexpr double MARK_RECT_HEIGHT = 8.0;
 constexpr double VIRTUAL_MARK_STATIC_X = 10.0;
 constexpr double VIRTUAL_MARK_STATIC_Y = -10.0;
+
+// 供 poseChanged 等信号跨线程队列连接使用(与 CommEvent 一致);运行期还需 qRegisterMetaType
+Q_DECLARE_METATYPE(Pose)
+Q_DECLARE_METATYPE(Platform)
 
 #endif // PLATFORMTYPES_H

@@ -10,7 +10,7 @@
 #define STATUSBARCONTROLLER_H
 
 #include <QObject>
-#include <QSet>
+#include <QHash>
 #include <QStringList>
 #include <functional>
 
@@ -32,7 +32,7 @@ public:
     // bar: 主界面状态栏;parent: 父对象
     explicit StatusBarController(QStatusBar* bar, QObject* parent = nullptr);
 
-    // 各源信号 → 槽(跨线程信号自动 Queued,均在 GUI 线程执行)
+    // 各源信号 → 槽(均在 GUI 线程执行;通信/位姿为直连,仅 scriptFinished 来自线程池为 Queued)
     void onConnectionStateChanged(bool listening);
     void onClientsChanged(const QStringList& clientIds);
     void onCommEvent(const CommEvent& ev);
@@ -77,8 +77,8 @@ private:
     int     m_timeouts = 0;
     QString m_lastActivity;
 
-    // 脚本(运行中 index 集合 + 名称取值器)
-    QSet<int> m_running;
+    // 脚本(index → 运行中次数;引用计数容忍同 index 并发 + 名称取值器)
+    QHash<int, int> m_running;
     std::function<QString(int)> m_scriptNameProvider;
 
     // 平台

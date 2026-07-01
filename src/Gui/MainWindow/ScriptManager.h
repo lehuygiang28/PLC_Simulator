@@ -32,8 +32,6 @@ class ScriptManager : public QObject
 signals:
     // 脚本相关消息(如脚本不存在),转发到主界面日志
     void logMessage(const QString& message);
-    // 脚本开始执行(index 0-based);与 ScriptEngineHost::scriptFinished 配对供状态栏计运行数
-    void scriptStarted(int index);
 
 public:
     // host: 脚本引擎宿主指针; parent: 父窗口

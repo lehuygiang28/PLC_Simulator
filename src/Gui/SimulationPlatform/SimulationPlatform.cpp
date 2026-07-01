@@ -37,6 +37,10 @@ SimulationPlatform::SimulationPlatform(QWidget *parent)
     , m_statusLeft(nullptr)
     , m_statusRight(nullptr)
 {
+    // poseChanged 携带 Pose/Platform;注册元类型以支持将来跨线程队列连接(与 CommEvent 一致)
+    qRegisterMetaType<Pose>("Pose");
+    qRegisterMetaType<Platform>("Platform");
+
     m_scene = new PlatformScene(this);
 
     // 转发场景的 poseChanged 信号到外部
