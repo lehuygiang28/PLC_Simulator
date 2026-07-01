@@ -67,6 +67,8 @@ set(GUI_MAINWINDOW_SOURCES
     Gui/MainWindow/RegisterTable/RegisterTableModel.cpp
     Gui/MainWindow/ScriptManager.cpp
     Gui/MainWindow/AuxDialogs.cpp
+    Gui/MainWindow/StatusBar/StatusSegment.cpp
+    Gui/MainWindow/StatusBar/StatusBarController.cpp
 )
 
 set(GUI_MAINWINDOW_HEADERS
@@ -78,6 +80,8 @@ set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/RegisterTable/RegisterItemDelegate.h
     Gui/MainWindow/ScriptManager.h
     Gui/MainWindow/AuxDialogs.h
+    Gui/MainWindow/StatusBar/StatusSegment.h
+    Gui/MainWindow/StatusBar/StatusBarController.h
 )
 
 # Gui\Theme 模块
@@ -326,6 +330,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/MainWindow
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/MainWindow/RegisterTable
+    ${CMAKE_CURRENT_SOURCE_DIR}/Gui/MainWindow/StatusBar
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Theme
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/Gui/ScriptEditor

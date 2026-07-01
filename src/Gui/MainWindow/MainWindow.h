@@ -14,6 +14,7 @@
 #include "Core/PlatformTypes.h"
 #include "RegisterTableController.h"
 #include "ScriptManager.h"
+#include "StatusBarController.h"
 #include "Core/PlatformController.h"
 #include "AuxDialogs.h"
 #include "Config/ConfigStore.h"
@@ -60,6 +61,7 @@ private:
     void connectComm();
     void connectLog();
     void connectScript();
+    void connectStatusBar();
 
     // 协议相关
     void CreateCurrentProtocol();
@@ -94,7 +96,6 @@ private:
 
     // 平台控制:参数数据成员
     AuxDialogs::PlatformParams m_platformParams{3, 3, 114, 120};
-    QLabel* m_statusAddrLabel = nullptr;
 
     // 平台菜单 actions(跨槽访问的才做成员;仅菜单构建期用的为局部变量)
     QAction* m_actShowPlatform = nullptr;
@@ -118,6 +119,9 @@ private:
 
     // 脚本管理器
     std::unique_ptr<ScriptManager> m_scriptManager;
+
+    // 状态栏控制器
+    std::unique_ptr<StatusBarController> m_statusBarController;
 
 
     // 日志显示状态

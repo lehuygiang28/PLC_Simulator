@@ -117,14 +117,13 @@ bool MainWorkflow::OpenComm()
 
 		m_pComm = new CommSocket(this);
 
-		//新建信号槽连接
+		//新建信号槽连接:通信实例信号原样转发到本工作流同名信号(signal→signal)
 		{
-			connect(m_pComm, &CommBase::logRecord, this, [this](const QString& text) {
-				emit logRecord(text);
-			});
-			connect(m_pComm, &CommBase::commEvent, this, [this](const CommEvent& ev) {
-				emit commEvent(ev);
-			});
+			connect(m_pComm, &CommBase::logRecord,              this, &MainWorkflow::logRecord);
+			connect(m_pComm, &CommBase::commEvent,              this, &MainWorkflow::commEvent);
+			connect(m_pComm, &CommBase::connectionStateChanged, this, &MainWorkflow::connectionStateChanged);
+			connect(m_pComm, &CommBase::clientsChanged,         this, &MainWorkflow::clientsChanged);
+			connect(m_pComm, &CommBase::commTimeout,            this, &MainWorkflow::commTimeout);
 		}
 
 		m_bValidComm = m_pComm->Open(m_pCommInfo.get());

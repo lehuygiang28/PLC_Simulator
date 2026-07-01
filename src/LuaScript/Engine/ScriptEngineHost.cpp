@@ -63,6 +63,8 @@ ScriptEngineHost::~ScriptEngineHost()
 
 void ScriptEngineHost::runOnPool(int index, std::function<bool(LuaEngine*, QString&)> exec)
 {
+    // 唯一执行咽喉:两条运行入口(面板/编辑器)都经此。started 在校验前发,与 finished 严格配对。
+    emit scriptStarted(index);
     if (index < 0 || index >= m_engineCount || !m_engines[index]) {
         emit scriptFinished(index, false, QString("LuaEngine instance not found"));
         return;

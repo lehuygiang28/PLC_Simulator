@@ -47,6 +47,8 @@ public:
 
 signals:
     void scriptLog(QString msg);
+    // 任一池任务投递时发出(GUI 线程,直连);与 scriptFinished 严格 1:1 配对,供状态栏计运行数。
+    void scriptStarted(int index);
     // 任一池任务完成(成功/失败)后发出,index 为引擎索引;跨线程自动排队到接收者线程。
     void scriptFinished(int index, bool ok, QString err);
 

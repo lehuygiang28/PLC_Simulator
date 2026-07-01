@@ -83,6 +83,9 @@ signals:
 	//通信实例的信号转发
 	void logRecord(QString text);
 	void commEvent(const CommEvent& ev);
+	void connectionStateChanged(bool listening);
+	void clientsChanged(const QStringList& clientIds);
+	void commTimeout(const QString& endpointId);
 
 };
 
