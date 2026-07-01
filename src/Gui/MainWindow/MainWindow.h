@@ -66,6 +66,11 @@ private:
     // 协议相关
     void CreateCurrentProtocol();
 
+    // 通信连接开/关(由 Btn_Create 分发)
+    void openConnection();
+    void closeConnection();
+    void setCommControlsEnabled(bool enabled);   // 未连接态可编辑通信参数+按钮"打开",连接态锁定+"关闭"
+
     // 平台控制相关
     void OnWriteAxisDoubleWord();
     void OnWriteAxisFloat();
@@ -131,8 +136,9 @@ private:
     // UI 就绪标志:startup 期间控件初值变更不落盘,initialRefresh 末尾置真
     bool m_uiReady = false;
 
-    // 日志显示状态
-    int m_nLogStat;
+    // 日志显示格式(通信日志按此在 ASCII / HEX 间切换)
+    enum class LogFormat { Ascii, Hex };
+    LogFormat m_logFormat = LogFormat::Ascii;
 
     // 通信日志重复帧过滤状态(与上一帧方向+端点+数据相同则不刷屏;收/发各自独立)
     QString    m_lastRecEndpoint;

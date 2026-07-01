@@ -55,7 +55,7 @@ void MainWindow::applyPlatformParams()
 }
 
 MainWindow::MainWindow(QWidget *parent)
-	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkflow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr), m_nLogStat(0)
+	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkflow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr)
 {
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(APP_NAME).arg(APP_VERSION));
@@ -558,64 +558,72 @@ void MainWindow::connectComm()
 			m_configStore->SaveProtocolType(static_cast<int>(selectedType));
 		} });
 
-	// 点击打开连接按钮
-	connect(ui->Btn_Create, &QPushButton::clicked, this, [=]
+	// 点击打开/关闭连接按钮:仅分发,具体逻辑见 openConnection / closeConnection
+	connect(ui->Btn_Create, &QPushButton::clicked, this, [this]
 			{
-
-		if (m_pWorkflow == nullptr)	return;
-
+		if (m_pWorkflow == nullptr) return;
 		if (m_pWorkflow->IsCommOpen())
-		{
-			if (!m_pWorkflow->CloseComm())
-			{
-				UpdateLogDisplay("关闭连接失败!");
-				return;
-			}
-
-			ui->Btn_Create->setText("打开链接");
-			ui->edit_IP->setEnabled(true);
-			ui->edit_Port->setEnabled(true);
-			ui->cmbBox_ProtocolType->setEnabled(true);
-		}
+			closeConnection();
 		else
-		{
-			auto info = std::make_unique<CommSocket::SocketCommInfo>();
-			info->m_SocketType         = CommSocket::SocketType::eSTServer;
-			info->m_strSocketIPAddress = ui->edit_IP->text();
-			info->m_nSocketPort        = ui->edit_Port->text().toUShort();
-			info->m_nSocketListenNum   = 10;
+			openConnection();
+			});
+}
 
-			// 非拥有视图,连接成功后落盘用;所有权随即转交工作流(对象仍由其持有,指针有效)
-			CommBase::CommInfoBase* infoView = info.get();
-			m_pWorkflow->SetCommInfo(std::move(info));
+void MainWindow::openConnection()
+{
+	auto info = std::make_unique<CommSocket::SocketCommInfo>();
+	info->m_SocketType         = CommSocket::SocketType::eSTServer;
+	info->m_strSocketIPAddress = ui->edit_IP->text();
+	info->m_nSocketPort        = ui->edit_Port->text().toUShort();
+	info->m_nSocketListenNum   = 10;
 
-			// 状态栏:开连接前注入通信配置,使随后的连接状态信号已有上下文
-			if (m_statusBarController)
-				m_statusBarController->setCommConfig(ui->cmbBox_ProtocolType->currentText(),
-					ui->edit_IP->text(), ui->edit_Port->text().toUShort(), true);
+	// 非拥有视图,连接成功后落盘用;所有权随即转交工作流(对象仍由其持有,指针有效)
+	CommBase::CommInfoBase* infoView = info.get();
+	m_pWorkflow->SetCommInfo(std::move(info));
 
-			if (!m_pWorkflow->OpenComm())
-			{
-				UpdateLogDisplay("打开连接失败!");
-				return;
-			}
+	// 状态栏:开连接前注入通信配置,使随后的连接状态信号已有上下文
+	if (m_statusBarController)
+		m_statusBarController->setCommConfig(ui->cmbBox_ProtocolType->currentText(),
+			ui->edit_IP->text(), ui->edit_Port->text().toUShort(), true);
 
-			// 仅在连接成功后持久化,避免保存打不开的通信参数
-			if (m_configStore)
-			{
-				m_configStore->SaveCommInfo(CommInfoFactory::Serialize(*infoView));
-			}
-			auto ExecuteRequest = [this](const QByteArray& in, QByteArray& out) {
-				if (!m_pWorkflow) return false;
-				return m_pWorkflow->ProcessRequest(in, out);
-			};
-			m_pWorkflow->SetRequestProcessor(ExecuteRequest);
+	if (!m_pWorkflow->OpenComm())
+	{
+		UpdateLogDisplay("打开连接失败!");
+		return;
+	}
 
-			ui->Btn_Create->setText("关闭链接");
-			ui->edit_IP->setEnabled(false);
-			ui->edit_Port->setEnabled(false);
-			ui->cmbBox_ProtocolType->setEnabled(false);
-		} });
+	// 仅在连接成功后持久化,避免保存打不开的通信参数
+	if (m_configStore)
+	{
+		m_configStore->SaveCommInfo(CommInfoFactory::Serialize(*infoView));
+	}
+
+	auto ExecuteRequest = [this](const QByteArray& in, QByteArray& out) {
+		if (!m_pWorkflow) return false;
+		return m_pWorkflow->ProcessRequest(in, out);
+	};
+	m_pWorkflow->SetRequestProcessor(ExecuteRequest);
+
+	setCommControlsEnabled(false);
+}
+
+void MainWindow::closeConnection()
+{
+	if (!m_pWorkflow->CloseComm())
+	{
+		UpdateLogDisplay("关闭连接失败!");
+		return;
+	}
+	setCommControlsEnabled(true);
+}
+
+void MainWindow::setCommControlsEnabled(bool enabled)
+{
+	// enabled=未连接态:通信参数可编辑、按钮显示"打开";否则连接态:锁定、按钮"关闭"
+	ui->edit_IP->setEnabled(enabled);
+	ui->edit_Port->setEnabled(enabled);
+	ui->cmbBox_ProtocolType->setEnabled(enabled);
+	ui->Btn_Create->setText(enabled ? "打开链接" : "关闭链接");
 }
 
 void MainWindow::connectLog()
@@ -629,22 +637,11 @@ void MainWindow::connectLog()
 	group2->addButton(ui->Radio_Log_Ascii);
 	group2->addButton(ui->Radio_Log_HEX);
 	ui->Radio_Log_Ascii->setChecked(true);
-	connect(group2, &QButtonGroup::buttonToggled, this, [=](QAbstractButton *button, bool checked)
+	connect(group2, &QButtonGroup::buttonToggled, this, [this](QAbstractButton *button, bool checked)
 			{
 		if (checked)
-		{
-
-			if (button == ui->Radio_Log_Ascii)
-			{
-				m_nLogStat = 0;
-			}
-			else if (button == ui->Radio_Log_HEX)
-			{
-				m_nLogStat = 1;
-			}
-
-			qDebug() << "日志组中选中了:" << button->text() << "m_nLogStat = " << m_nLogStat;
-		} });
+			m_logFormat = (button == ui->Radio_Log_HEX) ? LogFormat::Hex : LogFormat::Ascii;
+			});
 
 	// 主控类持有的通信实例信号转发
 	if (m_pWorkflow != nullptr)
@@ -672,7 +669,7 @@ void MainWindow::connectLog()
 					}
 
 					QString body(ev.bytes);
-					if (1 == m_nLogStat) body = QString(ev.bytes.toHex().toUpper());
+					if (m_logFormat == LogFormat::Hex) body = QString(ev.bytes.toHex().toUpper());
 
 					const QString pfx = (ev.direction == CommDirection::eReceive) ? "Rece" : "Send";
 					UpdateLogDisplay(QString("%1:[%2]:").arg(pfx, ev.endpointId) + body);
