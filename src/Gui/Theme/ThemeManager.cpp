@@ -15,6 +15,7 @@
 #include <QDebug>
 #include <QRegularExpression>
 #include <QEvent>
+#include <QTimer>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -148,23 +149,34 @@ void ThemeManager::applyTitleBar(QWidget* window)
     {
         return;
     }
-    HWND hwnd = reinterpret_cast<HWND>(window->winId()); // winId() 会按需创建原生句柄
-    if (hwnd == nullptr)
-    {
-        return;
-    }
-    BOOL dark = (m_current == Theme::Dark) ? TRUE : FALSE;
-    // 优先用新属性值(Win10 2004+/Win11),失败回退旧值(Win10 1809~1903)
-    if (FAILED(DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark))))
-    {
-        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &dark, sizeof(dark));
-    }
-    // 对已显示的窗口触发非客户区重绘,使标题栏立即更新
-    if (window->isVisible())
-    {
-        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    }
+
+    // 设置深浅属性 + 触发标题栏(非客户区)重绘。
+    auto setAndNudge = [this](QWidget* w) {
+        if (w == nullptr)
+        {
+            return;
+        }
+        HWND hwnd = reinterpret_cast<HWND>(w->winId()); // winId() 会按需创建原生句柄
+        if (hwnd == nullptr)
+        {
+            return;
+        }
+        BOOL dark = (m_current == Theme::Dark) ? TRUE : FALSE;
+        // 优先用新属性值(Win10 2004+/Win11),失败回退旧值(Win10 1809~1903)
+        if (FAILED(DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark))))
+        {
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &dark, sizeof(dark));
+        }
+        if (w->isVisible())
+        {
+            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        }
+    };
+
+    // 立即执行一次。但 DwmSetWindowAttribute 在 DWM 进程内异步提交
+    setAndNudge(window);
+    QTimer::singleShot(80, window, [window, setAndNudge]() { setAndNudge(window); });
 #else
     Q_UNUSED(window);
 #endif
