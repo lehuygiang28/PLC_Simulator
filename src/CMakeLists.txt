@@ -235,7 +235,7 @@ add_executable(${TARGET_NAME}
 
 # 设置目标属性
 set_target_properties(${TARGET_NAME} PROPERTIES
-    OUTPUT_NAME "PLC_Simulator$<$<CONFIG:Debug>:d>"
+    OUTPUT_NAME "PLCSimulator$<$<CONFIG:Debug>:d>"
     WIN32_EXECUTABLE TRUE
 )
 

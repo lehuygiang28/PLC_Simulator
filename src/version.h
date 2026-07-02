@@ -12,7 +12,7 @@
 // 版本号定义
 #define APP_VERSION_MAJOR   1
 #define APP_VERSION_MINOR   12
-#define APP_VERSION_PATCH   0
+#define APP_VERSION_PATCH   1
 #define APP_VERSION_BUILD   0
 
 // 版本字符串拼接宏
@@ -26,10 +26,9 @@
 
 // Windows RC 资源文件使用的信息（仅 ASCII/英文，避免编码问题）
 #define APP_NAME_RC         "PLC Simulator"
-#define APP_DESCRIPTION_RC  "A Qt6-based PLC simulation communication test software."
 #define APP_COPYRIGHT_RC    "Copyright (C) 2025-2026 WangMao. All rights reserved."
-#define APP_INTERNAL_NAME   "PLC_Simulator"
-#define APP_ORIGINAL_NAME   "PLC_Simulator.exe"
+#define APP_INTERNAL_NAME   "PLCSimulator"
+#define APP_ORIGINAL_NAME   "PLCSimulator.exe"
 #define APP_ORGANIZATION    "WangMao"
 
 // 以下定义仅供 C/C++ 代码使用，RC 编译器不支持中文

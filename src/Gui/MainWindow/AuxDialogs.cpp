@@ -19,6 +19,7 @@
 #include <QLineEdit>
 #include <QIntValidator>
 #include <QPixmap>
+#include <QIcon>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QTextStream>
@@ -40,8 +41,10 @@ void AuxDialogs::showAbout(QWidget* parent)
 
     // 图标显示（居中）
     QLabel *iconLabel = new QLabel(&aboutDialog);
-    QPixmap iconPixmap(":/app/PLC_Simulator.ico");
-    iconLabel->setPixmap(iconPixmap.scaled(128, 128, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    // .ico 为多帧图标:用 QIcon 按目标尺寸挑最合适的帧;
+    // 直接 QPixmap(ico) 只取目录首帧(此处为 16px),放大到 128 会糊。
+    QIcon appIcon(":/app/PLC_Simulator.ico");
+    iconLabel->setPixmap(appIcon.pixmap(128, 128));
     iconLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(iconLabel);
 

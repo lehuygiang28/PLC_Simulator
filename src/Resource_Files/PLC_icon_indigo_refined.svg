@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- 背景圆角瓦片(靛蓝,略降饱和更稳重) -->
+  <rect x="8" y="8" width="240" height="240" rx="44" fill="#4257C0"/>
+
+  <!-- PLC 模块本体(压深,更立体) -->
+  <rect x="66" y="26" width="124" height="204" rx="15" fill="#203C4D" stroke="#3A6480" stroke-width="1.75"/>
+
+  <!-- 顶部 header 带(上圆角随本体,下边取直) -->
+  <path d="M66 41 q0 -15 15 -15 h94 q15 0 15 15 v23 h-124 z" fill="#172F3D"/>
+
+  <!-- 中缝分栏 -->
+  <line x1="128" y1="70" x2="128" y2="224" stroke="#142833" stroke-width="2.5"/>
+
+  <!-- 状态指示灯(正圆,绿=运行 / 黄=通信) -->
+  <circle cx="110" cy="45" r="8" fill="#46C97A"/>
+  <circle cx="146" cy="45" r="8" fill="#F2B01E"/>
+
+  <!-- 数字方波信号(提亮,小尺寸更跳) -->
+  <polyline points="52,182 52,150 71,150 71,182 90,182 90,150 109,150 109,182 128,182 128,150 147,150 147,182 166,182 166,150 185,150 185,182 204,182"
+    fill="none" stroke="#6FCEF5" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
