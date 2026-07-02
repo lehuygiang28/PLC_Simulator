@@ -93,6 +93,9 @@ private:
     // 菜单栏相关
     void OnThemeSelected(Theme theme);
 
+    // 工具栏图标按当前主题前景色重染(初次构建 + 主题切换时调用)
+    void updateToolbarIcons();
+
     // 日志显示
     void UpdateLogDisplay(QString strNewLog);
 
@@ -111,6 +114,10 @@ private:
     QAction* m_actAutoWrite = nullptr;
     QAction* m_actFmtFloat = nullptr;
     QAction* m_actFmtInt32 = nullptr;
+
+    // 手动写入工具栏按钮(主题切换时需重染图标,故持为成员)
+    QAction* m_actManualFloat = nullptr;
+    QAction* m_actManualInt32 = nullptr;
 
     // 子窗口
     std::unique_ptr<QuickPanel> m_subWindow;

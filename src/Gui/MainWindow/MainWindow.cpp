@@ -31,6 +31,13 @@
 #include <QIntValidator>
 #include <QTextDocument>
 #include <QSignalBlocker>
+#include <QImageReader>
+#include <QImage>
+#include <QPixmap>
+#include <QPainter>
+#include <QColor>
+#include <QIcon>
+#include <QSize>
 
 namespace
 {
@@ -45,6 +52,27 @@ constexpr int kMaxLogLines = 5000;
 constexpr int kAxisRegSpan = 6;
 // 位姿字段步长(每轴占 2 个寄存器,X 起址、Y=起址+步长、Z=起址+2*步长)
 constexpr int kAxisFieldStride = 2;
+
+// 单色 SVG 图标按目标尺寸矢量栅格化,再整体染成主题前景色返回 QIcon。
+// 走 QImageReader + qsvg 运行期插件(无需链接 Qt Svg 模块);SourceIn 以图形 alpha 为遮罩重填颜色。
+QIcon makeTintedIcon(const QString& resPath, int px, const QColor& color, qreal dpr)
+{
+	QImageReader reader(resPath);
+	reader.setScaledSize(QSize(qRound(px * dpr), qRound(px * dpr)));  // 按设备像素栅格化,HiDPI 下仍锐利
+	QImage img = reader.read();
+	if (img.isNull())
+		return QIcon();
+
+	img = img.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+	QPainter p(&img);
+	p.setCompositionMode(QPainter::CompositionMode_SourceIn);  // 保留原图 alpha,颜色替换为主题色
+	p.fillRect(img.rect(), color);
+	p.end();
+
+	QPixmap pm = QPixmap::fromImage(img);
+	pm.setDevicePixelRatio(dpr);
+	return QIcon(pm);
+}
 }
 
 void MainWindow::refreshAxisAddrStatus()
@@ -409,13 +437,33 @@ void MainWindow::buildMenus()
 		}
 	});
 
-	// 手动写入工具栏
+	// 手动写入工具栏:图标+文字(两个按钮共用"写入"图标,文字区分格式,完整名进 tooltip)
 	QToolBar* platformToolBar = addToolBar("平台操作");
-	platformToolBar->setToolButtonStyle(Qt::ToolButtonTextOnly);
-	QAction* actManualFloat = platformToolBar->addAction("浮点写入");
-	QAction* actManualInt32 = platformToolBar->addAction("双字写入");
-	connect(actManualFloat, &QAction::triggered, this, &MainWindow::OnWriteAxisFloat);
-	connect(actManualInt32, &QAction::triggered, this, &MainWindow::OnWriteAxisDoubleWord);
+	platformToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	platformToolBar->setIconSize(QSize(18, 18));
+	m_actManualFloat = platformToolBar->addAction("浮点");
+	m_actManualInt32 = platformToolBar->addAction("双字");
+	m_actManualFloat->setToolTip("浮点写入");
+	m_actManualInt32->setToolTip("双字写入");
+	updateToolbarIcons();   // 按当前主题染色设置图标
+	connect(m_actManualFloat, &QAction::triggered, this, &MainWindow::OnWriteAxisFloat);
+	connect(m_actManualInt32, &QAction::triggered, this, &MainWindow::OnWriteAxisDoubleWord);
+
+	// 主题切换时重染工具栏图标(前景色随深浅变)
+	connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this,
+		[this]{ updateToolbarIcons(); });
+}
+
+void MainWindow::updateToolbarIcons()
+{
+	if (m_actManualFloat == nullptr || m_actManualInt32 == nullptr)
+		return;
+
+	// 两个手动写入按钮共用同一"写入"图标,染成当前主题前景色
+	const QColor fg = ThemeManager::instance().color("@text");
+	const QIcon icon = makeTintedIcon(":/icons/edit_register.svg", 18, fg, devicePixelRatioF());
+	m_actManualFloat->setIcon(icon);
+	m_actManualInt32->setIcon(icon);
 }
 
 void MainWindow::connectWindowSignals()

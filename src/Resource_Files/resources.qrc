@@ -8,4 +8,7 @@
         <file>arrow-down.svg</file>
         <file>radio-dot.svg</file>
     </qresource>
+    <qresource prefix="/icons">
+        <file>edit_register.svg</file>
+    </qresource>
 </RCC>
