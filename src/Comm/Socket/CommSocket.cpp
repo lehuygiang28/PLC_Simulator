@@ -1,0 +1,264 @@
+/*
+ * PLC Simulator - Industrial Communication Protocol Testing Tool
+ * Copyright (c) 2025-2026 Wang Mao
+ *
+ * This file is part of PLC Simulator.
+ * Licensed under the MIT License. See LICENSE file in the project root.
+ */
+
+#include "CommSocket.h"
+#include <QThread>
+#include <QEventLoop>
+
+CommSocket::CommSocket(QObject* pParent) : CommBase(pParent)
+{
+	m_bConnected = false;
+	m_Server = nullptr;
+	m_Client = nullptr;
+	m_ClientMap.clear();
+
+	auto SendDataTask = [this](const QString& clientId, const QByteArray& data) {
+		if (!m_bConnected) return false;
+		QTcpSocket* targetClient = m_ClientMap.value(clientId, nullptr);
+		if (!targetClient || targetClient->state() != QAbstractSocket::ConnectedState)
+		{
+			return false;
+		}
+		qint64 bytesWritten = targetClient->write(data);
+		if (bytesWritten == -1)
+		{
+			return false;
+		}
+
+		CommEvent ev;
+		ev.direction  = CommDirection::eSend;
+		ev.endpointId = clientId;
+		ev.bytes      = data;
+		ev.timestamp  = QDateTime::currentDateTime();
+		emit commEvent(ev);
+		return true;
+	};
+	connect(this, &CommSocket::dataSendRequest, this, SendDataTask, Qt::QueuedConnection);
+
+}
+
+CommSocket::~CommSocket()
+{
+	qDebug() << "CommSocket::~CommSocket()";
+}
+
+bool CommSocket::initializeServer()
+{
+	m_Server = new QTcpServer(this);
+
+	//设置最大连接数
+	int nListenNum = m_SocketInfo.m_nSocketListenNum > 0 ? m_SocketInfo.m_nSocketListenNum : 10;
+	m_Server->setMaxPendingConnections(nListenNum);
+
+	const QHostAddress addr = QHostAddress(m_SocketInfo.m_strSocketIPAddress);
+	const uint16_t port = static_cast<uint16_t>(m_SocketInfo.m_nSocketPort);
+
+	//服务器开始监听
+	if (!m_Server->listen(addr, port))
+	{
+		return false;
+	}
+
+	//记录日志
+	emit logRecord(QString("[%1:%2] 服务器创建成功,开始监听客户端链接...")
+		.arg(m_Server->serverAddress().toString())
+		.arg(m_Server->serverPort()));
+
+
+	m_bConnected = true;	//置位标志符
+	emit connectionStateChanged(true);	//状态栏:服务器已监听
+
+	//连接新的连接请求槽
+	connect(m_Server, &QTcpServer::newConnection, this, [=] {
+		//循环处理没有被处理的连接请求
+		while (m_Server->hasPendingConnections())
+		{
+			QTcpSocket* Cursocket = m_Server->nextPendingConnection();
+			QString clientId = GetClientId(Cursocket);
+
+			m_ClientMap[clientId] = Cursocket;
+			/*m_clientList.append(Cursocket);*/
+
+			//激活信号,将新建立连接的客户端信息发送出去
+			emit logRecord(QString("[%1:%2] 新客户端链接")
+				.arg(Cursocket->peerAddress().toString())
+				.arg(Cursocket->peerPort()));
+			emit clientsChanged(m_ClientMap.keys());	//状态栏:客户端快照
+
+			//接收到数据时的操作
+			connect(Cursocket, &QTcpSocket::readyRead, this, [=] {
+				if (Cursocket->bytesAvailable() <= 0) return;
+
+				QByteArray rec_Info = Cursocket->readAll();
+				
+				AddToRequestQueue(clientId, std::move(rec_Info));
+
+				});
+
+			//连接错误信息
+			connect(Cursocket, &QAbstractSocket::errorOccurred, [this, Cursocket](QAbstractSocket::SocketError) {
+
+				//发送错误信息
+				emit logRecord(QString("[%1:%2] 客户端错误:%3")
+					.arg(Cursocket->peerAddress().toString())
+					.arg(Cursocket->peerPort())
+					.arg(Cursocket->errorString()));
+				});
+
+			//连接断开,销毁socket对象
+			connect(Cursocket, &QTcpSocket::disconnected, [this, Cursocket] {
+
+				Cursocket->deleteLater();
+
+				//发送断开连接信息
+				emit logRecord(QString("[%1]:客户端断开链接").arg(GetClientId(Cursocket)));
+
+				m_ClientMap.remove(GetClientId(Cursocket));
+				emit clientsChanged(m_ClientMap.keys());	//状态栏:客户端快照
+
+
+				});
+
+		}
+		});
+
+	//server的错误信息
+	connect(m_Server, &QTcpServer::acceptError, [this](QAbstractSocket::SocketError) {
+
+		emit logRecord(QString("服务器错误:%1").arg(m_Server->errorString()));
+		});
+
+	return true;
+}
+
+bool CommSocket::initializeClient()
+{
+	return false;
+}
+
+void CommSocket::Cleanup()
+{
+
+	emit logRecord(QString("即将断开所有客户端链接,当前链接客户端数量[%1]").arg(m_ClientMap.size()));
+	// 清理客户端连接
+	for (QTcpSocket* client : m_ClientMap.values()) {
+		emit logRecord(QString("[%1:%2] 客户端即将断开").arg(client->peerAddress().toString())
+			.arg(client->peerPort()));
+
+		client->disconnectFromHost();
+		if (client->state() != QAbstractSocket::UnconnectedState) client->abort();
+	}
+
+	if (m_Server) {
+		emit logRecord(QString("[%1:%2] 即将关闭服务器...")
+			.arg(m_Server->serverAddress().toString())
+			.arg(m_Server->serverPort()));
+
+		m_Server->close();
+		m_Server->deleteLater();
+		m_Server = nullptr;
+	}
+
+	m_ClientMap.clear();
+	m_bConnected = false;
+	emit connectionStateChanged(false);
+
+	// 清理客户端socket
+	if (m_Client) {
+		emit logRecord(QString("[%1:%2] 即将关闭网络连接...").arg(GetClientId(m_Client)));
+
+		m_Client->close();
+		m_Client->deleteLater();
+		m_Client = nullptr;
+	}
+}
+
+
+bool CommSocket::Open(CommInfoBase* commInfo)
+{
+	//传参类型判断
+	if (commInfo == nullptr || commInfo->GetCommType() != CommType::eSocket)
+		return false;
+
+	SocketCommInfo* socketInfo = static_cast<SocketCommInfo*>(commInfo);
+	m_SocketInfo = *socketInfo;
+
+	//若已有链接先关闭
+	if (m_bConnected)
+	{
+		Close();
+	}
+
+	//判断当前网络通信的类型
+	if (m_SocketInfo.m_SocketType == SocketType::eSTServer)
+	{
+		return initializeServer();
+	}
+	else
+	{
+		return initializeClient();
+	}
+
+
+	return false;
+}
+
+bool CommSocket::Close()
+{
+	{
+		QMutexLocker locker(&m_queueMutex);
+		m_endpointQueues.clear();
+		m_endpointProcessing.clear();
+	}
+	Cleanup();
+	return true;
+}
+
+bool CommSocket::SendData(const QByteArray& strData)
+{
+	return false;
+}
+
+ 
+
+bool CommSocket::SendDataToEndpoint(const QString& clientId, const QByteArray& strData)
+{
+	if (!m_bConnected) return false;
+	emit dataSendRequest(clientId, strData);
+	return true;
+}
+
+namespace {
+// 序列化键(单一来源,to/from 共用,避免字面量两处漂移)
+constexpr auto kSocketType = "socketType";
+constexpr auto kIp         = "ip";
+constexpr auto kPort       = "port";
+constexpr auto kListenNum  = "listenNum";
+} // namespace
+
+QVariantMap CommSocket::SocketCommInfo::toVariantMap() const
+{
+	QVariantMap m;
+	m[kSocketType] = static_cast<int>(m_SocketType); // eSTServer=0 / eSTClient=1
+	m[kIp]         = m_strSocketIPAddress;
+	m[kPort]       = m_nSocketPort;
+	m[kListenNum]  = m_nSocketListenNum;
+	return m;
+}
+
+void CommSocket::SocketCommInfo::fromVariantMap(const QVariantMap& m)
+{
+	const int st = m.value(kSocketType, 0).toInt();
+	// 按值精确还原;脏值(含 eSTUnknown=-1)回退到可用的 Server
+	m_SocketType         = (st == 1) ? SocketType::eSTClient : SocketType::eSTServer;
+	m_strSocketIPAddress = m.value(kIp, "0.0.0.0").toString();
+	// 旧配置 port 以字符串持久化(旧版 toUShort 落入 toString 分支);toUInt 兼容数字字符串,保存一次即归一为数字
+	m_nSocketPort        = m.value(kPort, 2000).toUInt();
+	m_nSocketListenNum   = m.value(kListenNum, 10).toUInt();
+}
+

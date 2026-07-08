@@ -1,0 +1,190 @@
+/* 主界面统一样式模板:颜色以占位符书写,由 ThemeManager 按主题替换 */
+
+QWidget {
+    background-color: @bg;
+    color: @text;
+    font-family: "Microsoft YaHei", "Segoe UI";
+    font-size: 10pt;
+}
+
+/* 静态文本/单选/复选背景透明,透出所在卡片底色,避免在卡片上出现灰色方块 */
+QLabel, QRadioButton, QCheckBox {
+    background: transparent;
+}
+
+QToolTip {
+    background-color: @surface;
+    color: @text;
+    border: 1px solid @border;
+    padding: 4px 6px;
+}
+
+/* 卡片型容器 */
+QGroupBox {
+    background-color: @surface;
+    border: 1px solid @border;
+    border-radius: 8px;
+    margin-top: 10px;
+    padding: 10px 10px 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0 6px;
+    color: @accent;
+    font-weight: bold;
+}
+
+/* CollapsibleGroupBox 标题栏的关闭按钮:背景透明,× 与标题/箭头同为强调色 */
+QToolButton#groupCloseButton {
+    background: transparent;
+    border: none;
+    color: @accent;
+}
+QToolButton#groupCloseButton:hover { color: @accentHover; }
+
+/* 按钮 */
+QPushButton {
+    background-color: @surface2;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 10pt;
+    outline: none;
+}
+QPushButton:hover { border: 1px solid @accent; }
+QPushButton:pressed { background-color: @accentDark; color: #ffffff; border: 1px solid @accentDark; }
+QPushButton:disabled { background-color: @disabledBg; color: @disabledText; border: 1px solid @border; }
+
+/* 主色强调按钮:objectName=Btn_Create */
+QPushButton#Btn_Create {
+    background-color: @accent;
+    color: #ffffff;
+    border: 1px solid @accent;
+}
+QPushButton#Btn_Create:hover { background-color: @accentHover; border: 1px solid @accentHover; }
+
+/* 输入框 */
+QLineEdit, QSpinBox, QDoubleSpinBox {
+    background-color: @input;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: 6px;
+    padding: 4px 7px;
+    font-size: 10pt;
+}
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus { border: 1px solid @accent; }
+QLineEdit:disabled { background-color: @disabledBg; color: @disabledText; }
+
+/* 下拉框 */
+QComboBox {
+    background-color: @surface2;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: 6px;
+    padding: 4px 8px;
+    min-height: 22px;
+    font-size: 10pt;
+}
+QComboBox:hover { border: 1px solid @accent; }
+QComboBox::drop-down { width: 22px; border: 0; background: transparent; }
+QComboBox::down-arrow {
+    image: url(:/qss/arrow-down.svg);
+    width: 12px;
+    height: 12px;
+}
+QComboBox QAbstractItemView {
+    background-color: @surface;
+    color: @text;
+    border: 1px solid @accent;
+    selection-background-color: @accent;
+    selection-color: #ffffff;
+    outline: none;
+}
+
+/* 单选 / 复选 */
+QRadioButton, QCheckBox { color: @text; spacing: 6px; font-size: 10pt; }
+QRadioButton::indicator, QCheckBox::indicator {
+    width: 15px; height: 15px;
+    border: 1px solid @border;
+    background-color: @input;
+}
+QRadioButton::indicator { border-radius: 8px; }
+QCheckBox::indicator { border-radius: 4px; }
+QRadioButton::indicator:checked {
+    border: 1px solid @accentDark;
+    border-radius: 8px;
+    background-color: @accent;
+    image: url(:/qss/radio-dot.svg);
+}
+QCheckBox::indicator:checked {
+    background-color: @accent;
+    border: 1px solid @accentDark;
+    image: url(:/qss/check.svg);
+}
+QRadioButton::indicator:hover, QCheckBox::indicator:hover { border-color: @accent; }
+
+/* 文本编辑 / 日志 */
+QTextEdit, QPlainTextEdit {
+    background-color: @input;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: 6px;
+    padding: 4px;
+    font-size: 10pt;
+}
+
+/* 表格 */
+QTableView {
+    background-color: @surface;
+    alternate-background-color: @altRow;
+    gridline-color: @divider;
+    border: 1px solid @border;
+    border-radius: 8px;
+    outline: none;
+}
+QTableView::item { padding: 2px; color: @text; }
+QTableView::item:selected { background-color: @accent; color: #ffffff; }
+QHeaderView::section {
+    background-color: @thBg;
+    color: @text;
+    padding: 5px;
+    border: 0;
+    border-right: 1px solid @border;
+    border-bottom: 1px solid @border;
+    font-weight: 600;
+}
+
+/* 菜单栏 */
+QMenuBar { background-color: @surface; color: @text; border-bottom: 1px solid @border; }
+QMenuBar::item { padding: 4px 10px; background: transparent; }
+QMenuBar::item:selected { background-color: @surface2; border-radius: 5px; }
+QMenuBar::item:disabled { color: @disabledText; }
+QMenu { background-color: @surface; color: @text; border: 1px solid @border; }
+QMenu::item { padding: 5px 24px; }
+QMenu::item:selected { background-color: @accent; color: #ffffff; }
+QMenu::indicator:checked { color: @accent; }
+
+/* 状态栏 */
+QStatusBar { background-color: @surface; color: @text2; border-top: 1px solid @border; }
+
+/* 通用细分隔线(objectName=hSeparator,跟随主题)*/
+QFrame#hSeparator { background-color: @border; border: none; min-height: 1px; max-height: 1px; }
+
+/* 对话框次级/脚注文字(版本、版权等弱化显示,跟随主题) */
+QLabel#secondaryText { color: @text2; }
+QLabel#captionText { color: @text2; font-size: 8pt; }
+
+/* 滚动条 */
+QScrollBar:vertical { background: @bg; width: 11px; margin: 0; }
+QScrollBar:horizontal { background: @bg; height: 11px; margin: 0; }
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: @border; border-radius: 5px; min-height: 24px; min-width: 24px;
+}
+QScrollBar::handle:hover { background: @text2; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+
+/* 可折叠分组标题栏(CollapsibleGroupBox 用 QGroupBox 选择器即可复用上面卡片样式) */
