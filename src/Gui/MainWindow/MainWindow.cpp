@@ -895,8 +895,6 @@ void MainWindow::OnLanguageSelected(AppLanguage lang)
 		m_actLangZh->setChecked(lang == AppLanguage::Chinese);
 	if (m_actLangEn)
 		m_actLangEn->setChecked(lang == AppLanguage::English);
-
-	retranslateDynamicUi();
 }
 
 void MainWindow::changeEvent(QEvent* event)
@@ -976,6 +974,9 @@ void MainWindow::retranslateDynamicUi()
 		m_actManualInt32->setText(tr("双字"));
 		m_actManualInt32->setToolTip(tr("双字写入"));
 	}
+
+	if (m_registerTableController)
+		m_registerTableController->retranslateHeaders();
 
 	if (m_statusBarController)
 		m_statusBarController->refreshAll();

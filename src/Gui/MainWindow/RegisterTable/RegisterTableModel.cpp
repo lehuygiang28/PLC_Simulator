@@ -12,7 +12,6 @@
 
 #include <QMessageBox>
 #include <QCoreApplication>
-#include <QEvent>
 #include <QRegularExpression>
 #include <QTimer>
 #include <cfloat>
@@ -500,9 +499,8 @@ QString RegisterTableModel::formatCell(RegisterDataType type, int k) const
     return QString();
 }
 
-bool RegisterTableModel::event(QEvent* event)
+void RegisterTableModel::refreshHeaders()
 {
-    if (event->type() == QEvent::LanguageChange && columnCount() > 0)
+    if (columnCount() > 0)
         emit headerDataChanged(Qt::Horizontal, 0, columnCount() - 1);
-    return QAbstractTableModel::event(event);
 }

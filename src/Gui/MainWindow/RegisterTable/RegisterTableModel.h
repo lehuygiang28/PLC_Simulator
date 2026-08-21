@@ -56,14 +56,13 @@ public:
     void clearEditingIndex();
     bool isEditing() const { return m_editIndex.isValid(); }  // 编辑中(供 resize 重置避让)
 
+    void refreshHeaders();
+
 signals:
     // 闪烁定时器节拍:控制器据此 viewport()->update() 触发重绘
     void flashTick();
     // 编辑结束(委托 destroyEditor→clearEditingIndex):控制器据此补齐编辑期被跳过的维度自适应
     void editingFinished();
-
-protected:
-    bool event(QEvent* event) override;
 
 private slots:
     void onStoreChanged();   // store dataChanged → 差异化刷新 + 闪烁
