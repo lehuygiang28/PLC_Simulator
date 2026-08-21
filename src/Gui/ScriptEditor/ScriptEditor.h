@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QDialog>
 #include <QLabel>
+#include <QEvent>
 
 #include "CodeEditor.h"
 #include "LuaHighlighter.h"
@@ -60,9 +61,11 @@ private slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void changeEvent(QEvent* event) override;
 
 private:
     void createMenus();
+    void retranslateMenus();
     void setupHighlighter();
     void updateFunctionMenu();
     void addFunctionMenuGroup(const QList<LuaFunctionDoc>& docs);  // 向函数菜单添加一组(绑定/语言结构)

@@ -50,6 +50,15 @@ public:
     // 读取主题偏好(无配置时保持入参不变)
     bool LoadThemePref(int& themeId) const;
 
+    // 保存界面语言("zh" / "en")
+    bool SaveLanguagePref(const QString& languageCode);
+
+    // 加载界面语言(无配置时保持入参不变)
+    bool LoadLanguagePref(QString& languageCode) const;
+
+    // 启动时读取语言偏好(无需实例)
+    static bool PeekLanguagePref(QString& languageCode);
+
     // ==================== 脚本名称相关接口 ====================
 
     // 保存脚本名称列表(按给定数量与顺序持久化)

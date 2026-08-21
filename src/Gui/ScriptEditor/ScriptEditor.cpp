@@ -20,6 +20,7 @@
 #include <QPushButton>
 #include <QAbstractButton>
 #include <QFileInfo>
+#include <QEvent>
 
 ScriptEditor::ScriptEditor(QWidget *parent)
     : QMainWindow(parent)
@@ -47,12 +48,12 @@ ScriptEditor::ScriptEditor(QWidget *parent)
 
     // 语言结构模板（与绑定函数同构,统一为 LuaFunctionDoc：name / snippet / description）
     m_langTemplates = {
-        {"if",             "if (condition1) then\n    \nend", "if 条件分支"},
-        {"while",          "while (condition1) do\n    \nend", "while 循环"},
-        {"for",            "for i = 1, 10 do\n    \nend", "for 循环"},
+        {"if",             "if (condition1) then\n    \nend", tr("if 条件分支")},
+        {"while",          "while (condition1) do\n    \nend", tr("while 循环")},
+        {"for",            "for i = 1, 10 do\n    \nend", tr("for 循环")},
         {"if-elseif-else", "if (condition1) then\n    \n"
                            "elseif (condition2) then\n    \n"
-                           "else\n    \nend", "if-elseif-else 多分支"},
+                           "else\n    \nend", tr("if-elseif-else 多分支")},
     };
 
     updateFunctionMenu();
@@ -129,6 +130,48 @@ void ScriptEditor::createMenus()
     executeAction->setShortcut(tr("F5"));
     connect(executeAction, &QAction::triggered, this, &ScriptEditor::executeScript);
     scriptMenu->addAction(executeAction);
+}
+
+void ScriptEditor::retranslateMenus()
+{
+    setWindowTitle(tr("Lua Script Editor"));
+    updateWindowTitle();
+
+    if (fileMenu)
+        fileMenu->setTitle(tr("&File"));
+    if (saveAction)
+        saveAction->setText(tr("&Save"));
+    if (saveAsAction)
+        saveAsAction->setText(tr("Save &As..."));
+    if (loadFromAction)
+        loadFromAction->setText(tr("&Load From..."));
+    if (editMenu)
+        editMenu->setTitle(tr("&Edit"));
+    if (functionsMenu)
+        functionsMenu->setTitle(tr("&Insert Function"));
+    if (scriptMenu)
+        scriptMenu->setTitle(tr("&Script"));
+    if (compileAction)
+        compileAction->setText(tr("&Compile Script"));
+    if (executeAction)
+        executeAction->setText(tr("&Execute Script"));
+
+    m_langTemplates = {
+        {"if",             "if (condition1) then\n    \nend", tr("if 条件分支")},
+        {"while",          "while (condition1) do\n    \nend", tr("while 循环")},
+        {"for",            "for i = 1, 10 do\n    \nend", tr("for 循环")},
+        {"if-elseif-else", "if (condition1) then\n    \n"
+                           "elseif (condition2) then\n    \n"
+                           "else\n    \nend", tr("if-elseif-else 多分支")},
+    };
+    updateFunctionMenu();
+}
+
+void ScriptEditor::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::LanguageChange)
+        retranslateMenus();
+    QMainWindow::changeEvent(event);
 }
 
 void ScriptEditor::setupHighlighter()
