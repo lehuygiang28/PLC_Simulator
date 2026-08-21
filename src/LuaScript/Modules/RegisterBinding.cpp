@@ -6,6 +6,7 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 #include "RegisterBinding.h"
+#include <QCoreApplication>
 #include "Core/RegisterStore.h"
 #include "LuaBindingUtil.h"
 #include "Lua.hpp"
@@ -63,7 +64,8 @@ QList<LuaFunctionDoc> RegisterBinding::functions() const
 {
     QList<LuaFunctionDoc> docs;
     for (const Fn& f : kFns)
-        docs.append({QString::fromUtf8(f.name), QString::fromUtf8(f.snippet), QString::fromUtf8(f.description)});
+        docs.append({QString::fromUtf8(f.name), QString::fromUtf8(f.snippet),
+                     QCoreApplication::translate("RegisterBinding", f.description)});
     return docs;
 }
 

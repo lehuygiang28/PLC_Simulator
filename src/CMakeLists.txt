@@ -6,10 +6,12 @@ set(TARGET_NAME "PLC_Simulator")
 # 按原项目过滤器结构组织文件
 set(SOURCE_FILES
     main.cpp
+    I18n/LanguageManager.cpp
 )
 
 # 根目录工具头文件
 set(ROOT_HEADERS
+    I18n/LanguageManager.h
 )
 
 set(RESOURCE_FILES
@@ -231,6 +233,11 @@ add_executable(${TARGET_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCE_FILES}
+)
+
+qt_add_translations(${TARGET_NAME}
+    TS_FILES translations/plc_simulator_en.ts
+    RESOURCE_PREFIX "/i18n"
 )
 
 # 设置目标属性

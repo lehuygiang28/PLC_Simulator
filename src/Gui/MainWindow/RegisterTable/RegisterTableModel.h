@@ -62,6 +62,9 @@ signals:
     // 编辑结束(委托 destroyEditor→clearEditingIndex):控制器据此补齐编辑期被跳过的维度自适应
     void editingFinished();
 
+protected:
+    bool event(QEvent* event) override;
+
 private slots:
     void onStoreChanged();   // store dataChanged → 差异化刷新 + 闪烁
     void onFlashTick();      // 重绘节拍:发 flashTick、清过期、无活跃则停表

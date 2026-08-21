@@ -6,6 +6,7 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 #include "PlatformBinding.h"
+#include <QCoreApplication>
 #include "Core/PlatformController.h"
 #include "LuaBindingUtil.h"
 #include "Lua.hpp"
@@ -56,7 +57,8 @@ QList<LuaFunctionDoc> PlatformBinding::functions() const
 {
     QList<LuaFunctionDoc> docs;
     for (const Fn& f : kFns)
-        docs.append({QString::fromUtf8(f.name), QString::fromUtf8(f.snippet), QString::fromUtf8(f.description)});
+        docs.append({QString::fromUtf8(f.name), QString::fromUtf8(f.snippet),
+                     QCoreApplication::translate("PlatformBinding", f.description)});
     return docs;
 }
 

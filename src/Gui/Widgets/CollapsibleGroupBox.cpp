@@ -110,7 +110,7 @@ void CollapsibleGroupBox::setClosable(bool closable)
         m_closeButton = new QToolButton(this);
         m_closeButton->setObjectName(QStringLiteral("groupCloseButton"));
         m_closeButton->setText(QStringLiteral("×"));   // ×
-        m_closeButton->setToolTip(QStringLiteral("关闭"));
+        m_closeButton->setToolTip(tr("关闭"));
         m_closeButton->setCursor(Qt::PointingHandCursor);
         m_closeButton->setAutoRaise(true);
         m_closeButton->setFocusPolicy(Qt::NoFocus);
