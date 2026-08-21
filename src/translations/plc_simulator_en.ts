@@ -627,6 +627,134 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
 <context>
     <name>ScriptEditor</name>
     <message>
+        <source>Lua 脚本编辑器</source>
+        <translation>Lua Script Editor</translation>
+    </message>
+    <message>
+        <source>文件(&amp;F)</source>
+        <translation>&amp;File</translation>
+    </message>
+    <message>
+        <source>保存(&amp;S)</source>
+        <translation>&amp;Save</translation>
+    </message>
+    <message>
+        <source>另存为(&amp;A)...</source>
+        <translation>Save &amp;As...</translation>
+    </message>
+    <message>
+        <source>从文件加载(&amp;L)...</source>
+        <translation>&amp;Load From...</translation>
+    </message>
+    <message>
+        <source>退出(&amp;X)</source>
+        <translation>E&amp;xit</translation>
+    </message>
+    <message>
+        <source>编辑(&amp;E)</source>
+        <translation>&amp;Edit</translation>
+    </message>
+    <message>
+        <source>插入函数(&amp;I)</source>
+        <translation>&amp;Insert Function</translation>
+    </message>
+    <message>
+        <source>脚本(&amp;S)</source>
+        <translation>&amp;Script</translation>
+    </message>
+    <message>
+        <source>编译脚本(&amp;C)</source>
+        <translation>&amp;Compile Script</translation>
+    </message>
+    <message>
+        <source>执行脚本(&amp;E)</source>
+        <translation>&amp;Execute Script</translation>
+    </message>
+    <message>
+        <source>保存脚本</source>
+        <translation>Save Script</translation>
+    </message>
+    <message>
+        <source>Lua 脚本 (*.lua);;所有文件 (*)</source>
+        <translation>Lua Scripts (*.lua);;All Files (*)</translation>
+    </message>
+    <message>
+        <source>错误</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <source>无法写入文件 %1:\n%2。</source>
+        <translation>Cannot write file %1:\n%2.</translation>
+    </message>
+    <message>
+        <source>编译</source>
+        <translation>Compile</translation>
+    </message>
+    <message>
+        <source>语法检查器不可用。</source>
+        <translation>Syntax checker not available.</translation>
+    </message>
+    <message>
+        <source>脚本编译成功。</source>
+        <translation>Script compiled successfully.</translation>
+    </message>
+    <message>
+        <source>编译错误</source>
+        <translation>Compile Error</translation>
+    </message>
+    <message>
+        <source>未配置脚本运行器。</source>
+        <translation>Script runner not configured.</translation>
+    </message>
+    <message>
+        <source>执行</source>
+        <translation>Execute</translation>
+    </message>
+    <message>
+        <source>脚本执行成功。</source>
+        <translation>Script executed successfully.</translation>
+    </message>
+    <message>
+        <source>执行错误</source>
+        <translation>Execution Error</translation>
+    </message>
+    <message>
+        <source>脚本运行中</source>
+        <translation>Script Running</translation>
+    </message>
+    <message>
+        <source>Lua 运行中，用时: 0 秒......</source>
+        <translation>Lua is Running, Use-Time: 0 s......</translation>
+    </message>
+    <message>
+        <source>Lua 运行中，用时: %1 秒......</source>
+        <translation>Lua Running, UseTime: %1 s......</translation>
+    </message>
+    <message>
+        <source>另存为脚本</source>
+        <translation>Save Script As</translation>
+    </message>
+    <message>
+        <source>Lua 脚本 (*.lua)</source>
+        <translation>Lua Scripts (*.lua)</translation>
+    </message>
+    <message>
+        <source>成功</source>
+        <translation>Success</translation>
+    </message>
+    <message>
+        <source>脚本保存成功。</source>
+        <translation>Script saved successfully.</translation>
+    </message>
+    <message>
+        <source>从文件加载脚本</source>
+        <translation>Load Script From</translation>
+    </message>
+    <message>
+        <source>无法读取文件 %1:\n%2。</source>
+        <translation>Cannot read file %1:\n%2.</translation>
+    </message>
+    <message>
         <source>文件未保存</source>
         <translation>Unsaved File</translation>
     </message>
