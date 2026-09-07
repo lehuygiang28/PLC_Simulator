@@ -15,6 +15,7 @@ constexpr auto kProtocolType       = "protocol_type";
 constexpr auto kTheme              = "theme";
 constexpr auto kLanguage           = "language";
 constexpr auto kScriptNames        = "script_names";
+constexpr auto kScriptLanguages    = "script_languages";
 constexpr auto kSimulationPlatform = "simulation_platform";
 constexpr auto kAxisWriteParams    = "axis_write_params";
 constexpr auto kRegisterView       = "register_view";
@@ -171,6 +172,22 @@ bool ConfigStore::LoadScriptNames(QStringList& scriptNames) const
     const QJsonArray arr = Get(kScriptNames).toArray();
     scriptNames.clear();
     for (const QJsonValue& v : arr) scriptNames.append(v.toString());
+    return true;
+}
+
+bool ConfigStore::SaveScriptLanguages(const QStringList& languages)
+{
+    QJsonArray arr;
+    for (const QString& lang : languages) arr.append(lang);
+    return Set(kScriptLanguages, arr);
+}
+
+bool ConfigStore::LoadScriptLanguages(QStringList& languages) const
+{
+    if (!m_root.contains(kScriptLanguages)) return false;
+    const QJsonArray arr = Get(kScriptLanguages).toArray();
+    languages.clear();
+    for (const QJsonValue& v : arr) languages.append(v.toString());
     return true;
 }
 

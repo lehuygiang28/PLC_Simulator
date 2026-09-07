@@ -67,6 +67,12 @@ public:
     // 加载脚本名称列表(数量由配置决定;无该键返回 false)
     bool LoadScriptNames(QStringList& scriptNames) const;
 
+    // Save per-slot script language ("lua" / "typescript").
+    bool SaveScriptLanguages(const QStringList& languages);
+
+    // Load per-slot script languages (returns false if key missing).
+    bool LoadScriptLanguages(QStringList& languages) const;
+
     // ==================== 模拟平台参数相关接口 ====================
 
     // 保存模拟平台参数(不透明字典,字段由 PlatformScene 自描述)

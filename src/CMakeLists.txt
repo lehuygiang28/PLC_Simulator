@@ -107,12 +107,14 @@ set(GUI_SCRIPTEDITOR_SOURCES
     Gui/ScriptEditor/ScriptEditor.cpp
     Gui/ScriptEditor/CodeEditor.cpp
     Gui/ScriptEditor/LuaHighlighter.cpp
+    Gui/ScriptEditor/TypeScriptHighlighter.cpp
 )
 
 set(GUI_SCRIPTEDITOR_HEADERS
     Gui/ScriptEditor/ScriptEditor.h
     Gui/ScriptEditor/CodeEditor.h
     Gui/ScriptEditor/LuaHighlighter.h
+    Gui/ScriptEditor/TypeScriptHighlighter.h
 )
 
 # Gui\SimulationPlatform 模块
@@ -150,6 +152,7 @@ set(LUA_ENGINE_SOURCES
     LuaScript/Engine/LuaEngine.cpp
     LuaScript/Engine/ScriptEngineHost.cpp
     LuaScript/Engine/LuaStaticCheck.cpp
+    LuaScript/Engine/TypeScriptTranspiler.cpp
 )
 
 set(LUA_ENGINE_HEADERS
@@ -157,6 +160,8 @@ set(LUA_ENGINE_HEADERS
     LuaScript/Engine/ILuaBinding.h
     LuaScript/Engine/ScriptEngineHost.h
     LuaScript/Engine/LuaStaticCheck.h
+    LuaScript/Engine/ScriptLanguage.h
+    LuaScript/Engine/TypeScriptTranspiler.h
 )
 
 set(LUA_MODULE_SOURCES
@@ -453,6 +458,43 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/ChangeLog.txt")
             "${CMAKE_SOURCE_DIR}/ChangeLog.txt"
             "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/"
         COMMENT "Copying ChangeLog.txt to Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>"
+    )
+endif()
+
+# 复制 TypeScript 转 Lua 工具(需先在 tools/tstl-transpile 运行 npm install)
+if(EXISTS "${CMAKE_SOURCE_DIR}/tools/tstl-transpile/transpile.mjs")
+    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/tools/tstl-transpile"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/tools/tstl-transpile/transpile.mjs"
+            "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/tools/tstl-transpile/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/tools/tstl-transpile/package.json"
+            "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/tools/tstl-transpile/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/tools/tstl-transpile/plc-simulator.d.ts"
+            "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/tools/tstl-transpile/"
+        COMMENT "Copying TypeScript transpiler scripts to Bin"
+    )
+    if(EXISTS "${CMAKE_SOURCE_DIR}/tools/tstl-transpile/node_modules")
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_SOURCE_DIR}/tools/tstl-transpile/node_modules"
+                "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/tools/tstl-transpile/node_modules"
+            COMMENT "Copying TypeScript transpiler node_modules to Bin"
+        )
+    endif()
+endif()
+
+if(EXISTS "${CMAKE_SOURCE_DIR}/docs/SCRIPTING.md")
+    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/docs"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/docs/SCRIPTING.md"
+            "${CMAKE_SOURCE_DIR}/Bin/$<IF:$<CONFIG:Debug>,dbg_env,x64>/docs/"
+        COMMENT "Copying SCRIPTING.md to Bin/docs"
     )
 endif()
 
