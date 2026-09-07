@@ -9,3 +9,5 @@ build/
 /docs/
 
 CLAUDE.local.md
+node_modules/
+aqtinstall.log

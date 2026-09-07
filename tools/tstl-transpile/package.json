@@ -1,0 +1,13 @@
+{
+  "name": "plc-simulator-tstl-transpile",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript-to-Lua transpiler for PLC Simulator scripts",
+  "scripts": {
+    "transpile": "node transpile.mjs"
+  },
+  "dependencies": {
+    "typescript": "6.0.2",
+    "typescript-to-lua": "1.37.1"
+  }
+}
