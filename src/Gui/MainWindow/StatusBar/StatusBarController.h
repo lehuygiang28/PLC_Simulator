@@ -40,6 +40,8 @@ public:
     void onCommTimeout(const QString& endpointId);
     void onScriptStarted(int index);
     void onScriptFinished(int index, bool ok, const QString& err);
+    void onScriptCompileStarted(int index);
+    void onScriptCompileFinished(int index);
     void onPoseChanged(Platform which, const Pose& pose);
 
     // 注入控制器观察不到的配置
@@ -90,6 +92,7 @@ private:
 
     // 脚本(index → 运行中次数;引用计数容忍同 index 并发 + 名称取值器)
     QHash<int, int> m_running;
+    QHash<int, int> m_compiling;
     std::function<QString(int)> m_scriptNameProvider;
 
     // 平台

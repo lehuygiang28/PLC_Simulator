@@ -844,6 +844,13 @@ void MainWindow::connectStatusBar()
 		connect(m_pWorkflow->scriptHost(), &ScriptEngineHost::scriptFinished, sc, &StatusBarController::onScriptFinished);
 	}
 
+	if (m_scriptManager) {
+		connect(m_scriptManager.get(), &ScriptManager::scriptCompileStarted, sc,
+		        &StatusBarController::onScriptCompileStarted);
+		connect(m_scriptManager.get(), &ScriptManager::scriptCompileFinished, sc,
+		        &StatusBarController::onScriptCompileFinished);
+	}
+
 	// 脚本悬浮显示名称框内容(惰性读取,运行中改名亦实时);空名回退 "脚本 #N"
 	sc->setScriptNameProvider([this](int i) {
 		const QVector<QLineEdit*> edits = scriptNameEdits();

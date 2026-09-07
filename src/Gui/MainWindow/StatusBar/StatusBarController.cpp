@@ -152,6 +152,20 @@ void StatusBarController::onScriptFinished(int index, bool /*ok*/, const QString
     refreshScript();
 }
 
+void StatusBarController::onScriptCompileStarted(int index)
+{
+    ++m_compiling[index];
+    refreshScript();
+}
+
+void StatusBarController::onScriptCompileFinished(int index)
+{
+    auto it = m_compiling.find(index);
+    if (it != m_compiling.end() && --it.value() <= 0)
+        m_compiling.erase(it);
+    refreshScript();
+}
+
 void StatusBarController::onPoseChanged(Platform which, const Pose& pose)
 {
     if (which == Platform::Live) m_live = pose;
@@ -235,12 +249,20 @@ void StatusBarController::refreshHealth()
 
 void StatusBarController::refreshScript()
 {
-    if (m_running.isEmpty())
-    {
+    const int compiling = m_compiling.size();
+    const int running = m_running.size();
+
+    if (compiling == 0 && running == 0) {
         m_segScript->setValue(tr("脚本: <span style='color:%1'>空闲</span>").arg(themed("@text2")));
         return;
     }
-    m_segScript->setValue(tr("脚本: %1 运行中").arg(m_running.size()));
+
+    QStringList parts;
+    if (compiling > 0)
+        parts << tr("%1 编译中").arg(compiling);
+    if (running > 0)
+        parts << tr("%1 运行中").arg(running);
+    m_segScript->setValue(tr("脚本: %1").arg(parts.join(QStringLiteral(" / "))));
 }
 
 void StatusBarController::refreshPlatform()
@@ -288,18 +310,34 @@ QString StatusBarController::buildHealthDetail() const
 
 QString StatusBarController::buildScriptDetail() const
 {
-    if (m_running.isEmpty())
+    if (m_compiling.isEmpty() && m_running.isEmpty())
         return QString();
-    QList<int> idxs = m_running.keys();   // 运行中脚本 index(值为次数,此处只取键)
-    std::sort(idxs.begin(), idxs.end());
-    QStringList items;
-    for (int i : idxs)
-    {
+
+    auto scriptLabel = [this](int i) {
         const QString name = m_scriptNameProvider ? m_scriptNameProvider(i).trimmed() : QString();
-        items << (name.isEmpty() ? tr("脚本 #%1").arg(i + 1)
-                                 : name.toHtmlEscaped());           // 用户文本,转义防破坏 HTML 悬浮
+        return name.isEmpty() ? tr("脚本 #%1").arg(i + 1) : name.toHtmlEscaped();
+    };
+
+    QString detail;
+    if (!m_compiling.isEmpty()) {
+        QList<int> idxs = m_compiling.keys();
+        std::sort(idxs.begin(), idxs.end());
+        QStringList items;
+        for (int i : idxs)
+            items << scriptLabel(i);
+        detail += titledList(tr("编译中脚本 (%1)").arg(idxs.size()), items);
     }
-    return titledList(tr("运行中脚本 (%1)").arg(idxs.size()), items);
+    if (!m_running.isEmpty()) {
+        QList<int> idxs = m_running.keys();
+        std::sort(idxs.begin(), idxs.end());
+        QStringList items;
+        for (int i : idxs)
+            items << scriptLabel(i);
+        if (!detail.isEmpty())
+            detail += QStringLiteral("<div style='height:8px'></div>");
+        detail += titledList(tr("运行中脚本 (%1)").arg(idxs.size()), items);
+    }
+    return detail;
 }
 
 QString StatusBarController::buildPlatformDetail() const
