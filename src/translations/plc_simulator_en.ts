@@ -358,6 +358,18 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <translation>Display Address:</translation>
     </message>
     <message>
+        <source>显示地址1:</source>
+        <translation>Display Address 1:</translation>
+    </message>
+    <message>
+        <source>显示地址2:</source>
+        <translation>Display Address 2:</translation>
+    </message>
+    <message>
+        <source>双区域显示</source>
+        <translation>Split Range View</translation>
+    </message>
+    <message>
         <source>数据类型:</source>
         <translation>Data Type:</translation>
     </message>

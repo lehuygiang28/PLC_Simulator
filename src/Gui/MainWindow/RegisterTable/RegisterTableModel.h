@@ -46,6 +46,8 @@ public:
     // 视图状态 setter(由控制器在对应控件变化时转发;静默刷新,不闪)
     void setDataType(RegisterDataType type);
     void setStartAddr(int startAddr);
+    void setSecondStartAddr(int startAddr);
+    void setSplitView(bool enabled);
     void setNumberBase(bool hex);
 
     // 闪烁叠加色(供 RegisterItemDelegate::paint 调用):未闪/已过期返回无效 QColor
@@ -78,13 +80,16 @@ private:
     int flashIndex(int row, int col) const;                  // (row,col)→m_flashStartMs 线性下标;越界/无列返回 -1
     // 值锚点格判定(data/flags/onStoreChanged 共用):值列 && 在快照范围内 && 落在锚点(k%rpv==0)
     bool isAnchorValueCell(int row, int col) const;
+    int registerAddrForK(int k) const;
 
     RegisterStore* m_store;           // 数据源
     QWidget* m_dialogParent;          // 校验弹框父窗口
     RegisterCellLayout m_layout;      // cell<->寄存器映射(单一真相源,含维度)
 
     RegisterDataType m_currentType;   // 当前数据类型
-    int m_startAddr;                  // 起始地址
+    int m_startAddr;                  // 起始地址(左区/单区)
+    int m_secondStartAddr = 0;        // 双区域模式右区起始地址
+    bool m_splitView = false;         // 双区域显示:左右半表各用独立起始地址
     int m_intStat;                    // 整数显示状态 0=十进制, 1=十六进制
     std::vector<DataTypeConvert> m_registerVals;  // 窗口快照(差异基线 + data() 取数源)
     std::vector<DataTypeConvert> m_prevVals;      // onStoreChanged 差异基线的复用缓冲(避免每拍堆分配)

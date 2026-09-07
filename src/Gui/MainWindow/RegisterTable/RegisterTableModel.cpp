@@ -214,7 +214,7 @@ QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
     }
 
     // 地址列:地址越过 store 容量则留空(窗口可大于寄存器空间)
-    const int addr = m_layout.registerAddr(k, m_startAddr);
+    const int addr = registerAddrForK(k);
     if (m_store && addr >= m_store->size())
         return QString();
     return QString("D%1").arg(addr, 5, 10, QChar('0'));
@@ -262,7 +262,7 @@ bool RegisterTableModel::setData(const QModelIndex& index, const QVariant& value
     writeCell(m_currentType, k, r.normalized);
 
     // 统一回写:每值占 rpv 个 Int16,从 subIndex 起连续 rpv 个推入 store
-    const int addr = m_layout.registerAddr(k, m_startAddr);
+    const int addr = registerAddrForK(k);
     const int rpv = registersPerValue(m_currentType);
     const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
     const int s = m_layout.subIndex(k);
@@ -283,6 +283,21 @@ void RegisterTableModel::setDataType(RegisterDataType type)
 void RegisterTableModel::setStartAddr(int startAddr)
 {
     m_startAddr = startAddr;
+    refreshAll();
+}
+
+void RegisterTableModel::setSecondStartAddr(int startAddr)
+{
+    m_secondStartAddr = startAddr;
+    if (m_splitView)
+        refreshAll();
+}
+
+void RegisterTableModel::setSplitView(bool enabled)
+{
+    if (m_splitView == enabled)
+        return;
+    m_splitView = enabled;
     refreshAll();
 }
 
@@ -388,10 +403,13 @@ void RegisterTableModel::onFlashTick()
 void RegisterTableModel::refreshSnapshot()
 {
     if (!m_store) return;
-    constexpr int kPerUnion = RegisterCellLayout::kInt16PerUnion;
-    for (size_t i = 0; i < m_registerVals.size(); ++i)
-        for (int j = 0; j < kPerUnion; ++j)
-            m_registerVals[i].u_Int16[j] = m_store->cell(m_startAddr + static_cast<int>(i) * kPerUnion + j);
+    const int maxK = m_layout.valueCellCount();
+    for (int k = 0; k < maxK; ++k)
+    {
+        const int ci = m_layout.cacheIndex(k);
+        const int si = m_layout.subIndex(k);
+        m_registerVals[ci].u_Int16[si] = m_store->cell(registerAddrForK(k));
+    }
 }
 
 void RegisterTableModel::refreshAll()
@@ -416,10 +434,26 @@ bool RegisterTableModel::isAnchorValueCell(int row, int col) const
     if (m_store)
     {
         const int rpv = registersPerValue(m_currentType);
-        if (m_layout.registerAddr(k, m_startAddr) + rpv - 1 >= m_store->size())
+        if (registerAddrForK(k) + rpv - 1 >= m_store->size())
             return false;
     }
     return true;
+}
+
+int RegisterTableModel::registerAddrForK(int k) const
+{
+    if (!m_splitView)
+        return m_layout.registerAddr(k, m_startAddr);
+
+    const int totalPairs = m_layout.colCount / 2;
+    const int leftPairs = totalPairs / 2;
+    const int rowCount = m_layout.rowCount;
+    const int pairIndex = k / rowCount;
+    const int row = k % rowCount;
+
+    if (pairIndex < leftPairs)
+        return m_startAddr + row + pairIndex * rowCount;
+    return m_secondStartAddr + row + (pairIndex - leftPairs) * rowCount;
 }
 
 void RegisterTableModel::writeCell(RegisterDataType type, int k, const QString& text)

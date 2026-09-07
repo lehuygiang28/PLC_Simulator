@@ -95,6 +95,7 @@ private:
 
     // 寄存器表显示设置持久化(起始地址 / 数据类型 / 进制)
     void saveRegisterView();
+    void updateSplitRangeUi(bool enabled);
 
     // 菜单栏相关
     void OnThemeSelected(Theme theme);

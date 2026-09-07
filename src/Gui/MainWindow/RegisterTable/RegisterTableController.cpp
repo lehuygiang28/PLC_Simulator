@@ -98,6 +98,16 @@ void RegisterTableController::setStartAddr(int startAddr)
     if (m_model) m_model->setStartAddr(startAddr);
 }
 
+void RegisterTableController::setSecondStartAddr(int startAddr)
+{
+    if (m_model) m_model->setSecondStartAddr(startAddr);
+}
+
+void RegisterTableController::setSplitView(bool enabled)
+{
+    if (m_model) m_model->setSplitView(enabled);
+}
+
 void RegisterTableController::setNumberBase(bool hex)
 {
     if (m_model) m_model->setNumberBase(hex);

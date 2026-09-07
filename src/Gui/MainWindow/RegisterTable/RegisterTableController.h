@@ -35,6 +35,8 @@ public:
     // 三个语义 setter:由 MainWindow 在对应控件变化时推入,内部转发 model(自动刷新)
     void setDataType(RegisterDataType type);
     void setStartAddr(int startAddr);
+    void setSecondStartAddr(int startAddr);
+    void setSplitView(bool enabled);
     void setNumberBase(bool hex);
 
     void retranslateHeaders();

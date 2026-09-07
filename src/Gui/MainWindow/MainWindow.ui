@@ -185,6 +185,13 @@
           <string>寄存器设置</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
+          <item row="0" column="0" colspan="4">
+           <widget class="QCheckBox" name="ChkBox_SplitRangeView">
+            <property name="text">
+             <string>双区域显示</string>
+            </property>
+           </widget>
+          </item>
           <item row="1" column="0" colspan="4">
            <layout class="QHBoxLayout" name="addrRowLayout">
             <item>
@@ -237,6 +244,58 @@
             </item>
             <item>
              <widget class="QComboBox" name="cmbBox_DataType"/>
+            </item>
+           </layout>
+          </item>
+          <item row="2" column="0" colspan="4">
+           <layout class="QHBoxLayout" name="addr2RowLayout">
+            <item>
+             <widget class="QLabel" name="label_RegisterAddr2">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>显示地址2:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="edit_RegisterAddr2">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>30</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>100</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignmentFlag::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="addr2RowSpacer">
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
             </item>
            </layout>
           </item>

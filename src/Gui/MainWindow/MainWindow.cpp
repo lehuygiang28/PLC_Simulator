@@ -316,6 +316,16 @@ void MainWindow::initialRefresh()
 				QString::number(rv.value("startAddr", ui->edit_RegisterAddr->text().toInt()).toInt()));
 		}
 		{
+			QSignalBlocker blocker(ui->edit_RegisterAddr2);
+			ui->edit_RegisterAddr2->setText(
+				QString::number(rv.value("secondStartAddr", ui->edit_RegisterAddr2->text().toInt()).toInt()));
+		}
+		{
+			const bool splitView = rv.value("splitView", false).toBool();
+			QSignalBlocker blocker(ui->ChkBox_SplitRangeView);
+			ui->ChkBox_SplitRangeView->setChecked(splitView);
+		}
+		{
 			const int savedType = rv.value("dataType", -1).toInt();
 			for (int i = 0; i < ui->cmbBox_DataType->count(); ++i)
 			{
@@ -338,6 +348,9 @@ void MainWindow::initialRefresh()
 
 	// 三条视图状态统一显式首推(不依赖 setChecked 副作用;载入后为载入值,否则默认值)
 	m_registerTableController->setStartAddr(ui->edit_RegisterAddr->text().toInt());  // 内部自动刷新
+	m_registerTableController->setSecondStartAddr(ui->edit_RegisterAddr2->text().toInt());
+	m_registerTableController->setSplitView(ui->ChkBox_SplitRangeView->isChecked());
+	updateSplitRangeUi(ui->ChkBox_SplitRangeView->isChecked());
 	m_registerTableController->setDataType(ui->cmbBox_DataType->currentData().value<RegisterDataType>());
 	m_registerTableController->setNumberBase(ui->Radio_Data_HEX->isChecked());
 
@@ -348,10 +361,19 @@ void MainWindow::saveRegisterView()
 {
 	if (!m_uiReady || !m_configStore) return;   // 屏蔽启动期控件初值触发
 	QVariantMap m;
-	m["startAddr"]     = ui->edit_RegisterAddr->text().toInt();
-	m["dataType"]      = static_cast<int>(ui->cmbBox_DataType->currentData().value<RegisterDataType>());
-	m["numberBaseHex"] = ui->Radio_Data_HEX->isChecked();
+	m["startAddr"]        = ui->edit_RegisterAddr->text().toInt();
+	m["secondStartAddr"]  = ui->edit_RegisterAddr2->text().toInt();
+	m["splitView"]        = ui->ChkBox_SplitRangeView->isChecked();
+	m["dataType"]         = static_cast<int>(ui->cmbBox_DataType->currentData().value<RegisterDataType>());
+	m["numberBaseHex"]    = ui->Radio_Data_HEX->isChecked();
 	m_configStore->SaveRegisterView(m);
+}
+
+void MainWindow::updateSplitRangeUi(bool enabled)
+{
+	ui->label_RegisterAddr2->setVisible(enabled);
+	ui->edit_RegisterAddr2->setVisible(enabled);
+	ui->label_6->setText(enabled ? tr("显示地址1:") : tr("显示地址:"));
 }
 
 void MainWindow::connectSignals()
@@ -604,6 +626,26 @@ void MainWindow::connectRegisterTable()
 				saveRegisterView();
 			});
 
+	// 双区域显示开关
+	connect(ui->ChkBox_SplitRangeView, &QCheckBox::toggled, this, [this](bool checked)
+			{
+				updateSplitRangeUi(checked);
+				m_registerTableController->setSplitView(checked);
+				saveRegisterView();
+			});
+
+	// 右区起始地址(双区域模式下生效)
+	connect(ui->edit_RegisterAddr2, &QLineEdit::textChanged, this, [this](const QString& text)
+			{
+				if (text.isEmpty())
+					return;
+				const int nAddr = text.toInt();
+				if (nAddr < 0)
+					return;
+				m_registerTableController->setSecondStartAddr(nAddr);
+				saveRegisterView();
+			});
+
 	// 修改显示寄存器数据类型(推入即自动刷新)
 	connect(ui->cmbBox_DataType, &QComboBox::currentIndexChanged, this, [=]
 			{
@@ -794,8 +836,11 @@ void MainWindow::setupInputValidators()
 	// 只能输入整型数
 	ui->edit_Port->setValidator(PortValid);
 	ui->edit_RegisterAddr->setValidator(RegisterShowAddr);
+	ui->edit_RegisterAddr2->setValidator(RegisterShowAddr);
 
 	ui->edit_IP->setInputMask("000.000.000.000;"); // IP地址格式
+	ui->label_RegisterAddr2->setVisible(false);
+	ui->edit_RegisterAddr2->setVisible(false);
 }
 
 void MainWindow::CreateCurrentProtocol()
@@ -977,6 +1022,8 @@ void MainWindow::retranslateDynamicUi()
 
 	if (m_registerTableController)
 		m_registerTableController->retranslateHeaders();
+
+	updateSplitRangeUi(ui->ChkBox_SplitRangeView->isChecked());
 
 	if (m_statusBarController)
 		m_statusBarController->refreshAll();
