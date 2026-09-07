@@ -29,6 +29,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QComboBox>
+#include <QGridLayout>
 #include <QIntValidator>
 #include <QTextDocument>
 #include <QSignalBlocker>
@@ -231,7 +232,7 @@ void MainWindow::createMembers()
 	m_registerTableController->initTable(kRegRows, kRegCols);  // 内部自连 store、自装编辑委托
 
 	// 脚本管理器
-	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkflow->scriptHost(), this);
+	m_scriptManager = std::make_unique<ScriptManager>(m_pWorkflow->scriptHost(), m_configStore, this);
 
 	// 平台控制器
 	m_platformController = std::make_unique<PlatformController>(
@@ -558,15 +559,41 @@ void MainWindow::connectWindowSignals()
 
 void MainWindow::connectScript()
 {
-	// 连接脚本执行/编辑/循环按钮(数量由 UI 推导:Btn_Execute_{i+1} 找不到即停)
+	int scriptCount = 0;
+	for (int i = 0; ; ++i) {
+		if (!findChild<QPushButton*>(QString("Btn_Execute_%1").arg(i + 1)))
+			break;
+		++scriptCount;
+	}
+
+	if (m_scriptManager)
+		m_scriptManager->setScriptCount(scriptCount);
+
+	auto* scriptGrid = ui->grpbox_LuaScript->findChild<QGridLayout*>(QStringLiteral("gridLayout_4"));
+	if (scriptGrid)
+		ui->grpbox_LuaScript->setMinimumWidth(430);
+
+	// 连接脚本执行/编辑/循环/语言按钮(数量由 UI 推导:Btn_Execute_{i+1} 找不到即停)
 	for (int i = 0; ; ++i)
 	{
 		auto* execBtn = findChild<QPushButton*>(QString("Btn_Execute_%1").arg(i + 1));
-		if (!execBtn) break;   // 行数由 UI 推导:无执行按钮即停
+		if (!execBtn) break;
 		auto* editBtn = findChild<QPushButton*>(QString("Btn_Edit_%1").arg(i + 1));
 		auto* loopChk = findChild<QCheckBox*>(QString("ChkBox_LoopEnable_%1").arg(i + 1));
-		m_scriptManager->bindScriptRow(i, execBtn, editBtn, loopChk);
+
+		QComboBox* langCombo = nullptr;
+		if (scriptGrid) {
+			langCombo = new QComboBox(ui->grpbox_LuaScript);
+			langCombo->setMinimumHeight(30);
+			langCombo->setMaximumWidth(56);
+			scriptGrid->addWidget(langCombo, i, 4);
+		}
+
+		m_scriptManager->bindScriptRow(i, execBtn, editBtn, loopChk, langCombo);
 	}
+
+	if (m_scriptManager)
+		m_scriptManager->loadLanguagePrefs();
 
 	// 子窗口脚本执行:统一走 ScriptManager 单一入口(信号已 0-based)
 	connect(m_subWindow.get(), &QuickPanel::executeLuaScript, this, [this](int scriptIndex)
@@ -1027,6 +1054,9 @@ void MainWindow::retranslateDynamicUi()
 
 	if (m_statusBarController)
 		m_statusBarController->refreshAll();
+
+	if (m_scriptManager)
+		m_scriptManager->retranslateScriptRows();
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)

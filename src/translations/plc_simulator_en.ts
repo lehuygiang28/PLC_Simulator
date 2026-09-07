@@ -735,6 +735,26 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <translation>Script Running</translation>
     </message>
     <message>
+        <source>%1 秒</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>正在编译 TypeScript… (%1)</source>
+        <translation>Compiling TypeScript… (%1)</translation>
+    </message>
+    <message>
+        <source>正在准备脚本… (%1)</source>
+        <translation>Preparing script… (%1)</translation>
+    </message>
+    <message>
+        <source>正在运行脚本… (%1)</source>
+        <translation>Running script… (%1)</translation>
+    </message>
+    <message>
+        <source>正在运行 Lua 脚本… (%1)</source>
+        <translation>Running Lua script… (%1)</translation>
+    </message>
+    <message>
         <source>Lua 运行中，用时: 0 秒......</source>
         <translation>Lua is Running, Use-Time: 0 s......</translation>
     </message>
@@ -802,6 +822,46 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <source>if-elseif-else 多分支</source>
         <translation>if-elseif-else multi-branch</translation>
     </message>
+    <message>
+        <source>脚本编辑器</source>
+        <translation>Script Editor</translation>
+    </message>
+    <message>
+        <source>TypeScript 脚本编辑器</source>
+        <translation>TypeScript Script Editor</translation>
+    </message>
+    <message>
+        <source>TypeScript 脚本 (*.ts);;所有文件 (*)</source>
+        <translation>TypeScript Scripts (*.ts);;All Files (*)</translation>
+    </message>
+    <message>
+        <source>TypeScript 编译成功。</source>
+        <translation>TypeScript compiled successfully.</translation>
+    </message>
+    <message>
+        <source>TypeScript → Lua 运行中，用时: 0 秒......</source>
+        <translation>TypeScript → Lua running, elapsed: 0 s...</translation>
+    </message>
+    <message>
+        <source>TypeScript → Lua 运行中，用时: %1 秒......</source>
+        <translation>TypeScript → Lua running, elapsed: %1 s...</translation>
+    </message>
+    <message>
+        <source>TypeScript 脚本 (*.ts)</source>
+        <translation>TypeScript Scripts (*.ts)</translation>
+    </message>
+    <message>
+        <source>TypeScript 脚本 (*.ts);;Lua 脚本 (*.lua);;所有文件 (*)</source>
+        <translation>TypeScript Scripts (*.ts);;Lua Scripts (*.lua);;All Files (*)</translation>
+    </message>
+    <message>
+        <source>Lua 脚本 (*.lua);;TypeScript 脚本 (*.ts);;所有文件 (*)</source>
+        <translation>Lua Scripts (*.lua);;TypeScript Scripts (*.ts);;All Files (*)</translation>
+    </message>
+    <message>
+        <source>if-else 分支</source>
+        <translation>if-else branch</translation>
+    </message>
 </context>
 <context>
     <name>ScriptManager</name>
@@ -832,6 +892,42 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
     <message>
         <source>取消</source>
         <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>TypeScript 编译错误</source>
+        <translation>TypeScript Compile Error</translation>
+    </message>
+    <message>
+        <source>Lua</source>
+        <translation>Lua</translation>
+    </message>
+    <message>
+        <source>TS</source>
+        <translation>TS</translation>
+    </message>
+    <message>
+        <source>脚本语言: Lua 或 TypeScript (编译为 Lua 后执行)</source>
+        <translation>Script language: Lua or TypeScript (compiled to Lua before run)</translation>
+    </message>
+    <message>
+        <source>执行</source>
+        <translation>Execute</translation>
+    </message>
+    <message>
+        <source>编译中…</source>
+        <translation>Compiling…</translation>
+    </message>
+    <message>
+        <source>运行中…</source>
+        <translation>Running…</translation>
+    </message>
+    <message>
+        <source>脚本正在编译或运行中。</source>
+        <translation>Script is already compiling or running.</translation>
+    </message>
+    <message>
+        <source>脚本 %1 执行完成</source>
+        <translation>Script %1 finished</translation>
     </message>
 </context>
 <context>
@@ -964,6 +1060,22 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <translation>Scripts: %1 running</translation>
     </message>
     <message>
+        <source>%1 编译中</source>
+        <translation>%1 compiling</translation>
+    </message>
+    <message>
+        <source>%1 运行中</source>
+        <translation>%1 running</translation>
+    </message>
+    <message>
+        <source>脚本: %1</source>
+        <translation>Scripts: %1</translation>
+    </message>
+    <message>
+        <source>编译中脚本 (%1)</source>
+        <translation>Compiling Scripts (%1)</translation>
+    </message>
+    <message>
         <source>平台 X:%1 Y:%2 θ:%3</source>
         <translation>Platform X:%1 Y:%2 θ:%3</translation>
     </message>
@@ -1061,6 +1173,52 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
     <message>
         <source>程序正在运行！请勿重复启动！</source>
         <translation>The application is already running. Do not start it again.</translation>
+    </message>
+</context>
+<context>
+    <name>ScriptEngineHost</name>
+    <message>
+        <source>Lua执行失败:%1</source>
+        <translation>Lua execution failed: %1</translation>
+    </message>
+</context>
+<context>
+    <name>TypeScriptTranspiler</name>
+    <message>
+        <source>未找到 Node.js。请安装 Node.js 18+ 并将 node 加入 PATH。</source>
+        <translation>Node.js not found. Install Node.js 18+ and add node to PATH.</translation>
+    </message>
+    <message>
+        <source>未找到 transpile.mjs (tools/tstl-transpile)。</source>
+        <translation>transpile.mjs not found (tools/tstl-transpile).</translation>
+    </message>
+    <message>
+        <source>TypeScript 工具未安装。请在 tools/tstl-transpile 目录运行: npm install</source>
+        <translation>TypeScript tools not installed. Run npm install in tools/tstl-transpile.</translation>
+    </message>
+    <message>
+        <source>无法启动 Node.js 进程。</source>
+        <translation>Failed to start Node.js process.</translation>
+    </message>
+    <message>
+        <source>TypeScript 编译超时。</source>
+        <translation>TypeScript compile timed out.</translation>
+    </message>
+    <message>
+        <source>TypeScript 编译失败 (exit %1).</source>
+        <translation>TypeScript compile failed (exit %1).</translation>
+    </message>
+    <message>
+        <source>脚本文件不存在: %1</source>
+        <translation>Script file not found: %1</translation>
+    </message>
+    <message>
+        <source>无法创建临时文件。</source>
+        <translation>Failed to create temporary file.</translation>
+    </message>
+    <message>
+        <source>无法写入临时文件。</source>
+        <translation>Failed to write temporary file.</translation>
     </message>
 </context>
 </TS>

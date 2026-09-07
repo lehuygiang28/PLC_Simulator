@@ -25,36 +25,24 @@
 ScriptEditor::ScriptEditor(QWidget *parent)
     : QMainWindow(parent)
     , editor(new CodeEditor(this))
-    , highlighter(new LuaHighlighter(editor->document()))
     , m_isModified(false)
     , m_savedContent("")
 {
     setCentralWidget(editor);
-    setWindowTitle(tr("Lua 脚本编辑器"));
+    setWindowTitle(tr("脚本编辑器"));
 
-    // 设置代码字体:优先现代等宽字体,逐级回退,确保代码对齐
     QFont font;
     font.setFamilies({"Cascadia Mono", "Consolas", "Courier New", "monospace"});
     font.setStyleHint(QFont::Monospace);
     font.setFixedPitch(true);
     font.setPointSize(10);
-    editor->setFont(font);  // CodeEditor 会在字体变化时按 IndentWidth 自动同步 Tab 视觉列宽
+    editor->setFont(font);
 
     createMenus();
-    setupHighlighter();
+    rebuildLangTemplates();
+    rebuildHighlighter();
 
-    // 连接文本修改信号
     connect(editor->document(), &QTextDocument::contentsChanged, this, &ScriptEditor::onTextChanged);
-
-    // 语言结构模板（与绑定函数同构,统一为 LuaFunctionDoc：name / snippet / description）
-    m_langTemplates = {
-        {"if",             "if (condition1) then\n    \nend", tr("if 条件分支")},
-        {"while",          "while (condition1) do\n    \nend", tr("while 循环")},
-        {"for",            "for i = 1, 10 do\n    \nend", tr("for 循环")},
-        {"if-elseif-else", "if (condition1) then\n    \n"
-                           "elseif (condition2) then\n    \n"
-                           "else\n    \nend", tr("if-elseif-else 多分支")},
-    };
 
     updateFunctionMenu();
 
@@ -132,9 +120,56 @@ void ScriptEditor::createMenus()
     scriptMenu->addAction(executeAction);
 }
 
+void ScriptEditor::setScriptLanguage(ScriptLanguage lang)
+{
+    if (m_scriptLanguage == lang)
+        return;
+    m_scriptLanguage = lang;
+    rebuildLangTemplates();
+    rebuildHighlighter();
+    updateFunctionMenu();
+    updateWindowTitle();
+}
+
+void ScriptEditor::rebuildLangTemplates()
+{
+    if (m_scriptLanguage == ScriptLanguage::TypeScript) {
+        m_langTemplates = {
+            {"if",             "if (condition) {\n    \n}", tr("if 条件分支")},
+            {"while",          "while (IsLoopValid()) {\n    \n}", tr("while 循环")},
+            {"for",            "for (let i = 0; i < 10; i++) {\n    \n}", tr("for 循环")},
+            {"if-else",        "if (condition) {\n    \n} else {\n    \n}", tr("if-else 分支")},
+        };
+    } else {
+        m_langTemplates = {
+            {"if",             "if (condition1) then\n    \nend", tr("if 条件分支")},
+            {"while",          "while (condition1) do\n    \nend", tr("while 循环")},
+            {"for",            "for i = 1, 10 do\n    \nend", tr("for 循环")},
+            {"if-elseif-else", "if (condition1) then\n    \n"
+                               "elseif (condition2) then\n    \n"
+                               "else\n    \nend", tr("if-elseif-else 多分支")},
+        };
+    }
+}
+
+void ScriptEditor::rebuildHighlighter()
+{
+    delete highlighter;
+    highlighter = nullptr;
+
+    if (m_scriptLanguage == ScriptLanguage::TypeScript)
+        highlighter = new TypeScriptHighlighter(editor->document());
+    else
+        highlighter = new LuaHighlighter(editor->document());
+
+    setupHighlighter();
+}
+
 void ScriptEditor::retranslateMenus()
 {
-    setWindowTitle(tr("Lua 脚本编辑器"));
+    setWindowTitle(m_scriptLanguage == ScriptLanguage::TypeScript
+                       ? tr("TypeScript 脚本编辑器")
+                       : tr("Lua 脚本编辑器"));
     updateWindowTitle();
 
     if (fileMenu)
@@ -156,14 +191,7 @@ void ScriptEditor::retranslateMenus()
     if (executeAction)
         executeAction->setText(tr("执行脚本(&E)"));
 
-    m_langTemplates = {
-        {"if",             "if (condition1) then\n    \nend", tr("if 条件分支")},
-        {"while",          "while (condition1) do\n    \nend", tr("while 循环")},
-        {"for",            "for i = 1, 10 do\n    \nend", tr("for 循环")},
-        {"if-elseif-else", "if (condition1) then\n    \n"
-                           "elseif (condition2) then\n    \n"
-                           "else\n    \nend", tr("if-elseif-else 多分支")},
-    };
+    rebuildLangTemplates();
     updateFunctionMenu();
 }
 
@@ -176,9 +204,17 @@ void ScriptEditor::changeEvent(QEvent* event)
 
 void ScriptEditor::setupHighlighter()
 {
-    // 高亮自定义函数名由 m_functionDocs 提供（注入后通过 setFunctionDocs 刷新）
-    // 此处初始化为空，待 setFunctionDocs 调用后更新
-    highlighter->setCustomFunctions(QStringList());
+    if (!highlighter)
+        return;
+
+    QStringList names;
+    for (const LuaFunctionDoc& doc : m_functionDocs)
+        names.append(doc.name);
+
+    if (auto* luaHl = dynamic_cast<LuaHighlighter*>(highlighter))
+        luaHl->setCustomFunctions(names);
+    else if (auto* tsHl = dynamic_cast<TypeScriptHighlighter*>(highlighter))
+        tsHl->setCustomFunctions(names);
 }
 
 void ScriptEditor::setFunctionDocs(const QList<LuaFunctionDoc>& docs)
@@ -189,11 +225,7 @@ void ScriptEditor::setFunctionDocs(const QList<LuaFunctionDoc>& docs)
     updateFunctionMenu();
 
     // 更新高亮器：将绑定函数名提取为自定义函数列表
-    QStringList names;
-    for (const LuaFunctionDoc& doc : m_functionDocs) {
-        names.append(doc.name);
-    }
-    highlighter->setCustomFunctions(names);
+    setupHighlighter();
 }
 
 void ScriptEditor::updateFunctionMenu()
@@ -227,10 +259,12 @@ void ScriptEditor::addFunctionMenuGroup(const QList<LuaFunctionDoc>& docs)
 
 void ScriptEditor::saveScript()
 {
+    const QString filter = m_scriptLanguage == ScriptLanguage::TypeScript
+                               ? tr("TypeScript 脚本 (*.ts);;所有文件 (*)")
+                               : tr("Lua 脚本 (*.lua);;所有文件 (*)");
     if (scriptFileName.isEmpty()) {
         scriptFileName = QFileDialog::getSaveFileName(this, tr("保存脚本"),
-                                                     QDir::homePath(),
-                                                     tr("Lua 脚本 (*.lua);;所有文件 (*)"));
+                                                     QDir::homePath(), filter);
         if (scriptFileName.isEmpty())
             return;
     }
@@ -272,7 +306,10 @@ void ScriptEditor::compileScript()
         return;
     }
     if (m_checkFn(scriptContent, strError)) {
-        QMessageBox::information(this, tr("编译"), tr("脚本编译成功。"));
+        const QString okMsg = m_scriptLanguage == ScriptLanguage::TypeScript
+                                  ? tr("TypeScript 编译成功。")
+                                  : tr("脚本编译成功。");
+        QMessageBox::information(this, tr("编译"), okMsg);
     } else {
         QMessageBox::critical(this, tr("编译错误"), strError);
     }
@@ -294,29 +331,45 @@ void ScriptEditor::executeScript()
         saveScript();
     }
 
-    // 先编译检查
     QString scriptContent = editor->toPlainText();
-    QString strError;
-    if (m_checkFn && !m_checkFn(scriptContent, strError)) {
-        QMessageBox::critical(this, tr("编译错误"), strError);
+
+    if (m_scriptLanguage == ScriptLanguage::Lua) {
+        QString strError;
+        if (m_checkFn && !m_checkFn(scriptContent, strError)) {
+            QMessageBox::critical(this, tr("编译错误"), strError);
+            return;
+        }
+    }
+
+    m_runFn(scriptContent);
+}
+
+void ScriptEditor::onRunPhaseChanged(ScriptRunPhase phase)
+{
+    m_runPhase = phase;
+    if (phase == ScriptRunPhase::Idle) {
+        if (m_bExecuting) {
+            hideRunningDialog();
+            setEditorEnabled(true);
+            m_bExecuting = false;
+        }
         return;
     }
 
-    // 禁用界面并显示运行提示
-    m_bExecuting = true;
-    setEditorEnabled(false);
-    showRunningDialog();
-
-    // 异步执行;完成结果经 ScriptEngineHost::scriptFinished → ScriptManager → onRunFinished 回流
-    m_runFn(scriptContent);
+    if (!m_bExecuting) {
+        m_bExecuting = true;
+        setEditorEnabled(false);
+        showRunningDialog();
+    }
+    updateRunningLabel();
 }
 
 void ScriptEditor::onRunFinished(bool ok, const QString& err)
 {
-    // 收尾运行态:隐藏提示、恢复界面、清执行标志(与启动时 showRunningDialog/setEditorEnabled 对应)
     hideRunningDialog();
     setEditorEnabled(true);
     m_bExecuting = false;
+    m_runPhase = ScriptRunPhase::Idle;
 
     if (ok)
         QMessageBox::information(this, tr("执行"), tr("脚本执行成功。"));
@@ -328,27 +381,48 @@ void ScriptEditor::showRunningDialog()
 {
     m_nRunningSeconds = 0;
 
-    // 创建不可关闭的对话框
-    m_pRunningDialog = new QDialog(this);
-    m_pRunningDialog->setWindowTitle(tr("脚本运行中"));
-    m_pRunningDialog->setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
-    m_pRunningDialog->setModal(true);
-    m_pRunningDialog->setFixedSize(280, 80);
+    if (!m_pRunningDialog) {
+        m_pRunningDialog = new QDialog(this, Qt::Tool);
+        m_pRunningDialog->setWindowTitle(tr("脚本运行中"));
+        m_pRunningDialog->setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+        m_pRunningDialog->setModal(false);
+        m_pRunningDialog->setFixedSize(320, 80);
 
-    // 创建标签
-    m_pRunningLabel = new QLabel(tr("Lua 运行中，用时: 0 秒......"), m_pRunningDialog);
-    m_pRunningLabel->setAlignment(Qt::AlignCenter);
+        m_pRunningLabel = new QLabel(m_pRunningDialog);
+        m_pRunningLabel->setAlignment(Qt::AlignCenter);
 
-    QVBoxLayout* layout = new QVBoxLayout(m_pRunningDialog);
-    layout->addWidget(m_pRunningLabel);
-    m_pRunningDialog->setLayout(layout);
+        QVBoxLayout* layout = new QVBoxLayout(m_pRunningDialog);
+        layout->addWidget(m_pRunningLabel);
+        m_pRunningDialog->setLayout(layout);
 
-    // 创建计时器
-    m_pRunningTimer = new QTimer(this);
-    connect(m_pRunningTimer, &QTimer::timeout, this, &ScriptEditor::updateRunningTime);
-    m_pRunningTimer->start(1000); // 每秒更新
+        m_pRunningTimer = new QTimer(this);
+        connect(m_pRunningTimer, &QTimer::timeout, this, &ScriptEditor::updateRunningTime);
+    }
 
+    updateRunningLabel();
+    m_pRunningTimer->start(1000);
     m_pRunningDialog->show();
+    m_pRunningDialog->raise();
+    m_pRunningDialog->activateWindow();
+}
+
+void ScriptEditor::updateRunningLabel()
+{
+    if (!m_pRunningLabel)
+        return;
+
+    const QString elapsed = tr("%1 秒").arg(m_nRunningSeconds);
+    if (m_runPhase == ScriptRunPhase::Compiling) {
+        if (m_scriptLanguage == ScriptLanguage::TypeScript)
+            m_pRunningLabel->setText(tr("正在编译 TypeScript… (%1)").arg(elapsed));
+        else
+            m_pRunningLabel->setText(tr("正在准备脚本… (%1)").arg(elapsed));
+    } else {
+        if (m_scriptLanguage == ScriptLanguage::TypeScript)
+            m_pRunningLabel->setText(tr("正在运行脚本… (%1)").arg(elapsed));
+        else
+            m_pRunningLabel->setText(tr("正在运行 Lua 脚本… (%1)").arg(elapsed));
+    }
 }
 
 void ScriptEditor::hideRunningDialog()
@@ -371,10 +445,8 @@ void ScriptEditor::hideRunningDialog()
 
 void ScriptEditor::updateRunningTime()
 {
-    m_nRunningSeconds++;
-    if (m_pRunningLabel) {
-        m_pRunningLabel->setText(tr("Lua 运行中，用时: %1 秒......").arg(m_nRunningSeconds));
-    }
+    ++m_nRunningSeconds;
+    updateRunningLabel();
 }
 
 void ScriptEditor::setEditorEnabled(bool enabled)
@@ -477,7 +549,9 @@ void ScriptEditor::onTextChanged()
 
 void ScriptEditor::updateWindowTitle()
 {
-    const QString appName = tr("Lua 脚本编辑器");
+    const QString appName = m_scriptLanguage == ScriptLanguage::TypeScript
+                                ? tr("TypeScript 脚本编辑器")
+                                : tr("Lua 脚本编辑器");
     QString title;
 
     if (!scriptFileName.isEmpty()) {
@@ -503,9 +577,11 @@ void ScriptEditor::saveScriptAs()
     }
 
     // 弹出文件保存对话框
+    const QString filter = m_scriptLanguage == ScriptLanguage::TypeScript
+                               ? tr("TypeScript 脚本 (*.ts)")
+                               : tr("Lua 脚本 (*.lua)");
     QString newFileName = QFileDialog::getSaveFileName(this, tr("另存为脚本"),
-                                                      defaultPath,
-                                                      tr("Lua 脚本 (*.lua)"));
+                                                      defaultPath, filter);
     if (newFileName.isEmpty()) {
         return;  // 用户取消
     }
@@ -545,9 +621,11 @@ void ScriptEditor::loadScriptFrom()
     }
 
     // 弹出文件选择对话框
+    const QString filter = m_scriptLanguage == ScriptLanguage::TypeScript
+                               ? tr("TypeScript 脚本 (*.ts);;Lua 脚本 (*.lua);;所有文件 (*)")
+                               : tr("Lua 脚本 (*.lua);;TypeScript 脚本 (*.ts);;所有文件 (*)");
     QString loadFileName = QFileDialog::getOpenFileName(this, tr("从文件加载脚本"),
-                                                       defaultPath,
-                                                       tr("Lua 脚本 (*.lua)"));
+                                                       defaultPath, filter);
     if (loadFileName.isEmpty()) {
         return;  // 用户取消
     }

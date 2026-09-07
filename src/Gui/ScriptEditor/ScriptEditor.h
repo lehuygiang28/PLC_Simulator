@@ -17,10 +17,13 @@
 #include <QDialog>
 #include <QLabel>
 #include <QEvent>
+#include <QSyntaxHighlighter>
 
 #include "CodeEditor.h"
 #include "LuaHighlighter.h"
+#include "TypeScriptHighlighter.h"
 #include "ILuaBinding.h"
+#include "LuaScript/Engine/ScriptLanguage.h"
 
 class ScriptEditor : public QMainWindow
 {
@@ -39,6 +42,8 @@ public:
     // 注入绑定函数文档列表（供函数菜单与语法高亮使用）
     void setFunctionDocs(const QList<LuaFunctionDoc>& docs);
 
+    void setScriptLanguage(ScriptLanguage lang);
+    ScriptLanguage scriptLanguage() const { return m_scriptLanguage; }
 
     void setScriptName(const QString &name);
     void loadScript(const QString &content);
@@ -49,6 +54,7 @@ public:
 
     // 脚本运行完成时由 ScriptManager 在 GUI 线程调用:收尾运行态并提示结果
     void onRunFinished(bool ok, const QString& err);
+    void onRunPhaseChanged(ScriptRunPhase phase);
 
 private slots:
     void saveScript();
@@ -67,12 +73,16 @@ private:
     void createMenus();
     void retranslateMenus();
     void setupHighlighter();
+    void rebuildHighlighter();
+    void rebuildLangTemplates();
     void updateFunctionMenu();
     void addFunctionMenuGroup(const QList<LuaFunctionDoc>& docs);  // 向函数菜单添加一组(绑定/语言结构)
     void updateWindowTitle();  // 更新窗口标题(添加/移除星号)
 
     CodeEditor *editor;
-    LuaHighlighter *highlighter;
+    QSyntaxHighlighter *highlighter = nullptr;
+    ScriptLanguage m_scriptLanguage = ScriptLanguage::Lua;
+    ScriptRunPhase m_runPhase = ScriptRunPhase::Idle;
     QString scriptFileName;
     QList<LuaFunctionDoc> m_langTemplates;  // 语言结构模板(if/while/for/...),与绑定函数同构
 
@@ -107,6 +117,7 @@ private:
 
     void showRunningDialog();            // 显示运行提示
     void hideRunningDialog();            // 隐藏运行提示
+    void updateRunningLabel();           // 按阶段更新提示文案
     void updateRunningTime();            // 更新运行时间
     void setEditorEnabled(bool enabled); // 设置编辑器启用状态
 };

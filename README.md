@@ -19,6 +19,7 @@ PLC Simulator 以**服务端**身份模拟 PLC（可编程逻辑控制器），�
 - **图形界面**：协议选择、连接配置、寄存器实时查看 / 编辑、通信日志（ASCII / HEX 可切换）
 - **网络通信**：TCP/IP（作为服务端监听）
 - **Lua 脚本引擎**：编写自定义自动化测试脚本，支持语法高亮与代码提示
+- **TypeScript 脚本**：可用 TypeScript 编写脚本，运行前自动编译为 Lua（需 Node.js）；详见 [docs/SCRIPTING.md](docs/SCRIPTING.md)
 - **可视化模拟平台**：图像加载与模拟运动控制，用于测试设备控制指令
 - **深色 / 浅色主题**
 
@@ -38,7 +39,8 @@ PLC Simulator 以**服务端**身份模拟 PLC（可编程逻辑控制器），�
 - Qt6（需含 Widgets、Network、SerialPort 等组件）
 - 支持 C++17 的编译器（推荐 Visual Studio 2022 / MSVC）
 
-> Lua 已内置于 `thirdparty/Lua`，无需单独安装。
+> Lua 已内置于 `thirdparty/Lua`，无需单独安装。  
+> 使用 **TypeScript** 脚本时需安装 [Node.js 18+](https://nodejs.org)，并在 `tools/tstl-transpile` 目录执行一次 `npm install`（见 [docs/SCRIPTING.md](docs/SCRIPTING.md)）。
 
 ### 构建
 
@@ -58,7 +60,7 @@ cmake --build . --config Release
 1. 选择通信协议（基恩士 PC-Link / 三菱 MC）；
 2. 配置 IP 与端口，点击「打开链接」——程序作为服务端开始监听；
 3. 在寄存器表查看 / 编辑数据，在通信日志观察收发帧（可切换 ASCII / HEX）；
-4. （可选）编写 Lua 脚本实现自动化测试逻辑；
+4. （可选）编写 Lua 或 TypeScript 脚本实现自动化测试逻辑（TS 说明见 [docs/SCRIPTING.md](docs/SCRIPTING.md)）；
 5. （可选）打开模拟平台，测试运动控制相关指令。
 
 ## 路线图
