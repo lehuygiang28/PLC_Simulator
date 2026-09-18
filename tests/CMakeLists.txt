@@ -4,7 +4,10 @@ add_executable(${TEST_TARGET}
     main.cpp
     tst_DeviceAddress.h
     tst_DeviceAddress.cpp
+    tst_WatchList.h
+    tst_WatchList.cpp
     ${CMAKE_SOURCE_DIR}/src/Core/DeviceAddress.cpp
+    ${CMAKE_SOURCE_DIR}/src/Core/WatchList.cpp
 )
 
 target_include_directories(${TEST_TARGET} PRIVATE
@@ -22,7 +25,7 @@ set_target_properties(${TEST_TARGET} PROPERTIES
     WIN32_EXECUTABLE FALSE
 )
 
-add_test(NAME DeviceAddress COMMAND ${TEST_TARGET})
+add_test(NAME PLCSimulatorTests COMMAND ${TEST_TARGET})
 
 find_program(PLCSIM_WINDEPLOYQT windeployqt
     HINTS "$ENV{Qt6_DIR}/bin" "${Qt6_DIR}/../../../bin")
