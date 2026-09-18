@@ -250,6 +250,14 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <translation>Changelog(&amp;U)</translation>
     </message>
     <message>
+        <source>MCP 控制(&amp;M)...</source>
+        <translation>MCP Control(&amp;M)...</translation>
+    </message>
+    <message>
+        <source>MCP server failed to start on port %1: %2</source>
+        <translation>MCP server failed to start on port %1: %2</translation>
+    </message>
+    <message>
         <source>视图(&amp;V)</source>
         <translation>View(&amp;V)</translation>
     </message>
@@ -1219,6 +1227,113 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
     <message>
         <source>无法写入临时文件。</source>
         <translation>Failed to write temporary file.</translation>
+    </message>
+</context>
+<context>
+    <name>McpSettingsDialog</name>
+    <message>
+        <source>MCP 控制</source>
+        <translation>MCP Control</translation>
+    </message>
+    <message>
+        <source>端口:</source>
+        <translation>Port:</translation>
+    </message>
+    <message>
+        <source>留空表示无需 token</source>
+        <translation>Leave empty for no token</translation>
+    </message>
+    <message>
+        <source>生成</source>
+        <translation>Generate</translation>
+    </message>
+    <message>
+        <source>复制</source>
+        <translation>Copy</translation>
+    </message>
+    <message>
+        <source>Token:</source>
+        <translation>Token:</translation>
+    </message>
+    <message>
+        <source>复制 URL</source>
+        <translation>Copy URL</translation>
+    </message>
+    <message>
+        <source>MCP URL:</source>
+        <translation>MCP URL:</translation>
+    </message>
+    <message>
+        <source>启动程序时自动开启 MCP</source>
+        <translation>Start MCP automatically on launch</translation>
+    </message>
+    <message>
+        <source>Cursor 配置</source>
+        <translation>Cursor Configuration</translation>
+    </message>
+    <message>
+        <source>复制 Cursor JSON</source>
+        <translation>Copy Cursor JSON</translation>
+    </message>
+    <message>
+        <source>启动</source>
+        <translation>Start</translation>
+    </message>
+    <message>
+        <source>停止</source>
+        <translation>Stop</translation>
+    </message>
+    <message>
+        <source>重启</source>
+        <translation>Restart</translation>
+    </message>
+    <message>
+        <source>关闭</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <source>运行中: %1</source>
+        <translation>Running: %1</translation>
+    </message>
+    <message>
+        <source>已停止: %1</source>
+        <translation>Stopped: %1</translation>
+    </message>
+    <message>
+        <source>已停止</source>
+        <translation>Stopped</translation>
+    </message>
+    <message>
+        <source>已复制</source>
+        <translation>Copied</translation>
+    </message>
+    <message>
+        <source>Token 已复制到剪贴板。</source>
+        <translation>Token copied to clipboard.</translation>
+    </message>
+    <message>
+        <source>MCP URL 已复制到剪贴板。</source>
+        <translation>MCP URL copied to clipboard.</translation>
+    </message>
+    <message>
+        <source>Cursor MCP JSON 已复制到剪贴板。</source>
+        <translation>Cursor MCP JSON copied to clipboard.</translation>
+    </message>
+    <message>
+        <source>启动失败</source>
+        <translation>Start Failed</translation>
+    </message>
+    <message>
+        <source>无法启动 MCP 服务器: %1</source>
+        <translation>Failed to start MCP server: %1</translation>
+    </message>
+    <message>
+        <source>重启失败</source>
+        <translation>Restart Failed</translation>
+    </message>
+    <message>
+        <source>无法重启 MCP 服务器: %1</source>
+        <translation>Failed to restart MCP server: %1</translation>
     </message>
 </context>
 </TS>
