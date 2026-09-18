@@ -59,10 +59,7 @@ signals:
     void notificationReady(const QJsonObject& notification);
 
 private:
-    enum class RegisterValueType { Int16, Int32, Float, Double, String };
-
     static bool parseRegisterAddress(const QString& addr, int& index, QString& error);
-    static RegisterValueType parseRegisterType(const QString& type, QString& error);
     static ScriptLanguage parseScriptLanguage(const QString& lang, QString& error);
     static Platform parsePlatformName(const QString& name, QString& error);
 

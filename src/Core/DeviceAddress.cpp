@@ -53,6 +53,50 @@ bool DeviceAddress::parse(const QString& text, DeviceAddress& out)
     return true;
 }
 
+bool parseValueView(const QString& type, const DeviceAddress& addr, ValueView& out, QString& error)
+{
+    error.clear();
+    const QString t = type.trimmed().toLower();
+    if (t.isEmpty() || t == QLatin1String("auto")) {
+        out = addr.isBit() ? ValueView::Bit : ValueView::Int16;
+        return true;
+    }
+    if (t == QLatin1String("bit")) {
+        if (!addr.isBit()) {
+            error = QStringLiteral("type=bit requires M or D.n");
+            return false;
+        }
+        out = ValueView::Bit;
+        return true;
+    }
+    if (addr.isBit()) {
+        error = QStringLiteral("bit address requires type=bit");
+        return false;
+    }
+    if (t == QLatin1String("int16") || t == QLatin1String("int")) {
+        out = ValueView::Int16;
+        return true;
+    }
+    if (t == QLatin1String("int32") || t == QLatin1String("dword")) {
+        out = ValueView::Int32;
+        return true;
+    }
+    if (t == QLatin1String("float")) {
+        out = ValueView::Float;
+        return true;
+    }
+    if (t == QLatin1String("double")) {
+        out = ValueView::Double;
+        return true;
+    }
+    if (t == QLatin1String("string")) {
+        out = ValueView::String;
+        return true;
+    }
+    error = QStringLiteral("Unsupported register type: %1").arg(type);
+    return false;
+}
+
 QString DeviceAddress::toString() const
 {
     if (kind == DeviceKind::M)

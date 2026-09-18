@@ -343,18 +343,21 @@ QJsonArray McpHttpServer::toolDefinitions() const
 {
     QJsonArray tools;
     tools.append(makeTool("get_status", "Get simulator status, comm state, and script slots.", objectSchema({})));
-    tools.append(makeTool("get_register", "Read one typed register value.",
+    tools.append(makeTool("get_register",
+        "Read D word (D100), M bit (M1500), or D bit (D2024.3). type: int16|int32|float|double|string|bit (default auto).",
         objectSchema({
             {QStringLiteral("address"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
             {QStringLiteral("type"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}}
         }, {QStringLiteral("address")})));
-    tools.append(makeTool("set_register", "Write one typed register value.",
+    tools.append(makeTool("set_register",
+        "Write D word (D100), M bit (M1500), or D bit (D2024.3). type: int16|int32|float|double|string|bit (default auto).",
         objectSchema({
             {QStringLiteral("address"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
             {QStringLiteral("type"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
             {QStringLiteral("value"), QJsonObject{}}
         }, {QStringLiteral("address"), QStringLiteral("value")})));
-    tools.append(makeTool("dump_registers", "Read a contiguous register range.",
+    tools.append(makeTool("dump_registers",
+        "Read contiguous D words or M/D bits from start_address (e.g. M1500, D100). type: int16|bit (default auto).",
         objectSchema({
             {QStringLiteral("start_address"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
             {QStringLiteral("count"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}}},

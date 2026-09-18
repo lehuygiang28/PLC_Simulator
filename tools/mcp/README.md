@@ -76,6 +76,8 @@ $env:PLC_SIM_MCP_TOKEN = "your-secret"
 |------|-------|
 | 状态 | `get_status`, `get_logs` |
 | 寄存器 | `get_register`, `set_register`, `dump_registers`, `reset_registers` |
+
+地址支持 D 字（D100）、M 位（M1500）、D 位（D2024.3）；`type=bit` 用于位。
 | 通信 | `get_comm_status`, `set_comm_config`, `set_protocol`, `open_comm`, `close_comm` |
 | 脚本 | `list_scripts`, `read_script`, `write_script`, `run_script`, `stop_script`, `list_script_functions` |
 | 平台 | `get_platform_params`, `set_platform_params`, `get_platform_pose`, `move_platform` |

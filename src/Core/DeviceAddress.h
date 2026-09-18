@@ -5,6 +5,8 @@
 
 enum class DeviceKind { D, M };
 
+enum class ValueView { Int16, Int32, Float, Double, String, Bit };
+
 struct DeviceAddress
 {
     DeviceKind kind = DeviceKind::D;
@@ -17,5 +19,7 @@ struct DeviceAddress
     QString toString() const;
     static bool parse(const QString& text, DeviceAddress& out);
 };
+
+bool parseValueView(const QString& type, const DeviceAddress& addr, ValueView& out, QString& error);
 
 #endif

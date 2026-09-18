@@ -76,6 +76,8 @@ Omit `headers` when no token is configured.
 |----------|-------|
 | Status | `get_status`, `get_logs` |
 | Registers | `get_register`, `set_register`, `dump_registers`, `reset_registers` |
+
+Addresses: D100 (word), M1500 (bit), D2024.3 (bit of D). Use type=bit for bits.
 | Communication | `get_comm_status`, `set_comm_config`, `set_protocol`, `open_comm`, `close_comm` |
 | Scripts | `list_scripts`, `read_script`, `write_script`, `run_script`, `stop_script`, `list_script_functions` |
 | Platform | `get_platform_params`, `set_platform_params`, `get_platform_pose`, `move_platform` |

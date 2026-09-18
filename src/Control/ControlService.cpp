@@ -7,6 +7,7 @@
 #include "Comm/Socket/CommSocket.h"
 #include "Config/ConfigStore.h"
 #include "Core/PlatformController.h"
+#include "Core/DeviceAddress.h"
 #include "Core/RegisterStore.h"
 #include "Gui/SimulationPlatform/SimulationPlatform.h"
 #include "LuaScript/Engine/ScriptEngineHost.h"
@@ -260,16 +261,26 @@ bool ControlService::parseRegisterAddress(const QString& addr, int& index, QStri
     return true;
 }
 
-ControlService::RegisterValueType ControlService::parseRegisterType(const QString& type, QString& error)
+static bool parseDevice(const QString& addr, DeviceAddress& out, QString& error)
 {
-    const QString t = type.trimmed().toLower();
-    if (t == QStringLiteral("int16") || t == QStringLiteral("int")) return RegisterValueType::Int16;
-    if (t == QStringLiteral("int32") || t == QStringLiteral("dword")) return RegisterValueType::Int32;
-    if (t == QStringLiteral("float")) return RegisterValueType::Float;
-    if (t == QStringLiteral("double")) return RegisterValueType::Double;
-    if (t == QStringLiteral("string")) return RegisterValueType::String;
-    error = QStringLiteral("Unsupported register type: %1").arg(type);
-    return RegisterValueType::Int16;
+    if (!DeviceAddress::parse(addr, out)) {
+        error = QStringLiteral("Invalid register address: %1").arg(addr);
+        return false;
+    }
+    return true;
+}
+
+static QString valueViewTypeName(ValueView view)
+{
+    switch (view) {
+    case ValueView::Bit: return QStringLiteral("bit");
+    case ValueView::Int16: return QStringLiteral("int16");
+    case ValueView::Int32: return QStringLiteral("int32");
+    case ValueView::Float: return QStringLiteral("float");
+    case ValueView::Double: return QStringLiteral("double");
+    case ValueView::String: return QStringLiteral("string");
+    }
+    return QStringLiteral("int16");
 }
 
 ScriptLanguage ControlService::parseScriptLanguage(const QString& lang, QString& error)
@@ -301,39 +312,46 @@ QJsonObject ControlService::getRegister(const QJsonObject& args, QString& error)
         return {};
     }
 
-    const QString addr = args.value(QStringLiteral("address")).toString();
-    int index = 0;
-    if (!parseRegisterAddress(addr, index, error))
+    DeviceAddress addr;
+    if (!parseDevice(args.value(QStringLiteral("address")).toString(), addr, error))
         return {};
 
-    RegisterValueType type = parseRegisterType(args.value(QStringLiteral("type")).toString(QStringLiteral("int16")), error);
-    if (!error.isEmpty())
+    ValueView view;
+    if (!parseValueView(args.value(QStringLiteral("type")).toString(), addr, view, error))
         return {};
 
     RegisterStore* store = m_workflow->registerStore();
     QJsonObject result;
-    result.insert(QStringLiteral("address"), addr);
-    result.insert(QStringLiteral("index"), index);
-    switch (type) {
-    case RegisterValueType::Int16:
-        result.insert(QStringLiteral("type"), QStringLiteral("int16"));
+    result.insert(QStringLiteral("address"), addr.toString());
+    result.insert(QStringLiteral("index"), addr.index);
+    if (view == ValueView::Bit) {
+        result.insert(QStringLiteral("type"), QStringLiteral("bit"));
+        result.insert(QStringLiteral("value"), store->GetBit(addr) ? 1 : 0);
+        return result;
+    }
+    if (addr.kind != DeviceKind::D || addr.bit >= 0) {
+        error = QStringLiteral("Word types require a D word address");
+        return {};
+    }
+    const int index = addr.index;
+    result.insert(QStringLiteral("type"), valueViewTypeName(view));
+    switch (view) {
+    case ValueView::Int16:
         result.insert(QStringLiteral("value"), store->GetInt16(index));
         break;
-    case RegisterValueType::Int32:
-        result.insert(QStringLiteral("type"), QStringLiteral("int32"));
+    case ValueView::Int32:
         result.insert(QStringLiteral("value"), store->GetInt32(index));
         break;
-    case RegisterValueType::Float:
-        result.insert(QStringLiteral("type"), QStringLiteral("float"));
+    case ValueView::Float:
         result.insert(QStringLiteral("value"), store->GetFloat(index));
         break;
-    case RegisterValueType::Double:
-        result.insert(QStringLiteral("type"), QStringLiteral("double"));
+    case ValueView::Double:
         result.insert(QStringLiteral("value"), store->GetDouble(index));
         break;
-    case RegisterValueType::String:
-        result.insert(QStringLiteral("type"), QStringLiteral("string"));
+    case ValueView::String:
         result.insert(QStringLiteral("value"), store->GetString(index));
+        break;
+    case ValueView::Bit:
         break;
     }
     return result;
@@ -346,37 +364,57 @@ QJsonObject ControlService::setRegister(const QJsonObject& args, QString& error)
         return {};
     }
 
-    const QString addr = args.value(QStringLiteral("address")).toString();
-    int index = 0;
-    if (!parseRegisterAddress(addr, index, error))
+    DeviceAddress addr;
+    if (!parseDevice(args.value(QStringLiteral("address")).toString(), addr, error))
         return {};
 
-    RegisterValueType type = parseRegisterType(args.value(QStringLiteral("type")).toString(QStringLiteral("int16")), error);
-    if (!error.isEmpty())
+    ValueView view;
+    if (!parseValueView(args.value(QStringLiteral("type")).toString(), addr, view, error))
         return {};
 
     RegisterStore* store = m_workflow->registerStore();
-    switch (type) {
-    case RegisterValueType::Int16:
-        store->SetInt16(index, static_cast<int16_t>(args.value(QStringLiteral("value")).toInt()));
-        break;
-    case RegisterValueType::Int32:
-        store->SetInt32(index, args.value(QStringLiteral("value")).toInt());
-        break;
-    case RegisterValueType::Float:
-        store->SetFloat(index, static_cast<float>(args.value(QStringLiteral("value")).toDouble()));
-        break;
-    case RegisterValueType::Double:
-        store->SetDouble(index, args.value(QStringLiteral("value")).toDouble());
-        break;
-    case RegisterValueType::String:
-        store->SetString(index, args.value(QStringLiteral("value")).toString());
-        break;
+    if (view == ValueView::Bit) {
+        const QJsonValue raw = args.value(QStringLiteral("value"));
+        if (!raw.isDouble() && !raw.isBool()) {
+            error = QStringLiteral("Bit value must be 0 or 1");
+            return {};
+        }
+        const int bitVal = raw.toBool() ? 1 : static_cast<int>(raw.toDouble());
+        if (bitVal != 0 && bitVal != 1) {
+            error = QStringLiteral("Bit value must be 0 or 1");
+            return {};
+        }
+        store->SetBit(addr, bitVal == 1);
+    } else {
+        if (addr.kind != DeviceKind::D || addr.bit >= 0) {
+            error = QStringLiteral("Word types require a D word address");
+            return {};
+        }
+        const int index = addr.index;
+        switch (view) {
+        case ValueView::Int16:
+            store->SetInt16(index, static_cast<int16_t>(args.value(QStringLiteral("value")).toInt()));
+            break;
+        case ValueView::Int32:
+            store->SetInt32(index, args.value(QStringLiteral("value")).toInt());
+            break;
+        case ValueView::Float:
+            store->SetFloat(index, static_cast<float>(args.value(QStringLiteral("value")).toDouble()));
+            break;
+        case ValueView::Double:
+            store->SetDouble(index, args.value(QStringLiteral("value")).toDouble());
+            break;
+        case ValueView::String:
+            store->SetString(index, args.value(QStringLiteral("value")).toString());
+            break;
+        case ValueView::Bit:
+            break;
+        }
     }
 
     QJsonObject result;
-    result.insert(QStringLiteral("address"), addr);
-    result.insert(QStringLiteral("index"), index);
+    result.insert(QStringLiteral("address"), addr.toString());
+    result.insert(QStringLiteral("index"), addr.index);
     result.insert(QStringLiteral("updated"), true);
     return result;
 }
@@ -388,9 +426,9 @@ QJsonObject ControlService::dumpRegisters(const QJsonObject& args, QString& erro
         return {};
     }
 
-    const QString startAddr = args.value(QStringLiteral("start_address")).toString(QStringLiteral("D0"));
-    int start = 0;
-    if (!parseRegisterAddress(startAddr, start, error))
+    DeviceAddress start;
+    const QString startAddrText = args.value(QStringLiteral("start_address")).toString(QStringLiteral("D0"));
+    if (!parseDevice(startAddrText, start, error))
         return {};
 
     int count = args.value(QStringLiteral("count")).toInt(1);
@@ -399,30 +437,61 @@ QJsonObject ControlService::dumpRegisters(const QJsonObject& args, QString& erro
         return {};
     }
 
-    RegisterValueType type = parseRegisterType(args.value(QStringLiteral("type")).toString(QStringLiteral("int16")), error);
-    if (!error.isEmpty())
+    ValueView view;
+    if (!parseValueView(args.value(QStringLiteral("type")).toString(), start, view, error))
         return {};
 
     RegisterStore* store = m_workflow->registerStore();
     QJsonArray values;
-    for (int i = 0; i < count; ++i) {
-        const int index = start + i;
-        QJsonObject item;
-        item.insert(QStringLiteral("index"), index);
-        switch (type) {
-        case RegisterValueType::Int16: item.insert(QStringLiteral("value"), store->GetInt16(index)); break;
-        case RegisterValueType::Int32: item.insert(QStringLiteral("value"), store->GetInt32(index)); break;
-        case RegisterValueType::Float: item.insert(QStringLiteral("value"), store->GetFloat(index)); break;
-        case RegisterValueType::Double: item.insert(QStringLiteral("value"), store->GetDouble(index)); break;
-        case RegisterValueType::String: item.insert(QStringLiteral("value"), store->GetString(index)); break;
+
+    if (view == ValueView::Bit) {
+        if (start.bit >= 0) {
+            error = QStringLiteral("dump start must be M n or D n");
+            return {};
         }
-        values.append(item);
+        const auto bits = store->bits(start.kind, start.index, count);
+        for (int i = 0; i < count; ++i) {
+            QJsonObject item;
+            if (start.kind == DeviceKind::M) {
+                item.insert(QStringLiteral("index"), start.index + i);
+                item.insert(QStringLiteral("address"), QStringLiteral("M%1").arg(start.index + i));
+            } else {
+                const int word = start.index + i / 16;
+                const int bit = i % 16;
+                item.insert(QStringLiteral("index"), word);
+                item.insert(QStringLiteral("address"), QStringLiteral("D%1.%2").arg(word).arg(bit));
+            }
+            const int v = i < static_cast<int>(bits.size()) ? static_cast<int>(bits[static_cast<size_t>(i)]) : 0;
+            item.insert(QStringLiteral("value"), v);
+            values.append(item);
+        }
+    } else {
+        if (start.kind != DeviceKind::D || start.bit >= 0) {
+            error = QStringLiteral("Word dump requires a D word start address");
+            return {};
+        }
+        const int startIndex = start.index;
+        for (int i = 0; i < count; ++i) {
+            const int index = startIndex + i;
+            QJsonObject item;
+            item.insert(QStringLiteral("index"), index);
+            item.insert(QStringLiteral("address"), QStringLiteral("D%1").arg(index));
+            switch (view) {
+            case ValueView::Int16: item.insert(QStringLiteral("value"), store->GetInt16(index)); break;
+            case ValueView::Int32: item.insert(QStringLiteral("value"), store->GetInt32(index)); break;
+            case ValueView::Float: item.insert(QStringLiteral("value"), store->GetFloat(index)); break;
+            case ValueView::Double: item.insert(QStringLiteral("value"), store->GetDouble(index)); break;
+            case ValueView::String: item.insert(QStringLiteral("value"), store->GetString(index)); break;
+            case ValueView::Bit: break;
+            }
+            values.append(item);
+        }
     }
 
     QJsonObject result;
-    result.insert(QStringLiteral("start_address"), startAddr);
-    result.insert(QStringLiteral("start_index"), start);
-    result.insert(QStringLiteral("type"), args.value(QStringLiteral("type")).toString(QStringLiteral("int16")));
+    result.insert(QStringLiteral("start_address"), start.toString());
+    result.insert(QStringLiteral("start_index"), start.index);
+    result.insert(QStringLiteral("type"), valueViewTypeName(view));
     result.insert(QStringLiteral("values"), values);
     return result;
 }

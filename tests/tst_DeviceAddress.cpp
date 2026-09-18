@@ -65,6 +65,25 @@ void tst_DeviceAddress::parse_rejects_bad_d_bit()
     QVERIFY(!DeviceAddress::parse(QStringLiteral("M1500.0"), a));
 }
 
+void tst_DeviceAddress::value_view_defaults_bit_for_m()
+{
+    DeviceAddress a;
+    DeviceAddress::parse(QStringLiteral("M1"), a);
+    ValueView v;
+    QString err;
+    QVERIFY(parseValueView(QString(), a, v, err));
+    QCOMPARE(v, ValueView::Bit);
+}
+
+void tst_DeviceAddress::value_view_rejects_int16_on_m()
+{
+    DeviceAddress a;
+    DeviceAddress::parse(QStringLiteral("M1"), a);
+    ValueView v;
+    QString err;
+    QVERIFY(!parseValueView(QStringLiteral("int16"), a, v, err));
+}
+
 void tst_DeviceAddress::toString_roundtrip()
 {
     DeviceAddress a;

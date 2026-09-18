@@ -15,6 +15,8 @@ private slots:
     void parse_rejects_out_of_range();
     void parse_rejects_bad_d_bit();
     void toString_roundtrip();
+    void value_view_defaults_bit_for_m();
+    void value_view_rejects_int16_on_m();
 };
 
 #endif
