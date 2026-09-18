@@ -11,6 +11,13 @@ add_executable(${TEST_TARGET}
     tst_RegisterStoreBits.h
     tst_RegisterStoreBits.cpp
     ${CMAKE_SOURCE_DIR}/src/Core/RegisterStore.cpp
+    tst_MitsubishiDevices.h
+    tst_MitsubishiDevices.cpp
+    ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolBase.h
+    ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolMitsubishiQBinary.h
+    ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolKeyencePCLink.h
+    ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolMitsubishiQBinary.cpp
+    ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolKeyencePCLink.cpp
 )
 
 target_include_directories(${TEST_TARGET} PRIVATE

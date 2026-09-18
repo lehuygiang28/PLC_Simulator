@@ -8,6 +8,7 @@
 
 #ifndef COMM_PROTOCOL_BASE_H
 #define COMM_PROTOCOL_BASE_H
+#include "PlcAccess.h"
 #include <QObject>
 #include <cstdint>   // int16_t
 #include <map>       // std::map
@@ -43,13 +44,13 @@ public:
 	virtual bool AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmdType) = 0;
 
 	//20251101	wm	解析读寄存器指令
-	virtual bool AnalyzeReadReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum) = 0;
+	virtual bool AnalyzeReadReg(QByteArray strInfo, PlcAccess& access) = 0;
 
 	//20251101	wm	打包回复读寄存器指令信息
-	virtual bool PackReportReadRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, const std::vector<int16_t>& vWriteData) = 0;
+	virtual bool PackReportReadRegInfo(QByteArray& strInfo, const PlcAccess& access) = 0;
 
 	//20251101	wm	解析写寄存器指令
-	virtual bool AnalyzeWriteReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum, std::vector<int16_t>& vWriteData) = 0;
+	virtual bool AnalyzeWriteReg(QByteArray strInfo, PlcAccess& access) = 0;
 
 	//20251101	wm	打包回复写寄存器指令信息
 	virtual bool PackReportWriteRegInfo(QByteArray& strInfo) = 0;

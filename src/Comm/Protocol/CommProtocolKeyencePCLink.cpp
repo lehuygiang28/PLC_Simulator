@@ -32,7 +32,7 @@ bool CommProtocolKeyencePCLink::AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmd
 	return true;
 }
 
-bool CommProtocolKeyencePCLink::AnalyzeReadReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum)
+bool CommProtocolKeyencePCLink::AnalyzeReadReg(QByteArray strInfo, PlcAccess& access)
 {
 	QByteArray strCmdRead = ("RDS");
 	QByteArray strSpace = (" ");
@@ -40,16 +40,20 @@ bool CommProtocolKeyencePCLink::AnalyzeReadReg(QByteArray strInfo, long& nRegAdd
 	QByteArray RegType = ("DM");
 	QByteArray strDataFormat = (".H");
 
-	int nLenRegAddr = 5;
 	int nLenBeforeRegAddr = strCmdRead.length() + strSpace.length() + RegType.length();
 	int nLenBeforeRegNum = nLenBeforeRegAddr + 5 + strDataFormat.length() + strSpace.length();
 
-	if (strCmdRead.compare(strInfo.mid(0, 3)) != 0)	//先解析指令头是否为读指令
+	if (strCmdRead.compare(strInfo.mid(0, 3)) != 0)
 	{
 		return false;
 	}
 
-	if (strDataFormat.compare(strInfo.mid(nLenBeforeRegAddr + 5, 2)) != 0)	//判断读写数据格式
+	if (RegType.compare(strInfo.mid(4, 2)) != 0)
+	{
+		return false;
+	}
+
+	if (strDataFormat.compare(strInfo.mid(nLenBeforeRegAddr + 5, 2)) != 0)
 	{
 		return false;
 	}
@@ -58,19 +62,27 @@ bool CommProtocolKeyencePCLink::AnalyzeReadReg(QByteArray strInfo, long& nRegAdd
 	QByteArray strRegNum = strInfo.mid(nLenBeforeRegNum, 4);
 
 	bool bOk = false;
-	nRegAddr = strRegAddr.toInt(&bOk);
-	nWriteNum = strRegNum.toInt(&bOk);
+	access.start = strRegAddr.toInt(&bOk);
+	if (!bOk) return false;
+	access.count = strRegNum.toInt(&bOk);
+	if (!bOk || access.count <= 0) return false;
+	access.device = DeviceKind::D;
+	access.unit = PlcUnit::Word;
 
 	return true;
 }
 
-bool CommProtocolKeyencePCLink::PackReportReadRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, const std::vector<int16_t>& vWriteData)
+bool CommProtocolKeyencePCLink::PackReportReadRegInfo(QByteArray& strInfo, const PlcAccess& access)
 {
+	if (access.unit != PlcUnit::Word || access.device != DeviceKind::D)
+		return false;
+
 	QByteArray strReadData = ("");
 	QByteArray strSpace = (" ");
-	for (int i = 0; i < nWriteNum; i++)
+	for (int i = 0; i < access.count; i++)
 	{
-		uint16_t nTemp = vWriteData.at(i) & 0xFFFF;
+		const int16_t wordVal = (i < static_cast<int>(access.wordData.size())) ? access.wordData.at(i) : int16_t(0);
+		uint16_t nTemp = wordVal & 0xFFFF;
 
 		QByteArray strTemp = QString("%1").arg(nTemp, 4, 16, QChar('0')).toUpper().toLatin1();
 
@@ -78,7 +90,7 @@ bool CommProtocolKeyencePCLink::PackReportReadRegInfo(QByteArray& strInfo, long 
 	}
 
 	int nLenStrReadData = strReadData.length();
-	if (strReadData.at(nLenStrReadData - 1) == *strSpace.data())
+	if (nLenStrReadData > 0 && strReadData.at(nLenStrReadData - 1) == *strSpace.data())
 	{
 		strInfo = strReadData.mid(0, nLenStrReadData - 1);
 	}
@@ -87,29 +99,30 @@ bool CommProtocolKeyencePCLink::PackReportReadRegInfo(QByteArray& strInfo, long 
 		strInfo = strReadData;
 	}
 
-
 	return true;
 }
 
-bool CommProtocolKeyencePCLink::AnalyzeWriteReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum, std::vector<int16_t>& vWriteData)
+bool CommProtocolKeyencePCLink::AnalyzeWriteReg(QByteArray strInfo, PlcAccess& access)
 {
 	QByteArray strCmdWrite = ("WRS");
 	QByteArray strSpace = (" ");
 	QByteArray RegType = ("DM");
 	QByteArray strDataFormat = (".H");
 
-	int nLenRegAddr = 5;
-
 	int nLenBeforeRegAddr = strCmdWrite.length() + strSpace.length() + RegType.length();
 	int nLenBeforeRegNum = nLenBeforeRegAddr + 5 + strDataFormat.length() + strSpace.length();
 
-
-	if (strCmdWrite.compare(strInfo.mid(0, 3)) != 0)	//先解析指令头是否为写指令
+	if (strCmdWrite.compare(strInfo.mid(0, 3)) != 0)
 	{
 		return false;
 	}
 
-	if (strDataFormat.compare(strInfo.mid(nLenBeforeRegAddr + 5, 2)) != 0)	//判断读写数据格式
+	if (RegType.compare(strInfo.mid(4, 2)) != 0)
+	{
+		return false;
+	}
+
+	if (strDataFormat.compare(strInfo.mid(nLenBeforeRegAddr + 5, 2)) != 0)
 	{
 		return false;
 	}
@@ -118,19 +131,23 @@ bool CommProtocolKeyencePCLink::AnalyzeWriteReg(QByteArray strInfo, long& nRegAd
 	QByteArray strRegNum = strInfo.mid(nLenBeforeRegNum, 4);
 
 	bool bOk = false;
-	nRegAddr = strRegAddr.toInt(&bOk);
-	nWriteNum = strRegNum.toInt(&bOk);
+	access.start = strRegAddr.toInt(&bOk);
+	if (!bOk) return false;
+	access.count = strRegNum.toInt(&bOk);
+	if (!bOk || access.count <= 0) return false;
+	access.device = DeviceKind::D;
+	access.unit = PlcUnit::Word;
 
-	vWriteData.clear();
-	vWriteData.resize(nWriteNum);
-	for (int i = 0; i < nWriteNum; i++)
+	access.wordData.clear();
+	access.wordData.resize(access.count);
+	for (int i = 0; i < access.count; i++)
 	{
 		QByteArray strTemp = strInfo.mid(nLenBeforeRegNum + 5 + i * 5, 4);
 
 		int16_t d = strTemp.toInt(&bOk,16);
-		int16_t tmpInt16 = d & 0xFFFF;
+		if (!bOk) return false;
 
-		vWriteData.at(i) = d;
+		access.wordData.at(i) = d & 0xFFFF;
 	}
 
 	return true;

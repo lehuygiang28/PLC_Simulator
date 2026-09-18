@@ -28,31 +28,20 @@ public:
 	virtual bool AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmdType) override;
 
 	//20251101	wm	解析读寄存器指令
-	virtual bool AnalyzeReadReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum) override;
+	virtual bool AnalyzeReadReg(QByteArray strInfo, PlcAccess& access) override;
 
 	//20251101	wm	打包回复读寄存器指令信息
-	virtual bool PackReportReadRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, const std::vector<int16_t>& vWriteData) override;
+	virtual bool PackReportReadRegInfo(QByteArray& strInfo, const PlcAccess& access) override;
 
 	//20251101	wm	解析写寄存器指令
-	virtual bool AnalyzeWriteReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum, std::vector<int16_t>& vWriteData) override;
+	virtual bool AnalyzeWriteReg(QByteArray strInfo, PlcAccess& access) override;
 
 	//20251101	wm	打包回复写寄存器指令信息
 	virtual bool PackReportWriteRegInfo(QByteArray& strInfo) override;
 
 private:
 
-	//************************************
-	// Method:    CheckCmdInfoValid
-	// FullName:  CommProtocolMitsubishiQBinary::CheckCmdInfoValid
-	// Access:    private 
-	// Returns:   bool
-	// Qualifier:
-	// Parameter: QByteArray & strInfo : Input:完整的指令信息；output:寄存器数据信息
-	// Parameter: long & nRegAddr : Output:寄存器地址
-	// Parameter: int & nRegNum : Output:寄存器数量
-	// Parameter: QByteArray & strCmdInfo : Output:指令信息(读、写)
-	//************************************
-	bool CheckCmdInfoValid(QByteArray& strInfo, long& nRegAddr, int& nRegNum, QByteArray& strCmdInfo);	//检查收到的信息是否符合MC协议二进制方式的3E帧数据格式，并截取寄存器数据部分返回
+	bool CheckCmdInfoValid(QByteArray& strInfo, PlcAccess& access, QByteArray& strCmdInfo);
 
 	virtual bool CmdInfoProcessing(const QByteArray& strInfo, ProcessType Curtype, QByteArray& strOut) override;
 
@@ -61,5 +50,4 @@ private:
 };
 
 #endif //COMM_PROTOCOL_MITSUBISHIQBINARY_H
-
 

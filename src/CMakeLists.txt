@@ -54,6 +54,7 @@ set(COMM_PROTOCOL_SOURCES
 
 set(COMM_PROTOCOL_HEADERS
     Comm/Protocol/CommProtocolBase.h
+    Comm/Protocol/PlcAccess.h
     Comm/Protocol/CommProtocolMitsubishiQBinary.h
     Comm/Protocol/CommProtocolKeyencePCLink.h
     Comm/Protocol/CommProtocolFactory.h

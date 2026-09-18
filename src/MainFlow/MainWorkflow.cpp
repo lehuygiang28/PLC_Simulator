@@ -10,6 +10,7 @@
 #include "Comm/Socket/CommSocket.h"
 #include "RegisterBinding.h"
 #include "Comm/Protocol/CommProtocolFactory.h"
+#include "Comm/Protocol/PlcAccess.h"
 
 //初始化静态实例
 MainWorkflow* MainWorkflow::s_pInstance = nullptr;
@@ -193,49 +194,35 @@ bool MainWorkflow::ProcessRequest(const QByteArray& RecInfo, QByteArray& Reply)
         return false;
     }
 
-    int nCurAddr = 0;
-    int nDataNum = 0;
     bool dataChanged = false;   // 本次请求是否产生寄存器变化(仅本函数内有效)
 
+    PlcAccess access;
     switch (CurrentCmd)
     {
     case CmdType::eCmdWriteReg:
     {
-        long nCmdRegAddr = 0;
-        int nCmdRedNum = 0;
-        std::vector<int16_t> vnCmdWriteData;
-        if (!pro->AnalyzeWriteReg(RecInfo, nCmdRegAddr, nCmdRedNum, vnCmdWriteData))
-        {
-            return false;
+        if (!pro->AnalyzeWriteReg(RecInfo, access)) return false;
+        if (access.unit == PlcUnit::Bit) {
+            if (m_registerStore->setBits(access.device, access.start, access.bitData))
+                dataChanged = true;
+        } else {
+            if (m_registerStore->setWords(access.device, access.start, access.wordData))
+                dataChanged = true;
         }
-        nCurAddr = nCmdRegAddr;
-        nDataNum = nCmdRedNum;
-        if (m_registerStore->setCells(nCmdRegAddr, vnCmdWriteData))
-            dataChanged = true;
         QByteArray strSend;
-        if (!pro->PackReportWriteRegInfo(strSend))
-        {
-            return false;
-        }
+        if (!pro->PackReportWriteRegInfo(strSend)) return false;
         Reply = strSend;
     }
     break;
     case CmdType::eCmdReadReg:
     {
-        long nCmdRegAddr = 0;
-        int nCmdRedNum = 0;
-        if (!pro->AnalyzeReadReg(RecInfo, nCmdRegAddr, nCmdRedNum))
-        {
-            return false;
-        }
-        nCurAddr = nCmdRegAddr;
-        nDataNum = nCmdRedNum;
-        std::vector<int16_t> vnCmdData = m_registerStore->cells(nCmdRegAddr, nCmdRedNum);
+        if (!pro->AnalyzeReadReg(RecInfo, access)) return false;
+        if (access.unit == PlcUnit::Bit)
+            access.bitData = m_registerStore->bits(access.device, access.start, access.count);
+        else
+            access.wordData = m_registerStore->words(access.device, access.start, access.count);
         QByteArray strSend;
-        if (!pro->PackReportReadRegInfo(strSend, nCmdRegAddr, nCmdRedNum, vnCmdData))
-        {
-            return false;
-        }
+        if (!pro->PackReportReadRegInfo(strSend, access)) return false;
         Reply = strSend;
     }
     break;

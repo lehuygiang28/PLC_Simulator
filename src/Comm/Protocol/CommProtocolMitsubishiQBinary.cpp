@@ -12,20 +12,17 @@ CommProtocolMitsubishiQBinary::CommProtocolMitsubishiQBinary(QObject* pParent)
 	: CommProtocolBase(pParent) 
 {
 	m_mCmdInfoType.insert(std::make_pair(QByteArray("01040000"), CmdType::eCmdReadReg));
+	m_mCmdInfoType.insert(std::make_pair(QByteArray("01040100"), CmdType::eCmdReadReg));
 	m_mCmdInfoType.insert(std::make_pair(QByteArray("01140000"), CmdType::eCmdWriteReg));
+	m_mCmdInfoType.insert(std::make_pair(QByteArray("01140100"), CmdType::eCmdWriteReg));
 }
 
 bool CommProtocolMitsubishiQBinary::AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmdType)
 {
-
-	
-
-	long nRegAddr = 0;
-	int nRegNum = 0;
-
+	PlcAccess access;
 	QByteArray strCurCmdInfo = ("");
 
-	if (!CheckCmdInfoValid(strInfo, nRegAddr, nRegNum, strCurCmdInfo)) return false;
+	if (!CheckCmdInfoValid(strInfo, access, strCurCmdInfo)) return false;
 
 	cCmdType = CmdType::eCmdUnkown;
 
@@ -35,40 +32,52 @@ bool CommProtocolMitsubishiQBinary::AnalyzeCmdInfo(QByteArray strInfo, CmdType& 
 	return true;
 }
 
-bool CommProtocolMitsubishiQBinary::AnalyzeReadReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum)
+bool CommProtocolMitsubishiQBinary::AnalyzeReadReg(QByteArray strInfo, PlcAccess& access)
 {
 	QByteArray tmp;
-	if (!CheckCmdInfoValid(strInfo, nRegAddr, nWriteNum, tmp))
+	if (!CheckCmdInfoValid(strInfo, access, tmp))
 	{
 		return false;
 	}
+	if (access.device == DeviceKind::M && access.unit == PlcUnit::Word && (access.start % 16) != 0)
+		return false;
 	return true;
 }
 
-bool CommProtocolMitsubishiQBinary::PackReportReadRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, const std::vector<int16_t>& vWriteData)
+bool CommProtocolMitsubishiQBinary::PackReportReadRegInfo(QByteArray& strInfo, const PlcAccess& access)
 {
 	QByteArray strHead1 = ("D00000FFFF0300");
 	QByteArray strDataLen;
 	QByteArray strEnd = ("0000");
 
-	//strDataLen = QByteArray::number((nWriteNum + 1) * 2, 16);
-	strDataLen = QString("%1").arg((nWriteNum + 1) * 2, 4, 16, QChar('0')).toUpper().toLatin1();
-
-	strDataLen = strDataLen.mid(2, 2) + strDataLen.mid(0, 2);
-
 	QByteArray strRegData;
 	strRegData = ("");
 
-	for (int i = 0; i < nWriteNum; i++)
-	{
-		QByteArray strCurData;
-		//strCurData = QByteArray::number(vWriteData.at(i), 16);
-		uint16_t nTemp = vWriteData.at(i) & 0xFFFF;
-		strCurData = QString("%1").arg(nTemp, 4, 16, QChar('0')).toUpper().toLatin1();
+	if (access.unit == PlcUnit::Bit) {
+		for (int i = 0; i < access.count; ++i) {
+			const uint8_t v = (i < static_cast<int>(access.bitData.size()) && access.bitData.at(i) != 0) ? 1 : 0;
+			strRegData += QString("%1").arg(v, 2, 16, QChar('0')).toUpper().toLatin1();
+		}
+		if (access.count % 2 != 0)
+			strRegData += QByteArray("00");
+		const int payloadBytes = strRegData.length() / 2;
+		strDataLen = QString("%1").arg((payloadBytes + 2), 4, 16, QChar('0')).toUpper().toLatin1();
+	} else {
+		strDataLen = QString("%1").arg((access.count + 1) * 2, 4, 16, QChar('0')).toUpper().toLatin1();
 
-		QByteArray strOut = strCurData.mid(2, 2) + strCurData.mid(0, 2);
-		strRegData = strRegData + strOut;
+		for (int i = 0; i < access.count; i++)
+		{
+			QByteArray strCurData;
+			const int16_t wordVal = (i < static_cast<int>(access.wordData.size())) ? access.wordData.at(i) : int16_t(0);
+			uint16_t nTemp = wordVal & 0xFFFF;
+			strCurData = QString("%1").arg(nTemp, 4, 16, QChar('0')).toUpper().toLatin1();
+
+			QByteArray strOut = strCurData.mid(2, 2) + strCurData.mid(0, 2);
+			strRegData = strRegData + strOut;
+		}
 	}
+
+	strDataLen = strDataLen.mid(2, 2) + strDataLen.mid(0, 2);
 
 	strInfo = strHead1 + strDataLen + strEnd + strRegData;
 
@@ -81,17 +90,35 @@ bool CommProtocolMitsubishiQBinary::PackReportReadRegInfo(QByteArray& strInfo, l
 	return true;
 }
 
-bool CommProtocolMitsubishiQBinary::AnalyzeWriteReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum, std::vector<int16_t>& vWriteData)
+bool CommProtocolMitsubishiQBinary::AnalyzeWriteReg(QByteArray strInfo, PlcAccess& access)
 {
 	QByteArray tmp;
-	if (!CheckCmdInfoValid(strInfo, nRegAddr, nWriteNum, tmp))
+	if (!CheckCmdInfoValid(strInfo, access, tmp))
 	{
 		return false;
 	}
 
-	vWriteData.resize(nWriteNum);
+	if (access.device == DeviceKind::M && access.unit == PlcUnit::Word && (access.start % 16) != 0)
+		return false;
 
-	for (int i = 0; i < nWriteNum; i++)
+	if (access.unit == PlcUnit::Bit) {
+		access.bitData.resize(access.count);
+		for (int i = 0; i < access.count; ++i) {
+			if (i * 2 + 1 >= strInfo.length())
+				return false;
+			QByteArray strTemp = strInfo.mid(i * 2, 2);
+			bool bOk = false;
+			const int v = strTemp.toInt(&bOk, 16);
+			if (!bOk || (v != 0 && v != 1))
+				return false;
+			access.bitData.at(i) = static_cast<uint8_t>(v);
+		}
+		return true;
+	}
+
+	access.wordData.resize(access.count);
+
+	for (int i = 0; i < access.count; i++)
 	{
 		QByteArray strTemp = strInfo.mid(i * 4, 4);
 
@@ -100,7 +127,7 @@ bool CommProtocolMitsubishiQBinary::AnalyzeWriteReg(QByteArray strInfo, long& nR
 		bool bOk = false;
 		int16_t d = str1.toInt(&bOk, 16);
 
-		vWriteData.at(i) = d & 0xFFFF;
+		access.wordData.at(i) = d & 0xFFFF;
 	}
 
 	return true;
@@ -123,7 +150,7 @@ bool CommProtocolMitsubishiQBinary::PackReportWriteRegInfo(QByteArray& strInfo)
 	return true;
 }
 
-bool CommProtocolMitsubishiQBinary::CheckCmdInfoValid(QByteArray& strInfo, long& nRegAddr, int& nRegNum, QByteArray& strCmdInfo)
+bool CommProtocolMitsubishiQBinary::CheckCmdInfoValid(QByteArray& strInfo, PlcAccess& access, QByteArray& strCmdInfo)
 {
 	QByteArray strOut;
 	if (!CmdInfoProcessing(strInfo, ProcessType::eProcessRece, strOut))
@@ -131,29 +158,20 @@ bool CommProtocolMitsubishiQBinary::CheckCmdInfoValid(QByteArray& strInfo, long&
 
 	strInfo = strOut;
 
-	QByteArray strHead1 = ("500000FFFF0300");	//指令头，包含
-	QByteArray strDataLen;						//
-	QByteArray strTime = ("1000");
-	QByteArray strCmdWrite = ("01140000");
-	QByteArray strCmdRead = ("01040000");
-	QByteArray strAdrTpye = ("A8");
+	QByteArray strHead1 = ("500000FFFF0300");
 
-
-	//先判断指令头是否正常
 	if (strHead1.compare(strInfo.mid(0, strHead1.length())) != 0)
 	{
 		return false;
 	}
 
-	//解析其中的数据长度
-	strDataLen = strInfo.mid(strHead1.length(), 4);
+	QByteArray strDataLen = strInfo.mid(strHead1.length(), 4);
 
 	QByteArray strLen = strDataLen.mid(2, 2) + strDataLen.mid(0, 2);
 
 	bool bOk = false;
-	int nDataLen = strLen.toInt(&bOk, 16);/*_tcstoul(strLen, NULL, 16);*/
+	int nDataLen = strLen.toInt(&bOk, 16);
 
-	//判断后续数据长度和指令信息中的数据长度是否符合
 	QByteArray strCmdInfoAfterDataLen = strInfo.mid(strHead1.length() + 4);
 
 	int nAllDataLen = strCmdInfoAfterDataLen.length() / 2;
@@ -162,21 +180,38 @@ bool CommProtocolMitsubishiQBinary::CheckCmdInfoValid(QByteArray& strInfo, long&
 		return false;
 	}
 
-	//指令检查，暂时不支持其他指令
-	if (strCmdWrite.compare(strCmdInfoAfterDataLen.mid(4, 8)) != 0 && strCmdRead.compare(strCmdInfoAfterDataLen.mid(4, 8)) != 0)
+	const QByteArray strCmdField = strCmdInfoAfterDataLen.mid(4, 8);
+	if (strCmdField != QByteArray("01040000") && strCmdField != QByteArray("01040100")
+	    && strCmdField != QByteArray("01140000") && strCmdField != QByteArray("01140100"))
 	{
 		return false;
 	}
 
-	strCmdInfo = strCmdInfoAfterDataLen.mid(4, 8);
+	strCmdInfo = strCmdField;
+
+	const QByteArray strSub = strCmdField.mid(4, 4);
+	if (strSub == QByteArray("0000"))
+		access.unit = PlcUnit::Word;
+	else if (strSub == QByteArray("0100"))
+		access.unit = PlcUnit::Bit;
+	else
+		return false;
 
 	QByteArray strAdr = strCmdInfoAfterDataLen.mid(12, 6);
 	QByteArray strRegAdr = strAdr.mid(4, 2) + strAdr.mid(2, 2) + strAdr.mid(0, 2);
-	nRegAddr = strRegAdr.toInt(&bOk, 16);/*_tcstoul(strRegAdr, NULL, 16);*/
+	access.start = strRegAdr.toInt(&bOk, 16);
+
+	const QByteArray strDevCode = strCmdInfoAfterDataLen.mid(18, 2);
+	if (strDevCode == QByteArray("A8"))
+		access.device = DeviceKind::D;
+	else if (strDevCode == QByteArray("90"))
+		access.device = DeviceKind::M;
+	else
+		return false;
 
 	QByteArray strNum = strCmdInfoAfterDataLen.mid(20, 4);
 	QByteArray strRegNum = strNum.mid(2, 2) + strNum.mid(0, 2);
-	nRegNum = strRegNum.toInt(&bOk, 16);/*_tcstoul(strRegNum, NULL, 16);*/
+	access.count = strRegNum.toInt(&bOk, 16);
 
 	strInfo = strCmdInfoAfterDataLen.mid(24);
 	return true;

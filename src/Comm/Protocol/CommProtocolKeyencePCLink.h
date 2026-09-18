@@ -28,13 +28,13 @@ public:
 	virtual bool AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmdType) override;
 
 	//20251101	wm	解析读寄存器指令
-	virtual bool AnalyzeReadReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum) override;
+	virtual bool AnalyzeReadReg(QByteArray strInfo, PlcAccess& access) override;
 
 	//20251101	wm	打包回复读寄存器指令信息
-	virtual bool PackReportReadRegInfo(QByteArray& strInfo, long nRegAddr, int nWriteNum, const std::vector<int16_t>& vWriteData) override;
+	virtual bool PackReportReadRegInfo(QByteArray& strInfo, const PlcAccess& access) override;
 
 	//20251101	wm	解析写寄存器指令
-	virtual bool AnalyzeWriteReg(QByteArray strInfo, long& nRegAddr, int& nWriteNum, std::vector<int16_t>& vWriteData) override;
+	virtual bool AnalyzeWriteReg(QByteArray strInfo, PlcAccess& access) override;
 
 	//20251101	wm	打包回复写寄存器指令信息
 	virtual bool PackReportWriteRegInfo(QByteArray& strInfo) override;
@@ -44,4 +44,3 @@ private:
 };
 
 #endif
-
