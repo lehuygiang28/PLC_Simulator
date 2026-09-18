@@ -22,7 +22,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}/bin/$<CONFIG>)
 
 # 查找Qt包 - 使用与VS项目相同的版本
 set(QT_VERSION 6)
-find_package(Qt${QT_VERSION} REQUIRED COMPONENTS Core Gui Widgets Network SerialPort LinguistTools)
+find_package(Qt${QT_VERSION} REQUIRED COMPONENTS Core Gui Widgets Network SerialPort LinguistTools Test)
 
 # 启用Qt自动处理
 set(CMAKE_AUTOMOC ON)
@@ -90,3 +90,6 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT P
 
 # 添加子项目
 add_subdirectory(src)
+
+enable_testing()
+add_subdirectory(tests)

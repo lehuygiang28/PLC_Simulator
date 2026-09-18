@@ -228,6 +228,7 @@ set(APP_HEADERS
 set(CORE_SOURCES
     Core/RegisterStore.cpp
     Core/PlatformController.cpp
+    Core/DeviceAddress.cpp
 )
 
 set(CORE_HEADERS
@@ -235,6 +236,7 @@ set(CORE_HEADERS
     Core/RegisterStore.h
     Core/PlatformController.h
     Core/PlatformTypes.h
+    Core/DeviceAddress.h
 )
 
 # 合并所有文件
