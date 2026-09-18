@@ -19,7 +19,7 @@ Typical use cases:
 ## Key Features
 
 - **Protocol simulation**: Keyence PC-Link host link protocol, Mitsubishi Q-series MC binary protocol
-- **Graphical UI**: Protocol selection, connection setup, live register view/edit, communication log (ASCII / HEX toggle)
+- **Graphical UI**: Protocol selection, connection setup, free-form D-word / M-bit watch list (e.g. `M1500-1559, M1564, D2024`), live register view/edit, communication log (ASCII / HEX toggle)
 - **Network communication**: TCP/IP server mode
 - **Lua scripting**: Custom automation scripts with syntax highlighting and completion
 - **TypeScript scripting**: Write scripts in TypeScript, auto-transpiled to Lua before execution (requires Node.js); see [docs/SCRIPTING.md](docs/SCRIPTING.md)
@@ -63,7 +63,7 @@ After a successful Release build, `PLCSimulator.exe` is copied to `Bin/x64/` at 
 
 1. Select a communication protocol (Keyence PC-Link / Mitsubishi MC)
 2. Configure IP and port, then click **Open connection** — the app listens as a TCP server
-3. View and edit registers in the register table; watch frames in the communication log (ASCII / HEX)
+3. Enter devices to watch in the **Watch** field (comma-separated; ranges on the same device, e.g. `M1500-1559, M1564, D2024`); view and edit values in the register table; watch frames in the communication log (ASCII / HEX)
 4. *(Optional)* Write Lua or TypeScript automation scripts (TypeScript details: [docs/SCRIPTING.md](docs/SCRIPTING.md))
 5. *(Optional)* Open the simulation platform to test motion-control commands
 6. *(Optional)* Use **Help → MCP Control** to set port/token, copy URL or Cursor JSON, and start MCP for AI agent integration

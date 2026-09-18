@@ -39,11 +39,6 @@ void RegisterTableController::initTable()
     });
 }
 
-void RegisterTableController::initTable(int /*rowCount*/, int /*colCount*/)
-{
-    initTable();
-}
-
 void RegisterTableController::setWatches(const QVector<DeviceAddress>& items)
 {
     if (m_model) m_model->setWatches(items);
@@ -57,27 +52,6 @@ void RegisterTableController::setDataType(RegisterDataType type)
 void RegisterTableController::setNumberBase(bool hex)
 {
     if (m_model) m_model->setNumberBase(hex);
-}
-
-void RegisterTableController::setStartAddr(int startAddr)
-{
-    QVector<DeviceAddress> items;
-    for (int i = 0; i < 100; ++i) {
-        DeviceAddress a;
-        a.kind = DeviceKind::D;
-        a.index = startAddr + i;
-        a.bit = -1;
-        items.push_back(a);
-    }
-    setWatches(items);
-}
-
-void RegisterTableController::setSecondStartAddr(int /*startAddr*/)
-{
-}
-
-void RegisterTableController::setSplitView(bool /*enabled*/)
-{
 }
 
 void RegisterTableController::retranslateHeaders()

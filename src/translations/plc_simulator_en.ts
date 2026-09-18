@@ -362,6 +362,14 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <translation>Register Settings</translation>
     </message>
     <message>
+        <source>监视地址:</source>
+        <translation>Watch:</translation>
+    </message>
+    <message>
+        <source>M1500-1559, M1564, D2024</source>
+        <translation>M1500-1559, M1564, D2024</translation>
+    </message>
+    <message>
         <source>显示地址:</source>
         <translation>Display Address:</translation>
     </message>

@@ -29,17 +29,11 @@ public:
     ~RegisterTableController() override = default;
 
     void initTable();
-    void initTable(int rowCount, int colCount);
 
     void setWatches(const QVector<DeviceAddress>& items);
     void setDataType(RegisterDataType type);
     void setNumberBase(bool hex);
     void retranslateHeaders();
-
-    // Temporary adapters until MainWindow watch-expression UI (Task 9)
-    void setStartAddr(int startAddr);
-    void setSecondStartAddr(int startAddr);
-    void setSplitView(bool enabled);
 
 private:
     QTableView* m_view;

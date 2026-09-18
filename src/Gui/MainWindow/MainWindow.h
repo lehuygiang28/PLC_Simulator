@@ -28,6 +28,8 @@
 #include <QtWidgets/QMainWindow>
 #include <QEvent>
 #include <QMenu>
+#include <QTimer>
+#include <QVariantMap>
 #include <QVector>
 
 QT_BEGIN_NAMESPACE
@@ -96,9 +98,10 @@ private:
     void refreshAxisAddrStatus();
     void applyPlatformParams();    // 把 m_platformParams 应用到控制器+状态栏(加载/编辑复用)
 
-    // 寄存器表显示设置持久化(起始地址 / 数据类型 / 进制)
+    // 寄存器表显示设置持久化(监视表达式 / 数据类型 / 进制)
     void saveRegisterView();
-    void updateSplitRangeUi(bool enabled);
+    void applyWatchExpression(const QString& text);
+    QString migrateWatchExpr(const QVariantMap& rv) const;
 
     // 菜单栏相关
     void OnThemeSelected(Theme theme);
@@ -182,6 +185,8 @@ private:
     QByteArray m_lastRecData;
     QString    m_lastSendEndpoint;
     QByteArray m_lastSendData;
+
+    QTimer m_watchDebounce;
 };
 
 #endif // MAINWINDOW_H
