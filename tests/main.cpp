@@ -3,11 +3,14 @@
 #include "tst_RegisterStoreBits.h"
 #include "tst_MitsubishiDevices.h"
 #include "tst_KeyenceDevices.h"
+#include "tst_RegisterTableModel.h"
 
+#include <QApplication>
 #include <QtTest>
 
 int main(int argc, char** argv)
 {
+    QApplication app(argc, argv);
     int status = 0;
     {
         tst_DeviceAddress tc;
@@ -27,6 +30,10 @@ int main(int argc, char** argv)
     }
     {
         tst_KeyenceDevices tc;
+        status |= QTest::qExec(&tc, argc, argv);
+    }
+    {
+        tst_RegisterTableModel tc;
         status |= QTest::qExec(&tc, argc, argv);
     }
     return status;

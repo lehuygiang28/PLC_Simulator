@@ -20,16 +20,29 @@ add_executable(${TEST_TARGET}
     ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolKeyencePCLink.h
     ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolMitsubishiQBinary.cpp
     ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolKeyencePCLink.cpp
+    tst_RegisterTableModel.h
+    tst_RegisterTableModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/Gui/Theme/ThemeManager.cpp
+    ${CMAKE_SOURCE_DIR}/src/Gui/MainWindow/RegisterTable/RegisterTableModel.cpp
 )
 
 target_include_directories(${TEST_TARGET} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/Gui
+    ${CMAKE_SOURCE_DIR}/src/Gui/Theme
+    ${CMAKE_SOURCE_DIR}/src/Gui/MainWindow/RegisterTable
 )
 
 target_link_libraries(${TEST_TARGET} PRIVATE
     Qt${QT_VERSION}::Core
+    Qt${QT_VERSION}::Gui
+    Qt${QT_VERSION}::Widgets
     Qt${QT_VERSION}::Test
 )
+
+if(WIN32)
+    target_link_libraries(${TEST_TARGET} PRIVATE dwmapi)
+endif()
 
 target_compile_definitions(${TEST_TARGET} PRIVATE UNICODE _UNICODE)
 

@@ -24,31 +24,28 @@ QString trRT(const char* text)
     return QCoreApplication::translate("RegisterTableModel", text);
 }
 
-// 浮点显示/录入的有效数字位数:贴近各自类型真实精度,受列宽约束做的折中
-constexpr int kFloatSigDigits = 7;    // float 约 7 位有效数字
-constexpr int kDoubleSigDigits = 15;  // double 约 15-16 位,取 15
+constexpr int kFloatSigDigits = 7;
+constexpr int kDoubleSigDigits = 15;
 
-// 闪烁淡出参数
-constexpr int kFlashDurationMs = 400;  // 淡出总时长
-constexpr int kFlashPeakAlpha  = 140;  // 峰值不透明度(0~255)
-constexpr int kFlashTickMs     = 30;   // 重绘步进
+constexpr int kFlashDurationMs = 400;
+constexpr int kFlashPeakAlpha  = 140;
+constexpr int kFlashTickMs     = 30;
 
-// 浮点统一格式化:'g' 按有效数字。录入规范化与显示共用,保证录完刷新不变样
+constexpr int kValueColumn = 1;
+
 QString formatReal(double value, int sigDigits)
 {
     return QString::number(value, 'g', sigDigits);
 }
 
-// 类型特征:把每种数据类型的属性集中到一处(单一真相源)。
-// format/parse/validate 按 family 分派 + 读本表参数,联合体槽位再按 registersPerValue 推导。
 struct TypeTrait
 {
-    int registersPerValue;                       // 每值占几个 Int16(1/1/2/2/4)
-    enum Family { Char, Integer, Real } family;   // 三大族,决定 format/parse/validate 走向
-    long long intMin, intMax;                     // Integer 族取值范围
-    int hexDigits;                                // Integer 族十六进制位宽(4/8)
-    double realMin, realMax;                      // Real 族取值范围
-    int sigDigits;                                // Real 族有效数字位数
+    int registersPerValue;
+    enum Family { Char, Integer, Real } family;
+    long long intMin, intMax;
+    int hexDigits;
+    double realMin, realMax;
+    int sigDigits;
 };
 
 const TypeTrait& traitOf(RegisterDataType type)
@@ -64,12 +61,10 @@ const TypeTrait& traitOf(RegisterDataType type)
     case RegisterDataType::eDataTypeInt32:  return kInt32;
     case RegisterDataType::eDataTypeFloat:  return kFloat;
     case RegisterDataType::eDataTypeDouble: return kDouble;
-    default:                                return kChar8;  // Char8
+    default:                                return kChar8;
     }
 }
 
-// 校验结果(纯数据):ok=能否写入;normalized=规范化后的文本;title/msg 非空则需提示。
-// 注:title 非空但 ok=true 表示"截断后接受"——既写入也提示。
 struct ValidationResult
 {
     bool ok;
@@ -78,10 +73,9 @@ struct ValidationResult
     QString msg;
 };
 
-// 以下校验为纯函数:只判定/规范化,不弹框、不改单元格。提示与写入由 setData 决策。
 ValidationResult validateChar(const QString& text)
 {
-    if (text.isEmpty())  // 空串:拒写保留原值(与 integer/real 一致;空格是合法字符故不 trim)
+    if (text.isEmpty())
         return { false, QString(), trRT("输入非法"),
                  trRT("输入为空,已保留原值!") };
     if (text.length() > 2)
@@ -93,40 +87,38 @@ ValidationResult validateChar(const QString& text)
 ValidationResult validateInteger(const QString& text, const TypeTrait& t, int intStat)
 {
     const QString s = text.trimmed();
-    if (intStat == 1)  // 十六进制
+    if (intStat == 1)
     {
-        QRegularExpression hexRe("^[0-9A-Fa-f]+$");  // 至少一位:空串落入非法→拒写保留原值(与 dec/real 一致)
+        QRegularExpression hexRe("^[0-9A-Fa-f]+$");
         if (!hexRe.match(s).hasMatch())
             return { false, QString(), trRT("输入非法"),
                      trRT("输入值 %1 非十六进制数").arg(s) };
-        if (s.length() > t.hexDigits)  // 超位宽:截断后接受
+        if (s.length() > t.hexDigits)
             return { true, s.left(t.hexDigits).toUpper(), trRT("输入截断"),
                      trRT("输入值 %1 超过范围,将截断输入数据!").arg(s) };
         return { true, s.toUpper().rightJustified(t.hexDigits, '0'), QString(), QString() };
     }
 
-    // 十进制(放宽:接受前导零/正号)
     QRegularExpression decRe("^[+-]?\\d+$");
     if (!decRe.match(s).hasMatch())
         return { false, QString(), trRT("输入非法"),
                  trRT("输入值 %1 非整型数").arg(s) };
     bool ok = false;
-    long long v = s.toLongLong(&ok);  // 超 long long 也会 !ok → 判超范围
+    const long long v = s.toLongLong(&ok);
     if (!ok || v < t.intMin || v > t.intMax)
         return { false, QString(), trRT("输入超范围"),
                  trRT("输入值 %1 超过范围(%2 ~ %3)").arg(s).arg(t.intMin).arg(t.intMax) };
-    return { true, QString::number(v), QString(), QString() };  // 规范化(去前导零/正号)
+    return { true, QString::number(v), QString(), QString() };
 }
 
 ValidationResult validateReal(const QString& text, const TypeTrait& t)
 {
     const QString s = text.trimmed();
-    // 放宽:接受前导零/正号/.5/5.;不含科学计数法
     QRegularExpression re("^[+-]?(\\d+\\.?\\d*|\\.\\d+)$");
     if (!re.match(s).hasMatch())
         return { false, QString(), trRT("输入非法"),
                  trRT("输入值 %1 非浮点数").arg(s) };
-    double v = s.toDouble();
+    const double v = s.toDouble();
     if (v < t.realMin || v > t.realMax)
         return { false, QString(), trRT("输入超范围"),
                  trRT("输入值 %1 超过浮点数范围").arg(s) };
@@ -144,15 +136,24 @@ ValidationResult validateInput(const QString& text, RegisterDataType type, int i
     }
     return { false, QString(), QString(), QString() };
 }
+
+ValidationResult validateBit(const QString& text)
+{
+    const QString s = text.trimmed().toLower();
+    if (s == QLatin1String("0") || s == QLatin1String("false"))
+        return { true, QStringLiteral("0"), QString(), QString() };
+    if (s == QLatin1String("1") || s == QLatin1String("true"))
+        return { true, QStringLiteral("1"), QString(), QString() };
+    return { false, QString(), trRT("输入非法"),
+             trRT("位值须为 0 或 1") };
+}
 }  // namespace
 
 RegisterTableModel::RegisterTableModel(RegisterStore* store, QWidget* dialogParent, QObject* parent)
     : QAbstractTableModel(parent)
     , m_store(store)
     , m_dialogParent(dialogParent)
-    , m_layout{0, 0}
     , m_currentType(RegisterDataType::eDataTypeInt16)
-    , m_startAddr(0)
     , m_intStat(0)
     , m_flashTimer(nullptr)
 {
@@ -174,26 +175,26 @@ RegisterTableModel::RegisterTableModel(RegisterStore* store, QWidget* dialogPare
                 Qt::UniqueConnection);
 }
 
-void RegisterTableModel::setDimensions(int rowCount, int colCount)
+void RegisterTableModel::setWatches(const QVector<DeviceAddress>& items)
 {
     beginResetModel();
-    m_layout = { rowCount, colCount };
-    m_registerVals.assign(m_layout.convertCount(), DataTypeConvert());
-    m_flashStartMs.assign(rowCount * colCount, 0);
-    if (m_flashTimer->isActive()) m_flashTimer->stop();
+    m_items = items;
+    m_flashStartMs.assign(m_items.size() * columnCount(), 0);
+    if (m_flashTimer->isActive())
+        m_flashTimer->stop();
     m_editIndex = QPersistentModelIndex();
-    refreshSnapshot();
+    syncDisplayCache();
     endResetModel();
 }
 
 int RegisterTableModel::rowCount(const QModelIndex& parent) const
 {
-    return parent.isValid() ? 0 : m_layout.rowCount;
+    return parent.isValid() ? 0 : m_items.size();
 }
 
 int RegisterTableModel::columnCount(const QModelIndex& parent) const
 {
-    return parent.isValid() ? 0 : m_layout.colCount;
+    return parent.isValid() ? 0 : 2;
 }
 
 QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
@@ -205,27 +206,24 @@ QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
     if (role != Qt::DisplayRole && role != Qt::EditRole)
         return QVariant();
 
-    const int k = m_layout.linearIndex(index.row(), index.column());
-    if (m_layout.isValueColumn(index.column()))
-    {
-        if (!isAnchorValueCell(index.row(), index.column()))  // 越界/非锚点格留空
-            return QString();
-        return formatCell(m_currentType, k);
-    }
+    const int row = index.row();
+    if (row < 0 || row >= m_items.size())
+        return QVariant();
 
-    // 地址列:地址越过 store 容量则留空(窗口可大于寄存器空间)
-    const int addr = registerAddrForK(k);
-    if (m_store && addr >= m_store->size())
+    if (index.column() == 0)
+        return m_items[row].toString();
+
+    if (!isValueEditable(row))
         return QString();
-    return QString("D%1").arg(addr, 5, 10, QChar('0'));
+    return formatValueAtRow(row);
 }
 
 QVariant RegisterTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (role != Qt::DisplayRole) return QVariant();
     if (orientation == Qt::Horizontal)
-        return m_layout.isValueColumn(section) ? tr("值") : tr("地址");
-    return QStringLiteral(" ");  // 垂直表头留空(对齐原行为)
+        return section == kValueColumn ? tr("值") : tr("地址");
+    return QStringLiteral(" ");
 }
 
 Qt::ItemFlags RegisterTableModel::flags(const QModelIndex& index) const
@@ -233,7 +231,7 @@ Qt::ItemFlags RegisterTableModel::flags(const QModelIndex& index) const
     if (!index.isValid()) return Qt::NoItemFlags;
 
     Qt::ItemFlags f = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-    if (isAnchorValueCell(index.row(), index.column()))
+    if (index.column() == kValueColumn && isValueEditable(index.row()))
         f |= Qt::ItemIsEditable;
     return f;
 }
@@ -241,11 +239,19 @@ Qt::ItemFlags RegisterTableModel::flags(const QModelIndex& index) const
 bool RegisterTableModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
     if (role != Qt::EditRole || !index.isValid() || !m_store) return false;
-    if (!m_layout.isValueColumn(index.column())) return false;
+    if (index.column() != kValueColumn) return false;
 
-    const ValidationResult r = validateInput(value.toString(), m_currentType, m_intStat);
+    const int row = index.row();
+    if (row < 0 || row >= m_items.size() || !isValueEditable(row))
+        return false;
 
-    // 有提示则延迟弹框:推到事件循环下一拍(编辑器已关闭)再弹,避免夺焦重入
+    const DeviceAddress& addr = m_items[row];
+    ValidationResult r;
+    if (addr.isBit())
+        r = validateBit(value.toString());
+    else
+        r = validateInput(value.toString(), m_currentType, m_intStat);
+
     if (!r.title.isEmpty())
     {
         const QString title = r.title;
@@ -256,20 +262,22 @@ bool RegisterTableModel::setData(const QModelIndex& index, const QVariant& value
         });
     }
 
-    if (!r.ok) return false;  // 非法:不写(单元格保留原值)
+    if (!r.ok) return false;
 
-    const int k = m_layout.linearIndex(index.row(), index.column());
-    writeCell(m_currentType, k, r.normalized);
+    if (addr.isBit())
+    {
+        m_store->SetBit(addr, r.normalized == QLatin1String("1"));
+    }
+    else
+    {
+        if (!writeDWord(m_currentType, addr.index, r.normalized))
+            return false;
+    }
 
-    // 统一回写:每值占 rpv 个 Int16,从 subIndex 起连续 rpv 个推入 store
-    const int addr = registerAddrForK(k);
-    const int rpv = registersPerValue(m_currentType);
-    const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
-    const int s = m_layout.subIndex(k);
-    for (int j = 0; j < rpv; ++j)
-        m_store->setCell(addr + j, cell.u_Int16[s + j]);
+    if (row < m_displayCache.size())
+        m_displayCache[row] = formatValueAtRow(row);
 
-    stampFlash(index.row(), index.column());
+    stampFlash(row, kValueColumn);
     emit dataChanged(index, index);
     return true;
 }
@@ -277,27 +285,6 @@ bool RegisterTableModel::setData(const QModelIndex& index, const QVariant& value
 void RegisterTableModel::setDataType(RegisterDataType type)
 {
     m_currentType = type;
-    refreshAll();
-}
-
-void RegisterTableModel::setStartAddr(int startAddr)
-{
-    m_startAddr = startAddr;
-    refreshAll();
-}
-
-void RegisterTableModel::setSecondStartAddr(int startAddr)
-{
-    m_secondStartAddr = startAddr;
-    if (m_splitView)
-        refreshAll();
-}
-
-void RegisterTableModel::setSplitView(bool enabled)
-{
-    if (m_splitView == enabled)
-        return;
-    m_splitView = enabled;
     refreshAll();
 }
 
@@ -331,7 +318,7 @@ void RegisterTableModel::stampFlash(int row, int col)
 
 int RegisterTableModel::flashIndex(int row, int col) const
 {
-    const int cols = m_layout.colCount;
+    const int cols = columnCount();
     if (cols <= 0) return -1;
     const int idx = row * cols + col;
     if (idx < 0 || idx >= static_cast<int>(m_flashStartMs.size())) return -1;
@@ -348,40 +335,30 @@ void RegisterTableModel::clearEditingIndex()
     const QModelIndex idx = m_editIndex;
     m_editIndex = QPersistentModelIndex();
     if (idx.isValid())
-        emit dataChanged(idx, idx);  // 编辑结束:把该格刷到当前快照值
-    emit editingFinished();          // 解除编辑保护后补齐编辑期被跳过的维度自适应
+        emit dataChanged(idx, idx);
+    emit editingFinished();
 }
 
 void RegisterTableModel::onStoreChanged()
 {
-    if (m_layout.colCount <= 0) return;
+    if (m_items.isEmpty()) return;
 
-    m_prevVals = m_registerVals;  // 差异基线:复用成员缓冲,容量足够时不再每拍堆分配
-    refreshSnapshot();
+    const int rows = m_items.size();
+    if (m_displayCache.size() != rows)
+        m_displayCache.resize(rows);
 
-    const int rows = m_layout.rowCount;
-    const int cols = m_layout.colCount;
-    const int rpv = registersPerValue(m_currentType);
-
-    for (int col = 1; col < cols; col += 2)  // 值列(奇)
+    for (int row = 0; row < rows; ++row)
     {
-        for (int row = 0; row < rows; ++row)
-        {
-            if (!isAnchorValueCell(row, col)) continue;  // 仅范围内锚点格
+        if (!isValueEditable(row)) continue;
 
-            const int k = m_layout.linearIndex(row, col);
-            const int ci = m_layout.cacheIndex(k);
-            const int s = m_layout.subIndex(k);
-            bool changed = false;
-            for (int j = 0; j < rpv; ++j)
-                if (m_prevVals[ci].u_Int16[s + j] != m_registerVals[ci].u_Int16[s + j]) { changed = true; break; }
-            if (!changed) continue;
+        const QString newText = formatValueAtRow(row);
+        if (m_displayCache[row] == newText) continue;
+        m_displayCache[row] = newText;
 
-            const QModelIndex idx = index(row, col);
-            if (m_editIndex == idx) continue;  // 编辑保护:不刷正在编辑格(否则复原用户输入)
-            stampFlash(row, col);
-            emit dataChanged(idx, idx);
-        }
+        const QModelIndex idx = index(row, kValueColumn);
+        if (m_editIndex == idx) continue;
+        stampFlash(row, kValueColumn);
+        emit dataChanged(idx, idx);
     }
 }
 
@@ -394,29 +371,24 @@ void RegisterTableModel::onFlashTick()
     for (qint64& start : m_flashStartMs)
     {
         if (start == 0) continue;
-        if (now - start >= kFlashDurationMs) start = 0;  // 过期清零
+        if (now - start >= kFlashDurationMs) start = 0;
         else anyActive = true;
     }
     if (!anyActive) m_flashTimer->stop();
 }
 
-void RegisterTableModel::refreshSnapshot()
+void RegisterTableModel::syncDisplayCache()
 {
-    if (!m_store) return;
-    const int maxK = m_layout.valueCellCount();
-    for (int k = 0; k < maxK; ++k)
-    {
-        const int ci = m_layout.cacheIndex(k);
-        const int si = m_layout.subIndex(k);
-        m_registerVals[ci].u_Int16[si] = m_store->cell(registerAddrForK(k));
-    }
+    m_displayCache.resize(m_items.size());
+    for (int row = 0; row < m_items.size(); ++row)
+        m_displayCache[row] = formatValueAtRow(row);
 }
 
 void RegisterTableModel::refreshAll()
 {
-    refreshSnapshot();
-    if (m_layout.rowCount > 0 && m_layout.colCount > 0)
-        emit dataChanged(index(0, 0), index(m_layout.rowCount - 1, m_layout.colCount - 1));
+    syncDisplayCache();
+    if (!m_items.isEmpty())
+        emit dataChanged(index(0, 0), index(m_items.size() - 1, columnCount() - 1));
 }
 
 int RegisterTableModel::registersPerValue(RegisterDataType type) const
@@ -424,113 +396,88 @@ int RegisterTableModel::registersPerValue(RegisterDataType type) const
     return traitOf(type).registersPerValue;
 }
 
-bool RegisterTableModel::isAnchorValueCell(int row, int col) const
+bool RegisterTableModel::isValueEditable(int row) const
 {
-    if (!m_layout.isValueColumn(col)) return false;
-    const int k = m_layout.linearIndex(row, col);
-    if (m_layout.cacheIndex(k) >= static_cast<int>(m_registerVals.size())) return false;
-    if (k % registersPerValue(m_currentType) != 0) return false;
-    // 值占 rpv 个连续寄存器,整段须落在 store 容量内,否则该值格越界→留空/只读
-    if (m_store)
-    {
-        const int rpv = registersPerValue(m_currentType);
-        if (registerAddrForK(k) + rpv - 1 >= m_store->size())
-            return false;
-    }
-    return true;
+    if (row < 0 || row >= m_items.size() || !m_store) return false;
+    const DeviceAddress& addr = m_items[row];
+    if (addr.isBit()) return true;
+    if (addr.kind != DeviceKind::D || addr.bit >= 0) return false;
+    const int rpv = registersPerValue(m_currentType);
+    return addr.index + rpv - 1 < m_store->size();
 }
 
-int RegisterTableModel::registerAddrForK(int k) const
+QString RegisterTableModel::formatValueAtRow(int row) const
 {
-    if (!m_splitView)
-        return m_layout.registerAddr(k, m_startAddr);
-
-    const int totalPairs = m_layout.colCount / 2;
-    const int leftPairs = totalPairs / 2;
-    const int rowCount = m_layout.rowCount;
-    const int pairIndex = k / rowCount;
-    const int row = k % rowCount;
-
-    if (pairIndex < leftPairs)
-        return m_startAddr + row + pairIndex * rowCount;
-    return m_secondStartAddr + row + (pairIndex - leftPairs) * rowCount;
+    if (!m_store || row < 0 || row >= m_items.size()) return QString();
+    const DeviceAddress& addr = m_items[row];
+    if (addr.isBit())
+        return m_store->GetBit(addr) ? QStringLiteral("1") : QStringLiteral("0");
+    return formatDWord(m_currentType, addr.index);
 }
 
-void RegisterTableModel::writeCell(RegisterDataType type, int k, const QString& text)
+QString RegisterTableModel::formatDWord(RegisterDataType type, int wordIndex) const
 {
+    if (!m_store) return QString();
     const TypeTrait& t = traitOf(type);
-    DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
-    const int s = m_layout.subIndex(k);
     switch (t.family)
     {
     case TypeTrait::Char:
+        return m_store->GetString(wordIndex);
+    case TypeTrait::Integer:
     {
-        // 每个单元格写 2 个字符,字符下标 = Int16 子下标*2 + 字符序
-        // 写前清两字节:单字符录入须清掉同格旧高字节(否则 'AB'→'C' 残留显示成 'CB')
-        cell.u_chars[s * 2] = 0;
-        cell.u_chars[s * 2 + 1] = 0;
-        int curChar = 0;
-        while (curChar < 2 && text.length() > curChar)
+        if (m_intStat == 1)
         {
-            cell.u_chars[s * 2 + curChar] = text.at(curChar).toLatin1();
-            curChar++;
+            const unsigned long long bits = (t.registersPerValue == 1)
+                ? static_cast<unsigned long long>(static_cast<uint16_t>(m_store->GetInt16(wordIndex)))
+                : static_cast<unsigned long long>(static_cast<uint32_t>(m_store->GetInt32(wordIndex)));
+            return QString("%1").arg(QString::number(bits, 16), t.hexDigits, QChar('0')).toUpper();
         }
-        break;
+        const long long v = (t.registersPerValue == 1)
+            ? m_store->GetInt16(wordIndex)
+            : m_store->GetInt32(wordIndex);
+        return QString::number(v);
     }
+    case TypeTrait::Real:
+    {
+        const double v = (t.registersPerValue == 2)
+            ? static_cast<double>(m_store->GetFloat(wordIndex))
+            : m_store->GetDouble(wordIndex);
+        return formatReal(v, t.sigDigits);
+    }
+    }
+    return QString();
+}
+
+bool RegisterTableModel::writeDWord(RegisterDataType type, int wordIndex, const QString& text)
+{
+    if (!m_store) return false;
+    const TypeTrait& t = traitOf(type);
+    switch (t.family)
+    {
+    case TypeTrait::Char:
+        m_store->SetString(wordIndex, text);
+        return true;
     case TypeTrait::Integer:
     {
         int val;
         if (m_intStat == 0)
             val = text.toInt();
         else
-            // 十六进制按无符号解析:FFFFFFFF/80000000 等高位值不会溢出归零(toInt 上限仅 INT_MAX)
             val = static_cast<int>(text.toUInt(nullptr, 16));
         if (t.registersPerValue == 1)
-            cell.u_Int16[s] = val & 0xFFFF;      // Int16
+            m_store->SetInt16(wordIndex, static_cast<int16_t>(val & 0xFFFF));
         else
-            cell.u_Int32[s / 2] = val;           // Int32(占 2 个 Int16)
-        break;
+            m_store->SetInt32(wordIndex, val);
+        return true;
     }
     case TypeTrait::Real:
         if (t.registersPerValue == 2)
-            cell.u_float[s / 2] = text.toFloat();  // float(占 2 个 Int16)
+            m_store->SetFloat(wordIndex, text.toFloat());
         else
-            cell.u_double = text.toDouble();       // double(占 4 个 Int16)
-        break;
+            m_store->SetDouble(wordIndex, text.toDouble());
+        return true;
     }
-}
-
-QString RegisterTableModel::formatCell(RegisterDataType type, int k) const
-{
-    const TypeTrait& t = traitOf(type);
-    const DataTypeConvert& cell = m_registerVals[m_layout.cacheIndex(k)];
-    const int s = m_layout.subIndex(k);
-    switch (t.family)
-    {
-    case TypeTrait::Char:
-        return QString("%1%2")
-            .arg(QChar(cell.u_chars[s * 2]))
-            .arg(QChar(cell.u_chars[s * 2 + 1]));
-    case TypeTrait::Integer:
-    {
-        if (m_intStat == 1)
-        {
-            // 十六进制按无符号位模式显示,保证 0xFFFF/0xFFFFFFFF 与录入往返(有符号会显示成 '-1'→'00-1')
-            unsigned long long bits = (t.registersPerValue == 1)
-                ? static_cast<unsigned long long>(static_cast<uint16_t>(cell.u_Int16[s]))
-                : static_cast<unsigned long long>(static_cast<uint32_t>(cell.u_Int32[s / 2]));
-            return QString("%1").arg(QString::number(bits, 16), t.hexDigits, QChar('0')).toUpper();
-        }
-        long long v = (t.registersPerValue == 1) ? cell.u_Int16[s] : cell.u_Int32[s / 2];
-        return QString("%1").arg(v);
-    }
-    case TypeTrait::Real:
-    {
-        double v = (t.registersPerValue == 2) ? cell.u_float[s / 2] : cell.u_double;
-        return formatReal(v, t.sigDigits);
-    }
-    }
-    return QString();
+    return false;
 }
 
 void RegisterTableModel::refreshHeaders()
