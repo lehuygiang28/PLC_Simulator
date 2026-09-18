@@ -71,3 +71,14 @@ void tst_WatchList::parse_rejects_empty_expression()
     QString error;
     QVERIFY(!WatchList::parse(QStringLiteral("  , ,"), items, error));
 }
+
+void tst_WatchList::parseWithSegments_records_comma_boundaries()
+{
+    WatchList::ParseResult result;
+    QString error;
+    QVERIFY(WatchList::parseWithSegments(QStringLiteral("M1500-1501, D7"), result, error));
+    QCOMPARE(result.items.size(), 3);
+    QCOMPARE(result.segmentSizes.size(), 2);
+    QCOMPARE(result.segmentSizes[0], 2);
+    QCOMPARE(result.segmentSizes[1], 1);
+}

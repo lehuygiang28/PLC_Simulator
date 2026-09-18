@@ -15,6 +15,7 @@ private slots:
     void parse_rejects_inverted_range();
     void parse_rejects_too_many_items();
     void parse_rejects_empty_expression();
+    void parseWithSegments_records_comma_boundaries();
 };
 
 #endif
