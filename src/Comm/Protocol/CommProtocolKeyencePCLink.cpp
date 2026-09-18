@@ -32,48 +32,85 @@ bool CommProtocolKeyencePCLink::AnalyzeCmdInfo(QByteArray strInfo, CmdType& cCmd
 	return true;
 }
 
+bool CommProtocolKeyencePCLink::parsePcLink(QByteArray strInfo, bool isWrite, PlcAccess& access)
+{
+	const QByteArray cmd = isWrite ? QByteArray("WRS") : QByteArray("RDS");
+	if (strInfo.size() < 3 || strInfo.mid(0, 3) != cmd) return false;
+	if (strInfo.size() < 4 || strInfo.at(3) != ' ') return false;
+	const QByteArray dev = strInfo.mid(4, 2);
+	int pos = 6;
+	if (strInfo.size() < pos + 5) return false;
+	bool ok = false;
+	access.start = strInfo.mid(pos, 5).toInt(&ok);
+	if (!ok) return false;
+	pos += 5;
+
+	if (dev == "DM") {
+		if (strInfo.mid(pos, 2) != ".H") return false;
+		pos += 2;
+		if (strInfo.size() < pos + 1 || strInfo.at(pos) != ' ') return false;
+		pos += 1;
+		if (strInfo.size() < pos + 4) return false;
+		access.count = strInfo.mid(pos, 4).toInt(&ok);
+		if (!ok || access.count <= 0) return false;
+		pos += 4;
+		access.device = DeviceKind::D;
+		access.unit = PlcUnit::Word;
+		if (!isWrite) return true;
+		access.wordData.assign(access.count, 0);
+		for (int i = 0; i < access.count; ++i) {
+			if (strInfo.size() < pos + 5) return false;
+			if (strInfo.at(pos) != ' ') return false;
+			const int16_t v = static_cast<int16_t>(strInfo.mid(pos + 1, 4).toInt(&ok, 16));
+			if (!ok) return false;
+			access.wordData[i] = v;
+			pos += 5;
+		}
+		return true;
+	}
+	if (dev == "MR") {
+		if (strInfo.size() < pos + 1 || strInfo.at(pos) != ' ') return false;
+		pos += 1;
+		if (strInfo.size() < pos + 4) return false;
+		access.count = strInfo.mid(pos, 4).toInt(&ok);
+		if (!ok || access.count <= 0) return false;
+		pos += 4;
+		access.device = DeviceKind::M;
+		access.unit = PlcUnit::Bit;
+		if (!isWrite) return true;
+		access.bitData.assign(access.count, 0);
+		for (int i = 0; i < access.count; ++i) {
+			if (strInfo.size() < pos + 2) return false;
+			if (strInfo.at(pos) != ' ') return false;
+			const char ch = strInfo.at(pos + 1);
+			if (ch != '0' && ch != '1') return false;
+			access.bitData[i] = (ch == '1') ? 1 : 0;
+			pos += 2;
+		}
+		return true;
+	}
+	return false;
+}
+
 bool CommProtocolKeyencePCLink::AnalyzeReadReg(QByteArray strInfo, PlcAccess& access)
 {
-	QByteArray strCmdRead = ("RDS");
-	QByteArray strSpace = (" ");
-
-	QByteArray RegType = ("DM");
-	QByteArray strDataFormat = (".H");
-
-	int nLenBeforeRegAddr = strCmdRead.length() + strSpace.length() + RegType.length();
-	int nLenBeforeRegNum = nLenBeforeRegAddr + 5 + strDataFormat.length() + strSpace.length();
-
-	if (strCmdRead.compare(strInfo.mid(0, 3)) != 0)
-	{
-		return false;
-	}
-
-	if (RegType.compare(strInfo.mid(4, 2)) != 0)
-	{
-		return false;
-	}
-
-	if (strDataFormat.compare(strInfo.mid(nLenBeforeRegAddr + 5, 2)) != 0)
-	{
-		return false;
-	}
-
-	QByteArray strRegAddr = strInfo.mid(nLenBeforeRegAddr, 5);
-	QByteArray strRegNum = strInfo.mid(nLenBeforeRegNum, 4);
-
-	bool bOk = false;
-	access.start = strRegAddr.toInt(&bOk);
-	if (!bOk) return false;
-	access.count = strRegNum.toInt(&bOk);
-	if (!bOk || access.count <= 0) return false;
-	access.device = DeviceKind::D;
-	access.unit = PlcUnit::Word;
-
-	return true;
+	return parsePcLink(strInfo, false, access);
 }
 
 bool CommProtocolKeyencePCLink::PackReportReadRegInfo(QByteArray& strInfo, const PlcAccess& access)
 {
+	if (access.unit == PlcUnit::Bit) {
+		if (access.device != DeviceKind::M) return false;
+		QByteArray strReadData;
+		for (int i = 0; i < access.count; ++i) {
+			const uint8_t bitVal = (i < static_cast<int>(access.bitData.size())) ? access.bitData.at(i) : uint8_t(0);
+			if (i > 0) strReadData += ' ';
+			strReadData += (bitVal != 0) ? '1' : '0';
+		}
+		strInfo = strReadData;
+		return true;
+	}
+
 	if (access.unit != PlcUnit::Word || access.device != DeviceKind::D)
 		return false;
 
@@ -104,53 +141,7 @@ bool CommProtocolKeyencePCLink::PackReportReadRegInfo(QByteArray& strInfo, const
 
 bool CommProtocolKeyencePCLink::AnalyzeWriteReg(QByteArray strInfo, PlcAccess& access)
 {
-	QByteArray strCmdWrite = ("WRS");
-	QByteArray strSpace = (" ");
-	QByteArray RegType = ("DM");
-	QByteArray strDataFormat = (".H");
-
-	int nLenBeforeRegAddr = strCmdWrite.length() + strSpace.length() + RegType.length();
-	int nLenBeforeRegNum = nLenBeforeRegAddr + 5 + strDataFormat.length() + strSpace.length();
-
-	if (strCmdWrite.compare(strInfo.mid(0, 3)) != 0)
-	{
-		return false;
-	}
-
-	if (RegType.compare(strInfo.mid(4, 2)) != 0)
-	{
-		return false;
-	}
-
-	if (strDataFormat.compare(strInfo.mid(nLenBeforeRegAddr + 5, 2)) != 0)
-	{
-		return false;
-	}
-
-	QByteArray strRegAddr = strInfo.mid(nLenBeforeRegAddr, 5);
-	QByteArray strRegNum = strInfo.mid(nLenBeforeRegNum, 4);
-
-	bool bOk = false;
-	access.start = strRegAddr.toInt(&bOk);
-	if (!bOk) return false;
-	access.count = strRegNum.toInt(&bOk);
-	if (!bOk || access.count <= 0) return false;
-	access.device = DeviceKind::D;
-	access.unit = PlcUnit::Word;
-
-	access.wordData.clear();
-	access.wordData.resize(access.count);
-	for (int i = 0; i < access.count; i++)
-	{
-		QByteArray strTemp = strInfo.mid(nLenBeforeRegNum + 5 + i * 5, 4);
-
-		int16_t d = strTemp.toInt(&bOk,16);
-		if (!bOk) return false;
-
-		access.wordData.at(i) = d & 0xFFFF;
-	}
-
-	return true;
+	return parsePcLink(strInfo, true, access);
 }
 
 bool CommProtocolKeyencePCLink::PackReportWriteRegInfo(QByteArray& strInfo)

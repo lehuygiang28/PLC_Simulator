@@ -41,6 +41,7 @@ public:
 
 private:
 	virtual bool CmdInfoProcessing(const QByteArray& strInfo, ProcessType Curtype, QByteArray& strOut) override;
+	bool parsePcLink(QByteArray strInfo, bool isWrite, PlcAccess& access);
 };
 
 #endif

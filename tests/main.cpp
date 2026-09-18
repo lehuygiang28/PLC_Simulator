@@ -2,6 +2,7 @@
 #include "tst_WatchList.h"
 #include "tst_RegisterStoreBits.h"
 #include "tst_MitsubishiDevices.h"
+#include "tst_KeyenceDevices.h"
 
 #include <QtTest>
 
@@ -22,6 +23,10 @@ int main(int argc, char** argv)
     }
     {
         tst_MitsubishiDevices tc;
+        status |= QTest::qExec(&tc, argc, argv);
+    }
+    {
+        tst_KeyenceDevices tc;
         status |= QTest::qExec(&tc, argc, argv);
     }
     return status;

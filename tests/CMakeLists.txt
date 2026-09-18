@@ -13,6 +13,8 @@ add_executable(${TEST_TARGET}
     ${CMAKE_SOURCE_DIR}/src/Core/RegisterStore.cpp
     tst_MitsubishiDevices.h
     tst_MitsubishiDevices.cpp
+    tst_KeyenceDevices.h
+    tst_KeyenceDevices.cpp
     ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolBase.h
     ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolMitsubishiQBinary.h
     ${CMAKE_SOURCE_DIR}/src/Comm/Protocol/CommProtocolKeyencePCLink.h
@@ -30,6 +32,11 @@ target_link_libraries(${TEST_TARGET} PRIVATE
 )
 
 target_compile_definitions(${TEST_TARGET} PRIVATE UNICODE _UNICODE)
+
+if(MSVC)
+    target_compile_options(${TEST_TARGET} PRIVATE /FS)
+    set_property(TARGET ${TEST_TARGET} PROPERTY VS_GLOBAL_MultiProcessorCompilation false)
+endif()
 
 set_target_properties(${TEST_TARGET} PROPERTIES
     WIN32_EXECUTABLE FALSE
