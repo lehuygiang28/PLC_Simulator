@@ -14,6 +14,7 @@
 #include <QCoreApplication>
 #include <QRegularExpression>
 #include <QTimer>
+#include <algorithm>
 #include <cfloat>
 #include <cstdint>
 
@@ -30,8 +31,6 @@ constexpr int kDoubleSigDigits = 15;
 constexpr int kFlashDurationMs = 400;
 constexpr int kFlashPeakAlpha  = 140;
 constexpr int kFlashTickMs     = 30;
-
-constexpr int kValueColumn = 1;
 
 QString formatReal(double value, int sigDigits)
 {
@@ -137,6 +136,24 @@ ValidationResult validateInput(const QString& text, RegisterDataType type, int i
     return { false, QString(), QString(), QString() };
 }
 
+struct WatchDeviceColors
+{
+    QColor addrBg;
+    QColor addrFg;
+    QColor valueFg;
+};
+
+WatchDeviceColors watchColorsFor(const DeviceAddress& addr)
+{
+    auto& tm = ThemeManager::instance();
+    if (addr.kind == DeviceKind::M) {
+        return { tm.color("@watchMAddrBg"), tm.color("@watchMAddrFg"),
+                 tm.color("@watchMValueFg") };
+    }
+    return { tm.color("@watchDAddrBg"), tm.color("@watchDAddrFg"),
+             tm.color("@watchDValueFg") };
+}
+
 ValidationResult validateBit(const QString& text)
 {
     const QString s = text.trimmed().toLower();
@@ -167,6 +184,7 @@ RegisterTableModel::RegisterTableModel(RegisterStore* store, QWidget* dialogPare
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this]
     {
         m_flashColor = ThemeManager::instance().color("@flashBg");
+        refreshAll();
         emit flashTick();
     });
 
@@ -175,26 +193,158 @@ RegisterTableModel::RegisterTableModel(RegisterStore* store, QWidget* dialogPare
                 Qt::UniqueConnection);
 }
 
-void RegisterTableModel::setWatches(const QVector<DeviceAddress>& items)
+void RegisterTableModel::setGridDimensions(int rowCount, int colCount)
 {
+    if (colCount % 2 != 0) ++colCount;
+    rowCount = std::max(1, rowCount);
+    colCount = std::max(2, colCount);
+    if (m_layout.rowCount == rowCount && m_layout.colCount == colCount)
+        return;
+
     beginResetModel();
-    m_items = items;
-    m_flashStartMs.assign(m_items.size() * columnCount(), 0);
+    m_layout = { rowCount, colCount };
+    m_flashStartMs.assign(rowCount * colCount, 0);
     if (m_flashTimer->isActive())
         m_flashTimer->stop();
     m_editIndex = QPersistentModelIndex();
+    rebuildWatchGrid();
     syncDisplayCache();
     endResetModel();
 }
 
+void RegisterTableModel::setWatches(const QVector<DeviceAddress>& items,
+                                    const QVector<int>& segmentSizes)
+{
+    beginResetModel();
+    m_items = items;
+    m_segmentSizes = segmentSizes;
+    if (m_segmentSizes.isEmpty() && !m_items.isEmpty())
+        m_segmentSizes = QVector<int>{ static_cast<int>(m_items.size()) };
+    if (m_flashTimer->isActive())
+        m_flashTimer->stop();
+    m_editIndex = QPersistentModelIndex();
+    rebuildWatchGrid();
+    syncDisplayCache();
+    endResetModel();
+}
+
+void RegisterTableModel::rebuildWatchGrid()
+{
+    const int rows = m_layout.rowCount;
+    const int cols = m_layout.colCount;
+    m_watchIndexGrid.fill(-1, rows * cols);
+    m_segmentedLayout = false;
+
+    if (m_items.isEmpty() || cols < 2)
+        return;
+
+    if (trySegmentedGridPlacement())
+        return;
+
+    const int pairs = cols / 2;
+    for (int k = 0; k < m_items.size(); ++k) {
+        const int pair = k / rows;
+        if (pair >= pairs)
+            break;
+        const int row = k % rows;
+        const int addrCol = pair * 2;
+        const int a = row * cols + addrCol;
+        const int v = row * cols + addrCol + 1;
+        if (a >= 0 && a < m_watchIndexGrid.size())
+            m_watchIndexGrid[a] = k;
+        if (v >= 0 && v < m_watchIndexGrid.size())
+            m_watchIndexGrid[v] = k;
+    }
+}
+
+bool RegisterTableModel::trySegmentedGridPlacement()
+{
+    if (m_segmentSizes.isEmpty())
+        return false;
+
+    int sum = 0;
+    for (int s : m_segmentSizes)
+        sum += s;
+    if (sum != m_items.size())
+        return false;
+
+    const int rows = m_layout.rowCount;
+    const int cols = m_layout.colCount;
+    const int pairs = cols / 2;
+
+    int pairCursor = 0;
+    int flatCursor = 0;
+
+    for (int segSize : m_segmentSizes) {
+        const int pairsNeeded = (segSize + rows - 1) / rows;
+        if (pairCursor + pairsNeeded > pairs)
+            return false;
+
+        for (int j = 0; j < segSize; ++j) {
+            const int localPair = j / rows;
+            const int row = j % rows;
+            const int pair = pairCursor + localPair;
+            const int addrCol = pair * 2;
+            const int watchK = flatCursor + j;
+            const int a = row * cols + addrCol;
+            const int v = row * cols + addrCol + 1;
+            if (a < 0 || v < 0 || a >= m_watchIndexGrid.size() || v >= m_watchIndexGrid.size())
+                return false;
+            m_watchIndexGrid[a] = watchK;
+            m_watchIndexGrid[v] = watchK;
+        }
+        flatCursor += segSize;
+        pairCursor += pairsNeeded;
+    }
+
+    m_segmentedLayout = true;
+    return true;
+}
+
+int RegisterTableModel::watchIndexAt(int row, int col) const
+{
+    const int idx = row * m_layout.colCount + col;
+    if (idx < 0 || idx >= m_watchIndexGrid.size())
+        return -1;
+    return m_watchIndexGrid[idx];
+}
+
+QModelIndex RegisterTableModel::valueIndexForWatch(int watchIndex) const
+{
+    if (watchIndex < 0 || watchIndex >= m_items.size())
+        return QModelIndex();
+
+    if (!m_segmentedLayout) {
+        const int rowCount = m_layout.rowCount;
+        if (rowCount <= 0)
+            return QModelIndex();
+        const int pairIndex = watchIndex / rowCount;
+        const int row = watchIndex % rowCount;
+        const int valueCol = pairIndex * 2 + 1;
+        if (valueCol >= m_layout.colCount)
+            return QModelIndex();
+        return index(row, valueCol);
+    }
+
+    const int cols = m_layout.colCount;
+    for (int row = 0; row < m_layout.rowCount; ++row) {
+        for (int col = 1; col < cols; col += 2) {
+            const int idx = row * cols + col;
+            if (idx >= 0 && idx < m_watchIndexGrid.size() && m_watchIndexGrid[idx] == watchIndex)
+                return index(row, col);
+        }
+    }
+    return QModelIndex();
+}
+
 int RegisterTableModel::rowCount(const QModelIndex& parent) const
 {
-    return parent.isValid() ? 0 : m_items.size();
+    return parent.isValid() ? 0 : m_layout.rowCount;
 }
 
 int RegisterTableModel::columnCount(const QModelIndex& parent) const
 {
-    return parent.isValid() ? 0 : 2;
+    return parent.isValid() ? 0 : m_layout.colCount;
 }
 
 QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
@@ -203,26 +353,36 @@ QVariant RegisterTableModel::data(const QModelIndex& index, int role) const
 
     if (role == Qt::TextAlignmentRole)
         return int(Qt::AlignCenter);
+
+    const int watchIndex = watchIndexAt(index.row(), index.column());
+    if (watchIndex < 0)
+        return QVariant();
+
+    if (role == Qt::BackgroundRole) {
+        if (!RegisterCellLayout::isValueColumn(index.column()))
+            return watchColorsFor(m_items[watchIndex]).addrBg;
+        return QVariant();
+    }
+    if (role == Qt::ForegroundRole) {
+        const WatchDeviceColors c = watchColorsFor(m_items[watchIndex]);
+        return RegisterCellLayout::isValueColumn(index.column()) ? c.valueFg : c.addrFg;
+    }
     if (role != Qt::DisplayRole && role != Qt::EditRole)
         return QVariant();
 
-    const int row = index.row();
-    if (row < 0 || row >= m_items.size())
-        return QVariant();
+    if (!RegisterCellLayout::isValueColumn(index.column()))
+        return m_items[watchIndex].toString();
 
-    if (index.column() == 0)
-        return m_items[row].toString();
-
-    if (!isValueEditable(row))
+    if (!isValueEditable(watchIndex))
         return QString();
-    return formatValueAtRow(row);
+    return formatValueAtRow(watchIndex);
 }
 
 QVariant RegisterTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (role != Qt::DisplayRole) return QVariant();
     if (orientation == Qt::Horizontal)
-        return section == kValueColumn ? tr("值") : tr("地址");
+        return RegisterCellLayout::isValueColumn(section) ? tr("值") : tr("地址");
     return QStringLiteral(" ");
 }
 
@@ -231,7 +391,8 @@ Qt::ItemFlags RegisterTableModel::flags(const QModelIndex& index) const
     if (!index.isValid()) return Qt::NoItemFlags;
 
     Qt::ItemFlags f = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-    if (index.column() == kValueColumn && isValueEditable(index.row()))
+    if (RegisterCellLayout::isValueColumn(index.column())
+        && isValueEditable(watchIndexAt(index.row(), index.column())))
         f |= Qt::ItemIsEditable;
     return f;
 }
@@ -239,13 +400,13 @@ Qt::ItemFlags RegisterTableModel::flags(const QModelIndex& index) const
 bool RegisterTableModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
     if (role != Qt::EditRole || !index.isValid() || !m_store) return false;
-    if (index.column() != kValueColumn) return false;
+    if (!RegisterCellLayout::isValueColumn(index.column())) return false;
 
-    const int row = index.row();
-    if (row < 0 || row >= m_items.size() || !isValueEditable(row))
+    const int watchIndex = watchIndexAt(index.row(), index.column());
+    if (watchIndex < 0 || !isValueEditable(watchIndex))
         return false;
 
-    const DeviceAddress& addr = m_items[row];
+    const DeviceAddress& addr = m_items[watchIndex];
     ValidationResult r;
     if (addr.isBit())
         r = validateBit(value.toString());
@@ -274,10 +435,10 @@ bool RegisterTableModel::setData(const QModelIndex& index, const QVariant& value
             return false;
     }
 
-    if (row < m_displayCache.size())
-        m_displayCache[row] = formatValueAtRow(row);
+    if (watchIndex < m_displayCache.size())
+        m_displayCache[watchIndex] = formatValueAtRow(watchIndex);
 
-    stampFlash(row, kValueColumn);
+    stampFlash(index.row(), index.column());
     emit dataChanged(index, index);
     return true;
 }
@@ -343,21 +504,21 @@ void RegisterTableModel::onStoreChanged()
 {
     if (m_items.isEmpty()) return;
 
-    const int rows = m_items.size();
-    if (m_displayCache.size() != rows)
-        m_displayCache.resize(rows);
+    if (m_displayCache.size() != m_items.size())
+        m_displayCache.resize(m_items.size());
 
-    for (int row = 0; row < rows; ++row)
+    for (int watchIndex = 0; watchIndex < m_items.size(); ++watchIndex)
     {
-        if (!isValueEditable(row)) continue;
+        if (!isValueEditable(watchIndex)) continue;
 
-        const QString newText = formatValueAtRow(row);
-        if (m_displayCache[row] == newText) continue;
-        m_displayCache[row] = newText;
+        const QString newText = formatValueAtRow(watchIndex);
+        if (m_displayCache[watchIndex] == newText) continue;
+        m_displayCache[watchIndex] = newText;
 
-        const QModelIndex idx = index(row, kValueColumn);
+        const QModelIndex idx = valueIndexForWatch(watchIndex);
+        if (!idx.isValid()) continue;
         if (m_editIndex == idx) continue;
-        stampFlash(row, kValueColumn);
+        stampFlash(idx.row(), idx.column());
         emit dataChanged(idx, idx);
     }
 }
@@ -387,8 +548,8 @@ void RegisterTableModel::syncDisplayCache()
 void RegisterTableModel::refreshAll()
 {
     syncDisplayCache();
-    if (!m_items.isEmpty())
-        emit dataChanged(index(0, 0), index(m_items.size() - 1, columnCount() - 1));
+    if (rowCount() > 0 && columnCount() > 0)
+        emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
 }
 
 int RegisterTableModel::registersPerValue(RegisterDataType type) const

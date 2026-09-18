@@ -12,6 +12,8 @@
 
 #include <QTableView>
 #include <QHeaderView>
+#include <QEvent>
+#include <algorithm>
 
 RegisterTableController::RegisterTableController(QTableView* view, RegisterStore* store, QWidget* parent)
     : QObject(parent)
@@ -27,6 +29,7 @@ void RegisterTableController::initTable()
     if (!m_view) return;
 
     m_model = new RegisterTableModel(m_store, m_parentWidget, this);
+    m_model->setGridDimensions(21, 10);
     m_view->setModel(m_model);
 
     m_view->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
@@ -37,11 +40,48 @@ void RegisterTableController::initTable()
     {
         m_view->viewport()->update();
     });
+
+    m_view->viewport()->installEventFilter(this);
+
+    connect(m_model, &RegisterTableModel::editingFinished, this, [this]
+    {
+        applyViewportDimensions();
+    }, Qt::QueuedConnection);
+
+    applyViewportDimensions();
 }
 
-void RegisterTableController::setWatches(const QVector<DeviceAddress>& items)
+bool RegisterTableController::eventFilter(QObject* obj, QEvent* ev)
 {
-    if (m_model) m_model->setWatches(items);
+    if (m_view && obj == m_view->viewport() && ev->type() == QEvent::Resize)
+        applyViewportDimensions();
+    return QObject::eventFilter(obj, ev);
+}
+
+void RegisterTableController::applyViewportDimensions()
+{
+    if (!m_view || !m_model) return;
+
+    const int rowHeight = m_view->verticalHeader()->defaultSectionSize();
+    if (kCellWidth <= 0 || rowHeight <= 0) return;
+
+    const QSize vp = m_view->viewport()->size();
+
+    int cols = vp.width() / kCellWidth;
+    cols -= cols % 2;
+    cols = std::max(2, cols);
+    const int rows = std::max(1, vp.height() / rowHeight);
+
+    if (m_model->isEditing())
+        return;
+
+    m_model->setGridDimensions(rows, cols);
+}
+
+void RegisterTableController::setWatches(const QVector<DeviceAddress>& items,
+                                         const QVector<int>& segmentSizes)
+{
+    if (m_model) m_model->setWatches(items, segmentSizes);
 }
 
 void RegisterTableController::setDataType(RegisterDataType type)

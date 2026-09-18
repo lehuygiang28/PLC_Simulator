@@ -32,7 +32,9 @@ class RegisterTableModel : public QAbstractTableModel
 public:
     explicit RegisterTableModel(RegisterStore* store, QWidget* dialogParent, QObject* parent = nullptr);
 
-    void setWatches(const QVector<DeviceAddress>& items);
+    void setWatches(const QVector<DeviceAddress>& items,
+                    const QVector<int>& segmentSizes = QVector<int>());
+    void setGridDimensions(int rowCount, int colCount);
     void setDataType(RegisterDataType type);
     void setNumberBase(bool hex);
 
@@ -68,12 +70,20 @@ private:
     int registersPerValue(RegisterDataType type) const;
     void stampFlash(int row, int col);
     int flashIndex(int row, int col) const;
-    bool isValueEditable(int row) const;
+    bool isValueEditable(int watchIndex) const;
+    int watchIndexAt(int row, int col) const;
+    QModelIndex valueIndexForWatch(int watchIndex) const;
+    void rebuildWatchGrid();
+    bool trySegmentedGridPlacement();
 
     RegisterStore* m_store;
     QWidget* m_dialogParent;
+    RegisterCellLayout m_layout{ 21, 10 };
 
     QVector<DeviceAddress> m_items;
+    QVector<int> m_segmentSizes;
+    QVector<int> m_watchIndexGrid;  // row*colCount+col -> watch index, -1 empty
+    bool m_segmentedLayout = false;
     QVector<QString> m_displayCache;
 
     RegisterDataType m_currentType;

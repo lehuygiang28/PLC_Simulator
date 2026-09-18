@@ -30,12 +30,20 @@ public:
 
     void initTable();
 
-    void setWatches(const QVector<DeviceAddress>& items);
+    void setWatches(const QVector<DeviceAddress>& items,
+                    const QVector<int>& segmentSizes = QVector<int>());
     void setDataType(RegisterDataType type);
     void setNumberBase(bool hex);
     void retranslateHeaders();
 
+protected:
+    bool eventFilter(QObject* obj, QEvent* ev) override;
+
 private:
+    void applyViewportDimensions();
+
+    static constexpr int kCellWidth = 80;
+
     QTableView* m_view;
     RegisterStore* m_store;
     QWidget* m_parentWidget;

@@ -381,16 +381,16 @@ QString MainWindow::migrateWatchExpr(const QVariantMap& rv) const
 
 void MainWindow::applyWatchExpression(const QString& text)
 {
-	QVector<DeviceAddress> items;
+	WatchList::ParseResult parsed;
 	QString error;
-	if (!WatchList::parse(text, items, error)) {
+	if (!WatchList::parseWithSegments(text, parsed, error)) {
 		ui->label_WatchError->setText(error);
 		ui->label_WatchError->setVisible(true);
 		return;
 	}
 	ui->label_WatchError->clear();
 	ui->label_WatchError->setVisible(false);
-	m_registerTableController->setWatches(items);
+	m_registerTableController->setWatches(parsed.items, parsed.segmentSizes);
 }
 
 void MainWindow::saveRegisterView()
