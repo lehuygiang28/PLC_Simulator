@@ -13,6 +13,9 @@ declare function GetFloat(addr: string): number;
 declare function GetDouble(addr: string): number;
 declare function GetString(addr: string): string;
 
+declare function SetBit(addr: string, value: number): void;
+declare function GetBit(addr: string): number;
+
 declare function MoveAbsInt32(x: number, y: number, angle: number): void;
 declare function MoveAbsFloat(x: number, y: number, angle: number): void;
 declare function MoveRelativeInt32(dx: number, dy: number, dAngle: number): void;

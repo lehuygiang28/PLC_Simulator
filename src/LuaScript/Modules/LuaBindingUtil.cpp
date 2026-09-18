@@ -6,31 +6,18 @@
  * Licensed under the MIT License. See LICENSE file in the project root.
  */
 #include "LuaBindingUtil.h"
+#include "Core/DeviceAddress.h"
 #include <QString>
 
 namespace LuaBindingUtil {
 
 bool parseRegisterAddr(const char* strAddr, int& nAddr, int nMinVal /*= 0*/, int nMaxVal /*= 100000*/)
 {
-    QString addressStr = QString::fromUtf8(strAddr).trimmed();
-
-    if (addressStr.length() < 2 || addressStr.length() > 10) {
-        return false;
-    }
-    if (addressStr[0] != 'D') {
-        return false;
-    }
-    QString numberStr = addressStr.mid(1);
-    for (QChar ch : numberStr) {
-        if (!ch.isDigit()) {
-            return false;
-        }
-    }
-    bool ok;
-    nAddr = numberStr.toInt(&ok);
-    if (!ok || nAddr < nMinVal || nAddr > nMaxVal) {
-        return false;
-    }
+    DeviceAddress a;
+    if (!DeviceAddress::parse(QString::fromUtf8(strAddr), a)) return false;
+    if (a.kind != DeviceKind::D || a.bit >= 0) return false;
+    if (a.index < nMinVal || a.index > nMaxVal) return false;
+    nAddr = a.index;
     return true;
 }
 

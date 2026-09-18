@@ -7,6 +7,7 @@
  */
 #include "RegisterBinding.h"
 #include <QCoreApplication>
+#include "Core/DeviceAddress.h"
 #include "Core/RegisterStore.h"
 #include "LuaBindingUtil.h"
 #include "Lua.hpp"
@@ -29,12 +30,23 @@ static RegisterBinding* self_from(lua_State* L)
 
 // 各 wrapper 共用前导:取 binding、校验 arg1 为地址字符串、解析出 nAddr。
 // 出错时 luaL_error 直接 longjmp,不返回。
-static RegisterBinding* prologue(lua_State* L, int& nAddr)
+static RegisterBinding* prologueWord(lua_State* L, int& nAddr)
 {
     RegisterBinding* b = self_from(L);
     if (!lua_isstring(L, 1)) luaL_error(L, "Argument #1 must be a string (register address)");
     const char* addr = lua_tostring(L, 1);
-    if (!LuaBindingUtil::parseRegisterAddr(addr, nAddr)) luaL_error(L, "Register address Invalid: %s", addr);
+    if (!LuaBindingUtil::parseRegisterAddr(addr, nAddr))
+        luaL_error(L, "D-word address Invalid: %s (use GetBit/SetBit for M or D.n)", addr);
+    return b;
+}
+
+static RegisterBinding* prologueBit(lua_State* L, DeviceAddress& addr)
+{
+    RegisterBinding* b = self_from(L);
+    if (!lua_isstring(L, 1)) luaL_error(L, "Argument #1 must be a string (bit address)");
+    const char* text = lua_tostring(L, 1);
+    if (!DeviceAddress::parse(QString::fromUtf8(text), addr) || !addr.isBit())
+        luaL_error(L, "Bit address Invalid: %s (expected M0 or D0.0)", text);
     return b;
 }
 
@@ -49,6 +61,8 @@ const RegisterBinding::Fn RegisterBinding::kFns[] = {
     {"GetFloat",  &RegisterBinding::GetFloatWrapper,  "GetFloat(\"D100\")",           "读取寄存器值,浮点数"},
     {"GetDouble", &RegisterBinding::GetDoubleWrapper, "GetDouble(\"D100\")",          "读取寄存器值,双精度浮点数"},
     {"GetString", &RegisterBinding::GetStringWrapper, "GetString(\"D100\")",          "读取寄存器字符串"},
+    {"SetBit",    &RegisterBinding::SetBitWrapper,    "SetBit(\"M1500\", 1)",         "设置位(M 或 D.n)"},
+    {"GetBit",    &RegisterBinding::GetBitWrapper,    "GetBit(\"M1500\")",            "读取位(M 或 D.n)"},
 };
 
 void RegisterBinding::install(lua_State* L)
@@ -72,7 +86,7 @@ QList<LuaFunctionDoc> RegisterBinding::functions() const
 int RegisterBinding::SetInt16Wrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     lua_Integer value = luaL_checkinteger(L, 2);
     if (value < INT16_MIN || value > INT16_MAX) {
         char msg[128];
@@ -87,7 +101,7 @@ int RegisterBinding::SetInt16Wrapper(lua_State* L)
 int RegisterBinding::SetInt32Wrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     lua_Integer value = luaL_checkinteger(L, 2);
     if (value < INT32_MIN || value > INT32_MAX) {
         char msg[128];
@@ -102,7 +116,7 @@ int RegisterBinding::SetInt32Wrapper(lua_State* L)
 int RegisterBinding::SetFloatWrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     // 在转 float 前以 double 域判定:拦截 inf/nan 与超出 float 表示范围的入参
     double dValue = static_cast<double>(luaL_checknumber(L, 2));
     if (!std::isfinite(dValue) || std::fabs(dValue) > static_cast<double>(FLT_MAX))
@@ -115,7 +129,7 @@ int RegisterBinding::SetFloatWrapper(lua_State* L)
 int RegisterBinding::SetDoubleWrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     // lua_Number 即 double,有限值不可能越 double 界;此处只需拦截 inf/nan
     double dValue = static_cast<double>(luaL_checknumber(L, 2));
     if (!std::isfinite(dValue))
@@ -127,7 +141,7 @@ int RegisterBinding::SetDoubleWrapper(lua_State* L)
 int RegisterBinding::SetStringWrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     if (!lua_isstring(L, 2)) return luaL_error(L, "Argument #2 must be a string (register value)");
     const char* strValue = lua_tostring(L, 2);
     QString strVal = QString::fromUtf8(strValue);
@@ -139,7 +153,7 @@ int RegisterBinding::SetStringWrapper(lua_State* L)
 int RegisterBinding::GetInt16Wrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     lua_pushinteger(L, b->m_store->GetInt16(nAddr));
     return 1;
 }
@@ -147,7 +161,7 @@ int RegisterBinding::GetInt16Wrapper(lua_State* L)
 int RegisterBinding::GetInt32Wrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     lua_pushinteger(L, b->m_store->GetInt32(nAddr));
     return 1;
 }
@@ -155,7 +169,7 @@ int RegisterBinding::GetInt32Wrapper(lua_State* L)
 int RegisterBinding::GetFloatWrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     lua_pushnumber(L, b->m_store->GetFloat(nAddr));
     return 1;
 }
@@ -163,7 +177,7 @@ int RegisterBinding::GetFloatWrapper(lua_State* L)
 int RegisterBinding::GetDoubleWrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     lua_pushnumber(L, b->m_store->GetDouble(nAddr));
     return 1;
 }
@@ -171,9 +185,28 @@ int RegisterBinding::GetDoubleWrapper(lua_State* L)
 int RegisterBinding::GetStringWrapper(lua_State* L)
 {
     int nAddr = 0;
-    RegisterBinding* b = prologue(L, nAddr);
+    RegisterBinding* b = prologueWord(L, nAddr);
     QString value = b->m_store->GetString(nAddr);
     QByteArray utf8 = value.toUtf8();
     lua_pushstring(L, utf8.constData());
+    return 1;
+}
+
+int RegisterBinding::SetBitWrapper(lua_State* L)
+{
+    DeviceAddress addr;
+    RegisterBinding* b = prologueBit(L, addr);
+    const lua_Integer value = luaL_checkinteger(L, 2);
+    if (value != 0 && value != 1)
+        return luaL_error(L, "Bit value must be 0 or 1, got %lld", static_cast<long long>(value));
+    b->m_store->SetBit(addr, value == 1);
+    return 0;
+}
+
+int RegisterBinding::GetBitWrapper(lua_State* L)
+{
+    DeviceAddress addr;
+    RegisterBinding* b = prologueBit(L, addr);
+    lua_pushinteger(L, b->m_store->GetBit(addr) ? 1 : 0);
     return 1;
 }

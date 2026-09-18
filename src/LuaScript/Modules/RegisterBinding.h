@@ -40,6 +40,8 @@ private:
     static int GetFloatWrapper(lua_State* L);
     static int GetDoubleWrapper(lua_State* L);
     static int GetStringWrapper(lua_State* L);
+    static int SetBitWrapper(lua_State* L);
+    static int GetBitWrapper(lua_State* L);
 };
 
 #endif // REGISTERBINDING_H
