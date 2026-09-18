@@ -4,6 +4,8 @@
 
 > 工业通信协议测试与仿真工具（PLC 通信模拟器）· 基于 Qt6 + CMake
 
+**中文** · [English](README.en.md)
+
 ## 简介
 
 PLC Simulator 以**服务端**身份模拟 PLC（可编程逻辑控制器），让上位机 / 客户端在**没有真实 PLC** 时也能联调、测试通信协议。
@@ -20,6 +22,7 @@ PLC Simulator 以**服务端**身份模拟 PLC（可编程逻辑控制器），�
 - **网络通信**：TCP/IP（作为服务端监听）
 - **Lua 脚本引擎**：编写自定义自动化测试脚本，支持语法高亮与代码提示
 - **TypeScript 脚本**：可用 TypeScript 编写脚本，运行前自动编译为 Lua（需 Node.js）；详见 [docs/SCRIPTING.md](docs/SCRIPTING.md)
+- **MCP 控制面**：内置 MCP 服务器，供 Cursor 等 AI 工具通过 localhost 控制寄存器/通信/脚本/平台；详见 [tools/mcp/README.md](tools/mcp/README.md)（[English](tools/mcp/README.en.md)）
 - **可视化模拟平台**：图像加载与模拟运动控制，用于测试设备控制指令
 - **深色 / 浅色主题**
 
@@ -62,6 +65,7 @@ cmake --build . --config Release
 3. 在寄存器表查看 / 编辑数据，在通信日志观察收发帧（可切换 ASCII / HEX）；
 4. （可选）编写 Lua 或 TypeScript 脚本实现自动化测试逻辑（TS 说明见 [docs/SCRIPTING.md](docs/SCRIPTING.md)）；
 5. （可选）打开模拟平台，测试运动控制相关指令。
+6. （可选）在 **帮助 → MCP 控制** 中配置端口/token，复制 URL 或 Cursor JSON，启动 MCP 供 AI agent 联调。
 
 ## 路线图
 
