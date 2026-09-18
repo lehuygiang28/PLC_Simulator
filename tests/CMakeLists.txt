@@ -8,6 +8,9 @@ add_executable(${TEST_TARGET}
     tst_WatchList.cpp
     ${CMAKE_SOURCE_DIR}/src/Core/DeviceAddress.cpp
     ${CMAKE_SOURCE_DIR}/src/Core/WatchList.cpp
+    tst_RegisterStoreBits.h
+    tst_RegisterStoreBits.cpp
+    ${CMAKE_SOURCE_DIR}/src/Core/RegisterStore.cpp
 )
 
 target_include_directories(${TEST_TARGET} PRIVATE

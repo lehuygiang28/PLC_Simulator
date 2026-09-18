@@ -1,5 +1,6 @@
 #include "tst_DeviceAddress.h"
 #include "tst_WatchList.h"
+#include "tst_RegisterStoreBits.h"
 
 #include <QtTest>
 
@@ -12,6 +13,10 @@ int main(int argc, char** argv)
     }
     {
         tst_WatchList tc;
+        status |= QTest::qExec(&tc, argc, argv);
+    }
+    {
+        tst_RegisterStoreBits tc;
         status |= QTest::qExec(&tc, argc, argv);
     }
     return status;

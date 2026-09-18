@@ -9,6 +9,8 @@
 #ifndef CORE_REGISTERSTORE_H
 #define CORE_REGISTERSTORE_H
 
+#include "Core/DeviceAddress.h"
+
 #include <QObject>
 #include <QString>
 #include <vector>
@@ -22,6 +24,7 @@ class RegisterStore : public QObject
     Q_OBJECT
 public:
     static constexpr int kRegisterCount = 100000;
+    static constexpr int kBitCount = 100000;
 
     explicit RegisterStore(QObject* parent = nullptr);
 
@@ -48,6 +51,15 @@ public:
     void SetDouble(int index, double value);
     void SetString(int index, const QString& value);
 
+    bool GetBit(const DeviceAddress& addr) const;
+    bool SetBit(const DeviceAddress& addr, bool value);
+
+    std::vector<uint8_t> bits(DeviceKind kind, int start, int count) const;
+    bool setBits(DeviceKind kind, int start, const std::vector<uint8_t>& values);
+
+    std::vector<int16_t> words(DeviceKind kind, int start, int count) const;
+    bool setWords(DeviceKind kind, int start, const std::vector<int16_t>& values);
+
     bool resetAll(int16_t value);   // emit 一次
     void notifyChanged();           // emit 一次
 
@@ -55,7 +67,15 @@ signals:
     void dataChanged();
 
 private:
+    static int mWordCount() { return (kBitCount + 15) / 16; }
+
+    bool mBit(int index) const;
+    bool setMBit(int index, bool value);
+    bool dBit(int word, int bit) const;
+    bool setDBit(int word, int bit, bool value);
+
     std::vector<std::atomic_int16_t> m_cells;
+    std::vector<std::atomic_int16_t> m_mWords;
 };
 
 #endif // CORE_REGISTERSTORE_H
