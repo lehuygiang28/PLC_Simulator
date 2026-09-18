@@ -21,6 +21,9 @@
 #include "MainWorkflow.h"
 #include "Theme/ThemeManager.h"
 #include "I18n/LanguageManager.h"
+#include "App/AppOptions.h"
+#include "Control/ControlService.h"
+#include "Mcp/McpService.h"
 
 #include <QtWidgets/QMainWindow>
 #include <QEvent>
@@ -43,7 +46,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(const AppOptions& options = AppOptions{}, QWidget* parent = nullptr);
     ~MainWindow();
 
 protected:
@@ -100,6 +103,7 @@ private:
     // 菜单栏相关
     void OnThemeSelected(Theme theme);
     void OnLanguageSelected(AppLanguage lang);
+    void showMcpSettings();
     void retranslateDynamicUi();
 
     // 工具栏图标按当前主题前景色重染(初次构建 + 主题切换时调用)
@@ -135,6 +139,7 @@ private:
     QAction* m_actLangEn = nullptr;
     QMenu* m_fmtMenu = nullptr;
     QAction* m_actPlatformParams = nullptr;
+    QAction* m_actMcpSettings = nullptr;
     QToolBar* m_platformToolBar = nullptr;
 
     // 子窗口
@@ -159,6 +164,10 @@ private:
 
     // 状态栏控制器
     std::unique_ptr<StatusBarController> m_statusBarController;
+
+    AppOptions m_appOptions;
+    std::unique_ptr<ControlService> m_controlService;
+    std::unique_ptr<McpService> m_mcpService;
 
 
     // UI 就绪标志:startup 期间控件初值变更不落盘,initialRefresh 末尾置真

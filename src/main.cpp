@@ -22,12 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include "App/AppOptions.h"
+#include "App/AppRuntime.h"
 #include "MainWindow.h"
 #include "I18n/LanguageManager.h"
 #include "version.h"
 #include <QtWidgets/QApplication>
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QMessageBox>
 #include <QSharedMemory>
 #include <QSystemSemaphore>
@@ -51,6 +54,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain(APP_DOMAIN);
 
     applyLanguage(app, resolveStartupLanguage());
+
+    const AppOptions options = AppOptions::parse(app.arguments());
 
     // 步骤1：创建系统信号量（防止多实例同时检查共享内存）
     QSystemSemaphore semaphore(SEMAPHORE_KEY, 1);
@@ -76,18 +81,22 @@ int main(int argc, char *argv[])
 
     // 步骤3：已有实例，退出
     if (!isNewInstance) {
+        if (options.headless) {
+            qWarning() << "PLC Simulator is already running.";
+            return 0;
+        }
         QMessageBox::warning(nullptr,
                              QCoreApplication::translate("main", "提示"),
                              QCoreApplication::translate("main", "程序正在运行！请勿重复启动！"));
         return 0;
     }
 
-    // 作用域块:让 MainWindow 先于 QApplication 析构
     int result = 0;
-    {
-        MainWindow window;
+    if (options.headless) {
+        result = runHeadless(app, options);
+    } else {
+        MainWindow window(options);
         window.show();
-
         result = app.exec();
     }
 

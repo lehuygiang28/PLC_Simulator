@@ -71,6 +71,7 @@ set(GUI_MAINWINDOW_SOURCES
     Gui/MainWindow/AuxDialogs.cpp
     Gui/MainWindow/StatusBar/StatusSegment.cpp
     Gui/MainWindow/StatusBar/StatusBarController.cpp
+    Gui/MainWindow/McpSettingsDialog.cpp
 )
 
 set(GUI_MAINWINDOW_HEADERS
@@ -84,6 +85,7 @@ set(GUI_MAINWINDOW_HEADERS
     Gui/MainWindow/AuxDialogs.h
     Gui/MainWindow/StatusBar/StatusSegment.h
     Gui/MainWindow/StatusBar/StatusBarController.h
+    Gui/MainWindow/McpSettingsDialog.h
 )
 
 # Gui\Theme 模块
@@ -187,6 +189,41 @@ set(CONFIG_HEADERS
     Config/ConfigStore.h
 )
 
+# Control 模块
+set(CONTROL_SOURCES
+    Control/LogRingBuffer.cpp
+    Control/ControlService.cpp
+)
+
+set(CONTROL_HEADERS
+    Control/LogRingBuffer.h
+    Control/ControlService.h
+)
+
+# MCP 模块
+set(MCP_SOURCES
+    Mcp/McpHttpServer.cpp
+    Mcp/McpSettings.cpp
+    Mcp/McpService.cpp
+)
+
+set(MCP_HEADERS
+    Mcp/McpHttpServer.h
+    Mcp/McpSettings.h
+    Mcp/McpService.h
+)
+
+# App runtime 模块
+set(APP_SOURCES
+    App/AppOptions.cpp
+    App/AppRuntime.cpp
+)
+
+set(APP_HEADERS
+    App/AppOptions.h
+    App/AppRuntime.h
+)
+
 # Core 模块
 set(CORE_SOURCES
     Core/RegisterStore.cpp
@@ -214,6 +251,9 @@ set(SOURCES
     ${MAINFLOW_SOURCES}
     ${LUA_SOURCES}
     ${CONFIG_SOURCES}
+    ${CONTROL_SOURCES}
+    ${MCP_SOURCES}
+    ${APP_SOURCES}
     ${CORE_SOURCES}
 )
 
@@ -230,6 +270,9 @@ set(HEADERS
     ${MAINFLOW_HEADERS}
     ${LUA_HEADERS}
     ${CONFIG_HEADERS}
+    ${CONTROL_HEADERS}
+    ${MCP_HEADERS}
+    ${APP_HEADERS}
     ${CORE_HEADERS}
 )
 
@@ -272,6 +315,9 @@ source_group("MainFlow" FILES ${MAINFLOW_SOURCES} ${MAINFLOW_HEADERS})
 source_group("LuaScript\\\\Engine" FILES ${LUA_ENGINE_SOURCES} ${LUA_ENGINE_HEADERS})
 source_group("LuaScript\\\\Modules" FILES ${LUA_MODULE_SOURCES} ${LUA_MODULE_HEADERS})
 source_group("Config" FILES ${CONFIG_SOURCES} ${CONFIG_HEADERS})
+source_group("Control" FILES ${CONTROL_SOURCES} ${CONTROL_HEADERS})
+source_group("Mcp" FILES ${MCP_SOURCES} ${MCP_HEADERS})
+source_group("App" FILES ${APP_SOURCES} ${APP_HEADERS})
 source_group("Core" FILES ${CORE_SOURCES} ${CORE_HEADERS})
 source_group("Header Files" FILES ${ROOT_HEADERS})
 

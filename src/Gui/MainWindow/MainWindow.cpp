@@ -15,6 +15,7 @@
 #include "Comm/Socket/CommSocket.h"
 #include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
+#include "McpSettingsDialog.h"
 #include "version.h"
 #include <QWindow>
 #include <QScreen>
@@ -94,8 +95,8 @@ void MainWindow::applyPlatformParams()
 	refreshAxisAddrStatus();
 }
 
-MainWindow::MainWindow(QWidget *parent)
-	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkflow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr)
+MainWindow::MainWindow(const AppOptions& options, QWidget *parent)
+	: QMainWindow(parent), ui(new Ui::MainWindow()), m_pWorkflow(nullptr), m_simulationPlatform(nullptr), m_configStore(nullptr), m_appOptions(options)
 {
 	ui->setupUi(this);
 	setWindowTitle(QString("%1 - v%2").arg(QCoreApplication::translate("AppInfo", APP_NAME)).arg(APP_VERSION));
@@ -242,6 +243,29 @@ void MainWindow::createMembers()
 
 	// 状态栏控制器:5 段运行态信息(通信/客户端/健康/脚本/平台)
 	m_statusBarController = std::make_unique<StatusBarController>(ui->statusBar, this);
+
+	m_controlService = std::make_unique<ControlService>(m_pWorkflow, m_configStore, this);
+	m_controlService->setPlatformController(m_platformController.get());
+	m_controlService->setSimulationPlatform(m_simulationPlatform);
+	m_controlService->setPlatformParams(&m_platformParams);
+	m_controlService->wireSignals();
+
+	m_mcpService = std::make_unique<McpService>(m_controlService.get(), m_configStore, this);
+	m_mcpService->loadSettings();
+
+	McpSettings mcpSettings = m_mcpService->settings();
+	if (m_appOptions.mcpPortSet)
+		mcpSettings.port = m_appOptions.mcpPort;
+	if (m_appOptions.mcpTokenSet)
+		mcpSettings.token = m_appOptions.mcpToken;
+	m_mcpService->saveSettings(mcpSettings);
+
+	if (!m_appOptions.disableMcp && mcpSettings.autoStart) {
+		if (!m_mcpService->start())
+			UpdateLogDisplay(tr("MCP server failed to start on port %1: %2")
+			                     .arg(mcpSettings.port)
+			                     .arg(m_mcpService->lastError()));
+	}
 }
 
 void MainWindow::setupUiContent()
@@ -402,8 +426,10 @@ void MainWindow::buildMenus()
 {
 	// 初始化菜单栏
 	QMenu *helpMenu = ui->menuBar->addMenu(tr("帮助(&H)"));
+	m_actMcpSettings = helpMenu->addAction(tr("MCP 控制(&M)..."));
 	QAction *aboutAction = helpMenu->addAction(tr("关于(&A)"));
 	QAction *changelogAction = helpMenu->addAction(tr("更新日志(&U)"));
+	connect(m_actMcpSettings, &QAction::triggered, this, &MainWindow::showMcpSettings);
 	connect(aboutAction, &QAction::triggered, this, [this]() { AuxDialogs::showAbout(this); });
 	connect(changelogAction, &QAction::triggered, this, [this]() { AuxDialogs::showChangeLog(this); });
 
@@ -568,6 +594,8 @@ void MainWindow::connectScript()
 
 	if (m_scriptManager)
 		m_scriptManager->setScriptCount(scriptCount);
+	if (m_controlService)
+		m_controlService->setScriptSlotCount(scriptCount);
 
 	auto* scriptGrid = ui->grpbox_LuaScript->findChild<QGridLayout*>(QStringLiteral("gridLayout_4"));
 	if (scriptGrid)
@@ -976,6 +1004,15 @@ void MainWindow::OnLanguageSelected(AppLanguage lang)
 		m_actLangEn->setChecked(lang == AppLanguage::English);
 }
 
+void MainWindow::showMcpSettings()
+{
+	if (!m_mcpService)
+		return;
+
+	McpSettingsDialog dialog(m_mcpService.get(), this);
+	dialog.exec();
+}
+
 void MainWindow::changeEvent(QEvent* event)
 {
 	if (event->type() == QEvent::LanguageChange)
@@ -1041,6 +1078,8 @@ void MainWindow::retranslateDynamicUi()
 		m_actFmtInt32->setText(tr("双字写入"));
 	if (m_actPlatformParams)
 		m_actPlatformParams->setText(tr("参数设置…"));
+	if (m_actMcpSettings)
+		m_actMcpSettings->setText(tr("MCP 控制(&M)..."));
 	if (m_platformToolBar)
 		m_platformToolBar->setWindowTitle(tr("平台操作"));
 	if (m_actManualFloat)

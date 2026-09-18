@@ -97,6 +97,11 @@ public:
     // 加载寄存器表显示设置
     bool LoadRegisterView(QVariantMap& params) const;
 
+    // ==================== MCP 设置 ====================
+
+    bool SaveMcpSettings(const QVariantMap& params);
+    bool LoadMcpSettings(QVariantMap& params) const;
+
 private:
     // 配置文件路径 + 内存事实源
     QString m_configDirPath;

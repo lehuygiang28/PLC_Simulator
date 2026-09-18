@@ -19,6 +19,7 @@ constexpr auto kScriptLanguages    = "script_languages";
 constexpr auto kSimulationPlatform = "simulation_platform";
 constexpr auto kAxisWriteParams    = "axis_write_params";
 constexpr auto kRegisterView       = "register_view";
+constexpr auto kMcpSettings        = "mcp_settings";
 }
 
 ConfigStore::ConfigStore(QObject* parent)
@@ -224,5 +225,17 @@ bool ConfigStore::LoadRegisterView(QVariantMap& params) const
 {
     if (!m_root.contains(kRegisterView)) return false;
     params = Get(kRegisterView).toObject().toVariantMap();
+    return true;
+}
+
+bool ConfigStore::SaveMcpSettings(const QVariantMap& params)
+{
+    return Set(kMcpSettings, QJsonObject::fromVariantMap(params));
+}
+
+bool ConfigStore::LoadMcpSettings(QVariantMap& params) const
+{
+    if (!m_root.contains(kMcpSettings)) return false;
+    params = Get(kMcpSettings).toObject().toVariantMap();
     return true;
 }

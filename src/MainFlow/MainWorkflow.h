@@ -58,6 +58,9 @@ public:
     // 获取 Lua 脚本引擎宿主
     ScriptEngineHost* scriptHost() const { return m_scriptHost.get(); }
 
+    ProtocolType protocolType() const { return m_eProtocolType.load(); }
+    const CommBase::CommInfoBase* commInfo() const { return m_pCommInfo.get(); }
+
     void SetRequestProcessor(std::function<bool(const QByteArray&, QByteArray&)> fn);
 
 //MainWorkflow初始化相关
