@@ -16,6 +16,7 @@
 #include "Comm/Socket/CommSocket.h"
 #include "Comm/CommInfoFactory.h"
 #include "PlatformBinding.h"
+#include "LuaScript/Engine/ScriptLanguage.h"
 #include "McpSettingsDialog.h"
 #include "version.h"
 #include <QWindow>
@@ -32,6 +33,7 @@
 #include <QLineEdit>
 #include <QComboBox>
 #include <QGridLayout>
+#include <QCheckBox>
 #include <QIntValidator>
 #include <QTextDocument>
 #include <QSignalBlocker>
@@ -268,6 +270,8 @@ void MainWindow::createMembers()
 
 void MainWindow::setupUiContent()
 {
+	ensureScriptRowsBuilt();
+
 	// 协议类型下拉
 	{
 		QMap<ProtocolType, QString> protocolTypeMap;
@@ -585,39 +589,71 @@ void MainWindow::connectWindowSignals()
 		} });
 }
 
-void MainWindow::connectScript()
+void MainWindow::ensureScriptRowsBuilt()
 {
-	int scriptCount = 0;
-	for (int i = 0; ; ++i) {
-		if (!findChild<QPushButton*>(QString("Btn_Execute_%1").arg(i + 1)))
-			break;
-		++scriptCount;
+	if (m_scriptRowsBuilt)
+		return;
+
+	QGridLayout* grid = ui->widget_ScriptRows
+		? qobject_cast<QGridLayout*>(ui->widget_ScriptRows->layout())
+		: ui->grpbox_LuaScript->findChild<QGridLayout*>(QStringLiteral("gridLayout_4"));
+	QWidget* rowHost = ui->widget_ScriptRows ? ui->widget_ScriptRows : ui->grpbox_LuaScript;
+	if (!grid || !rowHost)
+		return;
+
+	m_scriptNameEdits.clear();
+	constexpr int kRowHeight = 30;
+	for (int i = 0; i < kMaxScriptSlots; ++i) {
+		auto* nameEdit = new QLineEdit(rowHost);
+		nameEdit->setObjectName(QStringLiteral("edit_ScriptName_%1").arg(i + 1));
+		nameEdit->setMinimumHeight(kRowHeight);
+		nameEdit->setAlignment(Qt::AlignCenter);
+		nameEdit->setText(tr("脚本%1").arg(i + 1));
+
+		auto* execBtn = new QPushButton(tr("执行"), rowHost);
+		execBtn->setObjectName(QStringLiteral("Btn_Execute_%1").arg(i + 1));
+		execBtn->setMinimumHeight(kRowHeight);
+
+		auto* editBtn = new QPushButton(tr("编辑"), rowHost);
+		editBtn->setObjectName(QStringLiteral("Btn_Edit_%1").arg(i + 1));
+		editBtn->setMinimumHeight(kRowHeight);
+
+		auto* loopChk = new QCheckBox(tr("循环执行"), rowHost);
+		loopChk->setObjectName(QStringLiteral("ChkBox_LoopEnable_%1").arg(i + 1));
+
+		auto* langCombo = new QComboBox(rowHost);
+		langCombo->setObjectName(QStringLiteral("cmb_ScriptLang_%1").arg(i + 1));
+		langCombo->setMinimumHeight(kRowHeight);
+		langCombo->setMaximumWidth(56);
+
+		grid->addWidget(nameEdit, i, 0);
+		grid->addWidget(execBtn, i, 1);
+		grid->addWidget(editBtn, i, 2);
+		grid->addWidget(loopChk, i, 3);
+		grid->addWidget(langCombo, i, 4);
+
+		m_scriptNameEdits << nameEdit;
 	}
 
+	ui->grpbox_LuaScript->setMinimumWidth(430);
+	m_scriptRowsBuilt = true;
+}
+
+void MainWindow::connectScript()
+{
+	ensureScriptRowsBuilt();
+
 	if (m_scriptManager)
-		m_scriptManager->setScriptCount(scriptCount);
+		m_scriptManager->setScriptCount(kMaxScriptSlots);
 	if (m_controlService)
-		m_controlService->setScriptSlotCount(scriptCount);
+		m_controlService->setScriptSlotCount(kMaxScriptSlots);
 
-	auto* scriptGrid = ui->grpbox_LuaScript->findChild<QGridLayout*>(QStringLiteral("gridLayout_4"));
-	if (scriptGrid)
-		ui->grpbox_LuaScript->setMinimumWidth(430);
-
-	// 连接脚本执行/编辑/循环/语言按钮(数量由 UI 推导:Btn_Execute_{i+1} 找不到即停)
-	for (int i = 0; ; ++i)
+	for (int i = 0; i < kMaxScriptSlots; ++i)
 	{
-		auto* execBtn = findChild<QPushButton*>(QString("Btn_Execute_%1").arg(i + 1));
-		if (!execBtn) break;
-		auto* editBtn = findChild<QPushButton*>(QString("Btn_Edit_%1").arg(i + 1));
-		auto* loopChk = findChild<QCheckBox*>(QString("ChkBox_LoopEnable_%1").arg(i + 1));
-
-		QComboBox* langCombo = nullptr;
-		if (scriptGrid) {
-			langCombo = new QComboBox(ui->grpbox_LuaScript);
-			langCombo->setMinimumHeight(30);
-			langCombo->setMaximumWidth(56);
-			scriptGrid->addWidget(langCombo, i, 4);
-		}
+		auto* execBtn = findChild<QPushButton*>(QStringLiteral("Btn_Execute_%1").arg(i + 1));
+		auto* editBtn = findChild<QPushButton*>(QStringLiteral("Btn_Edit_%1").arg(i + 1));
+		auto* loopChk = findChild<QCheckBox*>(QStringLiteral("ChkBox_LoopEnable_%1").arg(i + 1));
+		auto* langCombo = findChild<QComboBox*>(QStringLiteral("cmb_ScriptLang_%1").arg(i + 1));
 
 		m_scriptManager->bindScriptRow(i, execBtn, editBtn, loopChk, langCombo);
 	}
@@ -631,6 +667,17 @@ void MainWindow::connectScript()
 
 	// 脚本相关提示(如脚本不存在)转发到通信日志
 	connect(m_scriptManager.get(), &ScriptManager::logMessage, this, &MainWindow::UpdateLogDisplay);
+
+	if (m_controlService) {
+		connect(m_controlService.get(), &ControlService::scriptSlotsUpdated, this, [this]() {
+			if (!m_configStore) return;
+			QStringList names;
+			if (!m_configStore->LoadScriptNames(names)) return;
+			const QVector<QLineEdit*> edits = scriptNameEdits();
+			for (int i = 0; i < edits.size() && i < names.size(); ++i)
+				edits[i]->setText(names[i]);
+		});
+	}
 
 	if (m_configStore)
 	{
@@ -649,17 +696,6 @@ void MainWindow::connectScript()
 
 QVector<QLineEdit*> MainWindow::scriptNameEdits() const
 {
-	// 脚本名称编辑框在运行期不变,首次发现后缓存,避免每次全树 findChild 扫描。
-	// 数量由 UI 推导:edit_ScriptName_{i} 找不到即停
-	if (m_scriptNameEdits.isEmpty())
-	{
-		for (int i = 1; ; ++i)
-		{
-			auto* edit = findChild<QLineEdit*>(QString("edit_ScriptName_%1").arg(i));
-			if (!edit) break;
-			m_scriptNameEdits << edit;
-		}
-	}
 	return m_scriptNameEdits;
 }
 
@@ -1097,8 +1133,22 @@ void MainWindow::retranslateDynamicUi()
 	if (m_statusBarController)
 		m_statusBarController->refreshAll();
 
+	retranslateScriptRows();
 	if (m_scriptManager)
 		m_scriptManager->retranslateScriptRows();
+}
+
+void MainWindow::retranslateScriptRows()
+{
+	if (!m_scriptRowsBuilt)
+		return;
+
+	for (int i = 0; i < kMaxScriptSlots; ++i) {
+		if (auto* editBtn = findChild<QPushButton*>(QStringLiteral("Btn_Edit_%1").arg(i + 1)))
+			editBtn->setText(tr("编辑"));
+		if (auto* loopChk = findChild<QCheckBox*>(QStringLiteral("ChkBox_LoopEnable_%1").arg(i + 1)))
+			loopChk->setText(tr("循环执行"));
+	}
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)

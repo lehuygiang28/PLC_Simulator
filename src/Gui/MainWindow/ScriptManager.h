@@ -51,6 +51,7 @@ public:
 
     void openScriptEditor(int index);
     void runScript(int index);
+    void stopScript(int index);
 
     ScriptLanguage language(int index) const;
     void setLanguage(int index, ScriptLanguage lang);
@@ -88,6 +89,7 @@ private:
     QVector<ScriptLanguage> m_languages;
     QVector<QComboBox*> m_langCombos;
     QVector<QPushButton*> m_execBtns;
+    QVector<QCheckBox*> m_loopChks;
     QVector<ScriptRunPhase> m_rowPhase;
 };
 

@@ -136,8 +136,8 @@ void ScriptManager::updateExecuteButton(int index)
         btn->setText(tr("编译中…"));
         break;
     case ScriptRunPhase::Running:
-        btn->setEnabled(false);
-        btn->setText(tr("运行中…"));
+        btn->setEnabled(true);
+        btn->setText(tr("停止"));
         break;
     case ScriptRunPhase::Idle:
     default:
@@ -230,8 +230,22 @@ void ScriptManager::dispatchLuaRun(int index, const QString& luaOut)
 {
     if (!m_host)
         return;
+    const bool loop = index >= 0 && index < m_loopChks.size() && m_loopChks[index]
+                      && m_loopChks[index]->isChecked();
+    m_host->prepareEngineForRun(index, loop);
     setRowPhase(index, ScriptRunPhase::Running);
     m_host->runScriptAsync(index, luaOut);
+}
+
+void ScriptManager::stopScript(int index)
+{
+    if (!m_host || index < 0 || index >= m_rowPhase.size())
+        return;
+    if (m_rowPhase[index] != ScriptRunPhase::Running)
+        return;
+
+    m_host->requestStop(index);
+    emit logMessage(tr("正在停止脚本 %1…").arg(index + 1));
 }
 
 void ScriptManager::runScriptWithContent(int index, const QString& editorContent)
@@ -320,17 +334,30 @@ void ScriptManager::bindScriptRow(int index, QPushButton* execBtn, QPushButton* 
         });
     }
 
-    if (execBtn)
-        connect(execBtn, &QPushButton::clicked, this, [this, index]() { runScript(index); });
+    if (execBtn) {
+        connect(execBtn, &QPushButton::clicked, this, [this, index]() {
+            if (index >= 0 && index < m_rowPhase.size()
+                && m_rowPhase[index] == ScriptRunPhase::Running) {
+                stopScript(index);
+                return;
+            }
+            runScript(index);
+        });
+    }
 
     if (editBtn)
         connect(editBtn, &QPushButton::clicked, this, [this, index]() { openScriptEditor(index); });
 
-    if (loopChk)
+    if (loopChk) {
+        if (index >= m_loopChks.size())
+            m_loopChks.resize(index + 1);
+        m_loopChks[index] = loopChk;
         connect(loopChk, &QCheckBox::stateChanged, this, [this, index](int state) {
-            if (m_host)
+            if (m_host && (index >= m_rowPhase.size()
+                           || m_rowPhase[index] != ScriptRunPhase::Running))
                 m_host->setLoopValid(index, state == Qt::Checked);
         });
+    }
 }
 
 void ScriptManager::openScriptEditor(int index)
