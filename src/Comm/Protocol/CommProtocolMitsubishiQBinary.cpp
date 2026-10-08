@@ -54,12 +54,20 @@ bool CommProtocolMitsubishiQBinary::PackReportReadRegInfo(QByteArray& strInfo, c
 	strRegData = ("");
 
 	if (access.unit == PlcUnit::Bit) {
-		for (int i = 0; i < access.count; ++i) {
-			const uint8_t v = (i < static_cast<int>(access.bitData.size()) && access.bitData.at(i) != 0) ? 1 : 0;
-			strRegData += QString("%1").arg(v, 2, 16, QChar('0')).toUpper().toLatin1();
+		// MC 3E binary bit units: 1 bit = 1 nibble. High nibble = first bit (0x10),
+		// low nibble = second bit (0x01). Odd count pads the unused nibble with 0.
+		for (int i = 0; i < access.count; i += 2) {
+			uint8_t packed = 0;
+			const bool firstOn = i < static_cast<int>(access.bitData.size()) && access.bitData.at(i) != 0;
+			const bool secondOn = (i + 1) < access.count
+			                      && (i + 1) < static_cast<int>(access.bitData.size())
+			                      && access.bitData.at(i + 1) != 0;
+			if (firstOn)
+				packed |= 0x10;
+			if (secondOn)
+				packed |= 0x01;
+			strRegData += QString("%1").arg(packed, 2, 16, QChar('0')).toUpper().toLatin1();
 		}
-		if (access.count % 2 != 0)
-			strRegData += QByteArray("00");
 		const int payloadBytes = strRegData.length() / 2;
 		strDataLen = QString("%1").arg((payloadBytes + 2), 4, 16, QChar('0')).toUpper().toLatin1();
 	} else {
@@ -102,16 +110,18 @@ bool CommProtocolMitsubishiQBinary::AnalyzeWriteReg(QByteArray strInfo, PlcAcces
 		return false;
 
 	if (access.unit == PlcUnit::Bit) {
+		const int packedBytes = (access.count + 1) / 2;
+		if (strInfo.length() < packedBytes * 2)
+			return false;
 		access.bitData.resize(access.count);
 		for (int i = 0; i < access.count; ++i) {
-			if (i * 2 + 1 >= strInfo.length())
-				return false;
-			QByteArray strTemp = strInfo.mid(i * 2, 2);
+			QByteArray strTemp = strInfo.mid((i / 2) * 2, 2);
 			bool bOk = false;
 			const int v = strTemp.toInt(&bOk, 16);
-			if (!bOk || (v != 0 && v != 1))
+			if (!bOk)
 				return false;
-			access.bitData.at(i) = static_cast<uint8_t>(v);
+			const bool on = (i % 2 == 0) ? ((v & 0x10) != 0) : ((v & 0x01) != 0);
+			access.bitData.at(i) = on ? 1 : 0;
 		}
 		return true;
 	}

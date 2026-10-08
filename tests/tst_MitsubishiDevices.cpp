@@ -62,9 +62,9 @@ void tst_MitsubishiDevices::write_m_bit_payload()
 {
     CommProtocolMitsubishiQBinary pro(nullptr);
     PlcAccess a;
+    // MC 3E: two bits in one byte — high nibble = first bit, low nibble = second.
     QByteArray payload;
-    payload.append(char(0x01));
-    payload.append(char(0x00));
+    payload.append(char(0x10));
     const QByteArray req = mcRequest(0x1401, 0x0001, 1564, 0x90, 2, payload);
     CmdType t = CmdType::eCmdUnkown;
     QVERIFY(pro.AnalyzeCmdInfo(req, t));
@@ -90,7 +90,26 @@ void tst_MitsubishiDevices::pack_bit_read_pads_odd_count()
     QVERIFY(pro.PackReportReadRegInfo(reply, a));
     QVERIFY(!reply.isEmpty());
     const QByteArray hex = reply.toHex().toUpper();
-    QVERIFY(hex.contains("0100"));
+    // 1 bit ON → one data byte 0x10 (unused low nibble padded). Length = 2 (end) + 1 = 3.
+    QCOMPARE(hex, QByteArray("D00000FFFF03000300000010"));
+    QCOMPARE(reply.size(), 12);
+}
+
+void tst_MitsubishiDevices::pack_bit_read_even_count_nibble_packed()
+{
+    CommProtocolMitsubishiQBinary pro(nullptr);
+    PlcAccess a;
+    a.device = DeviceKind::M;
+    a.unit = PlcUnit::Bit;
+    a.count = 30;
+    a.bitData.assign(30, 0);
+    a.bitData[0] = 1;
+    QByteArray reply;
+    QVERIFY(pro.PackReportReadRegInfo(reply, a));
+    const QByteArray hex = reply.toHex().toUpper();
+    // 30 bits → 15 data bytes. Length field = 2 + 15 = 17 (0x11).
+    QVERIFY(hex.startsWith("D00000FFFF03001100"));
+    QCOMPARE(reply.size(), 7 + 2 + 2 + 15);
 }
 
 void tst_MitsubishiDevices::read_d_bit_unit()
