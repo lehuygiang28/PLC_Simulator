@@ -17,7 +17,8 @@
 
 #include <atomic>
 
-struct lua_State;  // m_pLua 成员直接使用;前向声明避免 Lua.hpp 泄漏到包含方
+struct lua_State;
+struct lua_Debug;
 
 #include "ILuaBinding.h"  // ILuaBinding(install 形参) / LuaFunctionDoc(builtinFunctionDocs)
 
@@ -34,15 +35,14 @@ public:
 
     static LuaEngine* InitialEngine(QObject* pParent = nullptr);
 
-	//设置循环是否有效
-	void SetLoopValid(bool bValid) {
-		m_bLoopValid = bValid;
-	}
+	void SetLoopValid(bool bValid) { m_bLoopValid = bValid; }
+	bool GetLoopValid() const { return m_bLoopValid.load(); }
 
-	// 获取循环是否有效
-	bool GetLoopValid() const {
-		return m_bLoopValid;
-	}
+	void RequestStop() { m_stopRequested.store(true); }
+	void ClearStopRequest() { m_stopRequested.store(false); }
+	bool StopRequested() const { return m_stopRequested.load(); }
+
+	void PrepareForRun(bool loopValid);
 
 	bool RunLuaScript(const QString& strLuaFile,QString& errorMsg);
 	bool RunLuaScriptWithEditor(const QString& strLuaContent,QString& errorMsg);
@@ -56,7 +56,11 @@ private:
 
 	lua_State* m_pLua;
 
-	std::atomic<bool> m_bLoopValid;	//循环是否有效(跨线程:GUI写/脚本线程读)
+	std::atomic<bool> m_bLoopValid;
+	std::atomic<bool> m_stopRequested;
+
+	static void abortHook(lua_State* L, lua_Debug* ar);
+	void setAbortHookEnabled(bool enabled);
 
 	bool RegisterLuaFunc();
 

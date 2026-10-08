@@ -13,6 +13,9 @@
 
 class QObject;
 
+// Maximum script slots addressable via UI rows, MCP, and script files (1-based file names).
+constexpr int kMaxScriptSlots = 32;
+
 // Script source language (file extension and transpile path are derived from this).
 enum class ScriptLanguage {
     Lua = 0,

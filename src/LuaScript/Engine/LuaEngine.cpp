@@ -13,6 +13,7 @@
 
 #include <QFile>
 #include <QByteArray>
+#include <QtGlobal>
 
 namespace {
 // 内建真实实现(upvalue 为 LuaEngine*)
@@ -27,10 +28,18 @@ int SleepReal(lua_State* L)
 	if (!lua_isnumber(L, 1)) {
 		return luaL_error(L, "Argument #1 (milliseconds) must be a number");
 	}
+	LuaEngine* pThis = static_cast<LuaEngine*>(lua_touserdata(L, lua_upvalueindex(1)));
 	int milliseconds = lua_tointeger(L, 1);
-	QEventLoop loop;
-	QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
-	loop.exec();
+	const int stepMs = 50;
+	while (milliseconds > 0) {
+		if (pThis && pThis->StopRequested())
+			return luaL_error(L, "script stopped by user");
+		const int slice = qMin(milliseconds, stepMs);
+		QEventLoop loop;
+		QTimer::singleShot(slice, &loop, &QEventLoop::quit);
+		loop.exec();
+		milliseconds -= slice;
+	}
 	return 0;
 }
 
@@ -50,16 +59,57 @@ LuaEngine* LuaEngine::InitialEngine(QObject* pParent /*= nullptr*/)
 	return new LuaEngine(pParent);
 }
 
+namespace {
+constexpr const char kEngineRegistryKey[] = "PLCSimulator.LuaEngine";
+constexpr int kAbortHookInstructionCount = 1000;
+} // namespace
+
+void LuaEngine::abortHook(lua_State* L, lua_Debug* ar)
+{
+	if (!ar || ar->event != LUA_HOOKCOUNT)
+		return;
+	lua_getfield(L, LUA_REGISTRYINDEX, kEngineRegistryKey);
+	LuaEngine* eng = static_cast<LuaEngine*>(lua_touserdata(L, -1));
+	lua_pop(L, 1);
+	if (eng && eng->StopRequested())
+		luaL_error(L, "script stopped by user");
+}
+
+void LuaEngine::setAbortHookEnabled(bool enabled)
+{
+	if (!m_pLua)
+		return;
+	if (enabled) {
+		lua_pushlightuserdata(m_pLua, this);
+		lua_setfield(m_pLua, LUA_REGISTRYINDEX, kEngineRegistryKey);
+		lua_sethook(m_pLua, &LuaEngine::abortHook, LUA_MASKCOUNT, kAbortHookInstructionCount);
+	} else {
+		lua_sethook(m_pLua, nullptr, 0, 0);
+	}
+}
+
+void LuaEngine::PrepareForRun(bool loopValid)
+{
+	ClearStopRequest();
+	SetLoopValid(loopValid);
+}
+
 bool LuaEngine::runChunk(const QByteArray& code, const QByteArray& chunkName, QString& errorMsg)
 {
+	setAbortHookEnabled(true);
 	int status = luaL_loadbuffer(m_pLua, code.constData(), static_cast<size_t>(code.size()),
 	                             chunkName.constData());
 	if (status == LUA_OK)
 		status = lua_pcall(m_pLua, 0, LUA_MULTRET, 0);
+	setAbortHookEnabled(false);
 	if (status != LUA_OK)
 	{
 		errorMsg = QString::fromUtf8(lua_tostring(m_pLua, -1));
-		lua_pop(m_pLua, 1); // 弹出错误信息
+		lua_pop(m_pLua, 1);
+		if (errorMsg.contains(QStringLiteral("script stopped by user"))) {
+			errorMsg.clear();
+			return true;
+		}
 		return false;
 	}
 	return true;
@@ -99,7 +149,8 @@ LuaEngine::~LuaEngine()
 LuaEngine::LuaEngine(QObject* parent /*= nullptr*/)
 	:QObject(parent),
 	m_pLua(luaL_newstate()),
-	m_bLoopValid(false)
+	m_bLoopValid(false),
+	m_stopRequested(false)
 {
 	luaL_openlibs(m_pLua);
 

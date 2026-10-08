@@ -11,6 +11,7 @@
 #include "RegisterBinding.h"
 #include "Comm/Protocol/CommProtocolFactory.h"
 #include "Comm/Protocol/PlcAccess.h"
+#include "LuaScript/Engine/ScriptLanguage.h"
 
 //初始化静态实例
 MainWorkflow* MainWorkflow::s_pInstance = nullptr;
@@ -27,7 +28,7 @@ MainWorkflow::MainWorkflow(QObject* pParent /*= nullptr*/)
 	m_eProtocolType = ProtocolType::eProUnknown;
 
     m_registerStore = std::make_unique<RegisterStore>();
-    m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerStore.get());
+    m_scriptHost = std::make_unique<ScriptEngineHost>(m_registerStore.get(), kMaxScriptSlots);
     m_scriptHost->installModule(std::make_unique<RegisterBinding>(m_registerStore.get()));
 }
 

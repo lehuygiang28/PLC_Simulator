@@ -43,8 +43,12 @@ ScriptEngineHost::ScriptEngineHost(RegisterStore* store, int engineCount, QObjec
 ScriptEngineHost::~ScriptEngineHost()
 {
     // 先令循环脚本尽快退出循环
-    for (auto& e : m_engines)
-        if (e) e->SetLoopValid(false);
+    for (auto& e : m_engines) {
+        if (e) {
+            e->RequestStop();
+            e->SetLoopValid(false);
+        }
+    }
 
     if (m_threadPool) {
         QElapsedTimer drainTimer; drainTimer.start();
@@ -126,6 +130,26 @@ QList<LuaFunctionDoc> ScriptEngineHost::functionDocs() const
 void ScriptEngineHost::setLoopValid(int index, bool valid)
 {
     if (LuaEngine* e = engine(index)) e->SetLoopValid(valid);
+}
+
+bool ScriptEngineHost::loopValid(int index) const
+{
+    if (LuaEngine* e = engine(index)) return e->GetLoopValid();
+    return false;
+}
+
+void ScriptEngineHost::requestStop(int index)
+{
+    if (LuaEngine* e = engine(index)) {
+        e->RequestStop();
+        e->SetLoopValid(false);
+    }
+}
+
+void ScriptEngineHost::prepareEngineForRun(int index, bool loopValid)
+{
+    if (LuaEngine* e = engine(index))
+        e->PrepareForRun(loopValid);
 }
 
 void ScriptEngineHost::installModule(std::unique_ptr<ILuaBinding> module)

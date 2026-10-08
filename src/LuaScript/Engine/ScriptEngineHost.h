@@ -16,6 +16,7 @@
 #include <functional>
 
 #include "ILuaBinding.h"                     // LuaFunctionDoc / ILuaBinding
+#include "ScriptLanguage.h"
 
 class RegisterStore;
 class LuaEngine;
@@ -27,7 +28,7 @@ class ScriptEngineHost : public QObject
 {
     Q_OBJECT
 public:
-    explicit ScriptEngineHost(RegisterStore* store, int engineCount = 6, QObject* parent = nullptr);
+    explicit ScriptEngineHost(RegisterStore* store, int engineCount = kMaxScriptSlots, QObject* parent = nullptr);
     ~ScriptEngineHost() override;
 
     // 外部构造的绑定注册进本宿主:install 进所有已建引擎 + 纳入文档清单。须在脚本运行前调用。
@@ -44,6 +45,9 @@ public:
     LuaEngine* engine(int index) const;
     QList<LuaFunctionDoc> functionDocs() const;   // 引擎内建 + 各模块
     void setLoopValid(int index, bool valid);
+    bool loopValid(int index) const;
+    void requestStop(int index);
+    void prepareEngineForRun(int index, bool loopValid);
 
 signals:
     void scriptLog(QString msg);
