@@ -465,6 +465,10 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
         <source>脚本6</source>
         <translation>Script 6</translation>
     </message>
+    <message>
+        <source>脚本%1</source>
+        <translation>Script %1</translation>
+    </message>
 </context>
 <context>
     <name>PlatformBinding</name>
@@ -552,6 +556,10 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
     <message>
         <source>退出小窗</source>
         <translation>Exit Mini Window</translation>
+    </message>
+    <message>
+        <source>脚本 %1</source>
+        <translation>Script %1</translation>
     </message>
 </context>
 <context>
@@ -936,6 +944,14 @@ See THIRD_PARTY_LICENSES.txt for details.</translation>
     <message>
         <source>运行中…</source>
         <translation>Running…</translation>
+    </message>
+    <message>
+        <source>停止</source>
+        <translation>Stop</translation>
+    </message>
+    <message>
+        <source>正在停止脚本 %1…</source>
+        <translation>Stopping script %1…</translation>
     </message>
     <message>
         <source>脚本正在编译或运行中。</source>
