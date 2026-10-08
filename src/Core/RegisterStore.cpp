@@ -67,7 +67,8 @@ bool RegisterStore::SetBit(const DeviceAddress& addr, bool value)
     bool changed = false;
     if (addr.kind == DeviceKind::M) changed = setMBit(addr.index, value);
     else if (addr.bit >= 0) changed = setDBit(addr.index, addr.bit, value);
-    emit dataChanged();
+    if (changed)
+        emit dataChanged();
     return changed;
 }
 

@@ -60,6 +60,7 @@ signals:
 private slots:
     void onStoreChanged();
     void onFlashTick();
+    void flushStoreRefresh();
 
 private:
     void syncDisplayCache();
@@ -91,6 +92,7 @@ private:
     std::vector<qint64> m_flashStartMs;
     QElapsedTimer m_clock;
     QTimer* m_flashTimer;
+    QTimer* m_storeRefreshTimer;
     QColor m_flashColor;
 
     QPersistentModelIndex m_editIndex;

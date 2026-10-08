@@ -28,9 +28,11 @@ QString trRT(const char* text)
 constexpr int kFloatSigDigits = 7;
 constexpr int kDoubleSigDigits = 15;
 
-constexpr int kFlashDurationMs = 400;
-constexpr int kFlashPeakAlpha  = 140;
-constexpr int kFlashTickMs     = 30;
+// Short pulse + ~60fps fade so rapid PLC updates stay readable (restamp on each change).
+constexpr int kFlashDurationMs = 280;
+constexpr int kFlashPeakAlpha  = 105;
+constexpr int kFlashTickMs     = 16;
+constexpr int kStoreRefreshCoalesceMs = 16;
 
 QString formatReal(double value, int sigDigits)
 {
@@ -179,6 +181,11 @@ RegisterTableModel::RegisterTableModel(RegisterStore* store, QWidget* dialogPare
     m_flashTimer = new QTimer(this);
     m_flashTimer->setInterval(kFlashTickMs);
     connect(m_flashTimer, &QTimer::timeout, this, &RegisterTableModel::onFlashTick);
+
+    m_storeRefreshTimer = new QTimer(this);
+    m_storeRefreshTimer->setSingleShot(true);
+    m_storeRefreshTimer->setInterval(kStoreRefreshCoalesceMs);
+    connect(m_storeRefreshTimer, &QTimer::timeout, this, &RegisterTableModel::flushStoreRefresh);
 
     m_flashColor = ThemeManager::instance().color("@flashBg");
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, [this]
@@ -501,6 +508,14 @@ void RegisterTableModel::clearEditingIndex()
 }
 
 void RegisterTableModel::onStoreChanged()
+{
+    if (m_items.isEmpty() || !m_storeRefreshTimer)
+        return;
+    if (!m_storeRefreshTimer->isActive())
+        m_storeRefreshTimer->start();
+}
+
+void RegisterTableModel::flushStoreRefresh()
 {
     if (m_items.isEmpty()) return;
 
