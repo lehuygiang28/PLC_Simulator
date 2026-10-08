@@ -376,22 +376,37 @@ QJsonArray McpHttpServer::toolDefinitions() const
                      {QStringLiteral("protocol")})));
     tools.append(makeTool("open_comm", "Open TCP server communication.", objectSchema({})));
     tools.append(makeTool("close_comm", "Close TCP server communication.", objectSchema({})));
-    tools.append(makeTool("list_scripts", "List script slots.", objectSchema({})));
+    tools.append(makeTool("list_scripts",
+        "List script slots (up to 32). Each slot has index, display name, language, path, loop flag.",
+        objectSchema({})));
     tools.append(makeTool("read_script", "Read script slot content.",
         objectSchema({{QStringLiteral("index"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}}}},
                      {QStringLiteral("index")})));
-    tools.append(makeTool("write_script", "Write script slot content.",
+    tools.append(makeTool("write_script",
+        "Create or replace script file content (alias of update_script with content).",
         objectSchema({
             {QStringLiteral("index"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}}},
             {QStringLiteral("content"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
-            {QStringLiteral("language"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}}
-        }, {QStringLiteral("index"), QStringLiteral("content")})));
+            {QStringLiteral("name"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
+            {QStringLiteral("language"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
+            {QStringLiteral("loop"), QJsonObject{{QStringLiteral("type"), QStringLiteral("boolean")}}}
+        }, {QStringLiteral("index")})));
+    tools.append(makeTool("update_script",
+        "Update script slot: optional content, display name, language, and/or loop flag.",
+        objectSchema({
+            {QStringLiteral("index"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}}},
+            {QStringLiteral("content"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
+            {QStringLiteral("name"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
+            {QStringLiteral("language"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
+            {QStringLiteral("loop"), QJsonObject{{QStringLiteral("type"), QStringLiteral("boolean")}}}
+        }, {QStringLiteral("index")})));
     tools.append(makeTool("run_script", "Run one script slot.",
         objectSchema({
             {QStringLiteral("index"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}}},
-            {QStringLiteral("content"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}}
+            {QStringLiteral("content"), QJsonObject{{QStringLiteral("type"), QStringLiteral("string")}}},
+            {QStringLiteral("loop"), QJsonObject{{QStringLiteral("type"), QStringLiteral("boolean")}}}
         }, {QStringLiteral("index")})));
-    tools.append(makeTool("stop_script", "Stop loop script by clearing loop validity.",
+    tools.append(makeTool("stop_script", "Request stop for a running script slot.",
         objectSchema({{QStringLiteral("index"), QJsonObject{{QStringLiteral("type"), QStringLiteral("integer")}}}},
                      {QStringLiteral("index")})));
     tools.append(makeTool("list_script_functions", "List Lua/TS script API functions.", objectSchema({})));
@@ -477,6 +492,7 @@ QJsonObject McpHttpServer::handleToolsCall(const QJsonObject& params)
     else if (name == QStringLiteral("list_scripts")) result = m_service->listScripts();
     else if (name == QStringLiteral("read_script")) result = m_service->readScript(args, error);
     else if (name == QStringLiteral("write_script")) result = m_service->writeScript(args, error);
+    else if (name == QStringLiteral("update_script")) result = m_service->updateScript(args, error);
     else if (name == QStringLiteral("run_script")) result = m_service->runScript(args, error);
     else if (name == QStringLiteral("stop_script")) result = m_service->stopScript(args, error);
     else if (name == QStringLiteral("list_script_functions")) result = m_service->listScriptFunctions();

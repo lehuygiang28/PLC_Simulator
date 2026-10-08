@@ -41,6 +41,7 @@ public:
     QJsonObject listScripts() const;
     QJsonObject readScript(const QJsonObject& args, QString& error) const;
     QJsonObject writeScript(const QJsonObject& args, QString& error);
+    QJsonObject updateScript(const QJsonObject& args, QString& error);
     QJsonObject runScript(const QJsonObject& args, QString& error);
     QJsonObject stopScript(const QJsonObject& args, QString& error);
     QJsonObject listScriptFunctions() const;
@@ -57,6 +58,7 @@ public:
 
 signals:
     void notificationReady(const QJsonObject& notification);
+    void scriptSlotsUpdated();
 
 private:
     static bool parseRegisterAddress(const QString& addr, int& index, QString& error);
@@ -67,8 +69,12 @@ private:
     QString scriptPath(int index, ScriptLanguage lang) const;
     ScriptLanguage scriptLanguage(int index) const;
     void setScriptLanguage(int index, ScriptLanguage lang);
+    QString scriptName(int index) const;
+    void setScriptName(int index, const QString& name);
+    void persistScriptNames();
     bool resolveLuaSource(int index, const QString& contentOverride, QString& luaOut, QString& error) const;
     bool ensureScriptSlot(int index, QString& error) const;
+    QJsonObject updateScriptSlot(const QJsonObject& args, QString& error);
     void appendLog(const QString& category, const QJsonObject& data);
     void onScriptFinished(int index, bool ok, const QString& err);
 
@@ -81,7 +87,8 @@ private:
     LogRingBuffer m_logs;
     QVector<ScriptLanguage> m_scriptLanguages;
     QVector<ScriptRunPhase> m_scriptPhases;
-    int m_scriptSlotCount = 6;
+    QVector<QString> m_scriptNames;
+    int m_scriptSlotCount = kMaxScriptSlots;
 };
 
 #endif // CONTROL_CONTROLSERVICE_H

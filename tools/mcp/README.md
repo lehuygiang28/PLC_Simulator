@@ -79,7 +79,7 @@ $env:PLC_SIM_MCP_TOKEN = "your-secret"
 
 地址支持 D 字（D100）、M 位（M1500）、D 位（D2024.3）；`type=bit` 用于位。
 | 通信 | `get_comm_status`, `set_comm_config`, `set_protocol`, `open_comm`, `close_comm` |
-| 脚本 | `list_scripts`, `read_script`, `write_script`, `run_script`, `stop_script`, `list_script_functions` |
+| 脚本 | `list_scripts`, `read_script`, `write_script`, `update_script`, `run_script`, `stop_script`, `list_script_functions`（最多 32 槽位；`update_script` 可改名称/语言/循环/内容） |
 | 平台 | `get_platform_params`, `set_platform_params`, `get_platform_pose`, `move_platform` |
 
 ## Resources

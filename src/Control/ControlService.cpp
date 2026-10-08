@@ -18,6 +18,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <algorithm>
 #include <QJsonArray>
 #include <QTextStream>
 
@@ -73,10 +74,12 @@ ControlService::ControlService(MainWorkflow* workflow, ConfigStore* config, QObj
 {
     m_scriptLanguages.resize(m_scriptSlotCount);
     m_scriptPhases.resize(m_scriptSlotCount);
+    m_scriptNames.resize(m_scriptSlotCount);
     for (int i = 0; i < m_scriptSlotCount; ++i) {
         m_scriptLanguages[i] = ScriptLanguage::Lua;
         m_scriptPhases[i] = ScriptRunPhase::Idle;
     }
+    loadPreferences();
 }
 
 void ControlService::setPlatformController(PlatformController* controller)
@@ -144,18 +147,27 @@ void ControlService::loadPreferences()
         for (int i = 0; i < m_scriptSlotCount && i < langs.size(); ++i)
             setScriptLanguage(i, ScriptLanguageUtil::fromConfigValue(langs[i]));
     }
+
+    m_scriptNames.resize(m_scriptSlotCount);
+    QStringList names;
+    if (m_config->LoadScriptNames(names)) {
+        for (int i = 0; i < m_scriptSlotCount && i < names.size(); ++i)
+            m_scriptNames[i] = names[i];
+    }
 }
 
 void ControlService::setScriptSlotCount(int count)
 {
-    if (count <= 0)
+    if (count <= 0 || count <= m_scriptSlotCount)
         return;
 
+    const int capped = std::min(count, kMaxScriptSlots);
     const int oldCount = m_scriptSlotCount;
-    m_scriptSlotCount = count;
-    m_scriptLanguages.resize(count);
-    m_scriptPhases.resize(count);
-    for (int i = oldCount; i < count; ++i) {
+    m_scriptSlotCount = capped;
+    m_scriptLanguages.resize(capped);
+    m_scriptPhases.resize(capped);
+    m_scriptNames.resize(capped);
+    for (int i = oldCount; i < capped; ++i) {
         m_scriptLanguages[i] = ScriptLanguage::Lua;
         m_scriptPhases[i] = ScriptRunPhase::Idle;
     }
@@ -242,11 +254,16 @@ QJsonObject ControlService::getStatus() const
     for (int i = 0; i < m_scriptSlotCount; ++i) {
         QJsonObject slot;
         slot.insert(QStringLiteral("index"), i);
+        slot.insert(QStringLiteral("name"), scriptName(i));
         slot.insert(QStringLiteral("language"), ScriptLanguageUtil::toConfigValue(scriptLanguage(i)));
         slot.insert(QStringLiteral("phase"), static_cast<int>(scriptPhaseAt(m_scriptPhases, i)));
         slot.insert(QStringLiteral("path"), scriptPath(i, scriptLanguage(i)));
+        slot.insert(QStringLiteral("exists"), QFile::exists(scriptPath(i, scriptLanguage(i))));
+        if (m_workflow && m_workflow->scriptHost())
+            slot.insert(QStringLiteral("loop"), m_workflow->scriptHost()->loopValid(i));
         scripts.append(slot);
     }
+    status.insert(QStringLiteral("script_slot_count"), m_scriptSlotCount);
     status.insert(QStringLiteral("scripts"), scripts);
     status.insert(QStringLiteral("latest_log_id"), m_logs.latestId());
     return status;
@@ -657,10 +674,34 @@ void ControlService::setScriptLanguage(int index, ScriptLanguage lang)
     m_scriptLanguages[index] = lang;
 }
 
+QString ControlService::scriptName(int index) const
+{
+    if (index < 0 || index >= m_scriptNames.size())
+        return QString();
+    return m_scriptNames[index];
+}
+
+void ControlService::setScriptName(int index, const QString& name)
+{
+    if (index < 0 || index >= m_scriptNames.size())
+        return;
+    m_scriptNames[index] = name;
+}
+
+void ControlService::persistScriptNames()
+{
+    if (!m_config)
+        return;
+    QStringList names;
+    for (int i = 0; i < m_scriptSlotCount; ++i)
+        names << m_scriptNames.value(i);
+    m_config->SaveScriptNames(names);
+}
+
 bool ControlService::ensureScriptSlot(int index, QString& error) const
 {
     if (index < 0 || index >= m_scriptSlotCount) {
-        error = QStringLiteral("Script index out of range");
+        error = QStringLiteral("Script index out of range (0..%1)").arg(m_scriptSlotCount - 1);
         return false;
     }
     return true;
@@ -674,13 +715,18 @@ QJsonObject ControlService::listScripts() const
         const QString path = scriptPath(i, lang);
         QJsonObject slot;
         slot.insert(QStringLiteral("index"), i);
+        slot.insert(QStringLiteral("name"), scriptName(i));
         slot.insert(QStringLiteral("language"), ScriptLanguageUtil::toConfigValue(lang));
         slot.insert(QStringLiteral("path"), path);
         slot.insert(QStringLiteral("exists"), QFile::exists(path));
         slot.insert(QStringLiteral("phase"), static_cast<int>(scriptPhaseAt(m_scriptPhases, i)));
+        if (m_workflow && m_workflow->scriptHost())
+            slot.insert(QStringLiteral("loop"), m_workflow->scriptHost()->loopValid(i));
         scriptSlots.append(slot);
     }
     QJsonObject result;
+    result.insert(QStringLiteral("slot_count"), m_scriptSlotCount);
+    result.insert(QStringLiteral("max_slots"), kMaxScriptSlots);
     result.insert(QStringLiteral("slots"), scriptSlots);
     return result;
 }
@@ -712,49 +758,88 @@ QJsonObject ControlService::readScript(const QJsonObject& args, QString& error) 
 
     QJsonObject result;
     result.insert(QStringLiteral("index"), index);
+    result.insert(QStringLiteral("name"), scriptName(index));
     result.insert(QStringLiteral("language"), ScriptLanguageUtil::toConfigValue(lang));
     result.insert(QStringLiteral("path"), path);
     result.insert(QStringLiteral("content"), QString::fromUtf8(file.readAll()));
+    if (m_workflow && m_workflow->scriptHost())
+        result.insert(QStringLiteral("loop"), m_workflow->scriptHost()->loopValid(index));
     return result;
 }
 
-QJsonObject ControlService::writeScript(const QJsonObject& args, QString& error)
+QJsonObject ControlService::updateScriptSlot(const QJsonObject& args, QString& error)
 {
     const int index = args.value(QStringLiteral("index")).toInt(-1);
     if (!ensureScriptSlot(index, error))
         return {};
 
-    const QString content = args.value(QStringLiteral("content")).toString();
+    const bool hasContent = args.contains(QStringLiteral("content"));
+    const bool hasName = args.contains(QStringLiteral("name"));
+    const bool hasLanguage = args.contains(QStringLiteral("language"));
+    const bool hasLoop = args.contains(QStringLiteral("loop"));
+    if (!hasContent && !hasName && !hasLanguage && !hasLoop) {
+        error = QStringLiteral("Provide at least one of: content, name, language, loop");
+        return {};
+    }
+
     ScriptLanguage lang = scriptLanguage(index);
-    if (args.contains(QStringLiteral("language"))) {
+    if (hasLanguage) {
         lang = parseScriptLanguage(args.value(QStringLiteral("language")).toString(), error);
         if (!error.isEmpty())
             return {};
         setScriptLanguage(index, lang);
     }
 
-    QDir().mkpath(scriptDirectory());
-    const QString path = scriptPath(index, lang);
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        error = QStringLiteral("Failed to write script: %1").arg(path);
-        return {};
+    QString path = scriptPath(index, lang);
+    if (hasContent) {
+        QDir().mkpath(scriptDirectory());
+        path = scriptPath(index, lang);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            error = QStringLiteral("Failed to write script: %1").arg(path);
+            return {};
+        }
+        file.write(args.value(QStringLiteral("content")).toString().toUtf8());
     }
-    file.write(content.toUtf8());
 
-    if (m_config) {
+    if (hasName)
+        setScriptName(index, args.value(QStringLiteral("name")).toString());
+
+    if (hasLoop && m_workflow && m_workflow->scriptHost())
+        m_workflow->scriptHost()->setLoopValid(index, args.value(QStringLiteral("loop")).toBool());
+
+    if (m_config && (hasLanguage || hasContent)) {
         QStringList langs;
         for (int i = 0; i < m_scriptSlotCount; ++i)
             langs << ScriptLanguageUtil::toConfigValue(scriptLanguage(i));
         m_config->SaveScriptLanguages(langs);
     }
+    if (hasName)
+        persistScriptNames();
 
     QJsonObject result;
     result.insert(QStringLiteral("index"), index);
+    result.insert(QStringLiteral("name"), scriptName(index));
     result.insert(QStringLiteral("language"), ScriptLanguageUtil::toConfigValue(lang));
     result.insert(QStringLiteral("path"), path);
-    result.insert(QStringLiteral("written"), true);
+    result.insert(QStringLiteral("updated"), true);
+    if (hasContent)
+        result.insert(QStringLiteral("content_written"), true);
+    if (m_workflow && m_workflow->scriptHost())
+        result.insert(QStringLiteral("loop"), m_workflow->scriptHost()->loopValid(index));
+
+    emit scriptSlotsUpdated();
     return result;
+}
+
+QJsonObject ControlService::writeScript(const QJsonObject& args, QString& error)
+{
+    return updateScriptSlot(args, error);
+}
+
+QJsonObject ControlService::updateScript(const QJsonObject& args, QString& error)
+{
+    return updateScriptSlot(args, error);
 }
 
 bool ControlService::resolveLuaSource(int index, const QString& contentOverride, QString& luaOut, QString& error) const
@@ -821,6 +906,10 @@ QJsonObject ControlService::runScript(const QJsonObject& args, QString& error)
         return {};
 
     if (ScriptEngineHost* host = m_workflow->scriptHost()) {
+        const bool loop = args.contains(QStringLiteral("loop"))
+                              ? args.value(QStringLiteral("loop")).toBool()
+                              : host->loopValid(index);
+        host->prepareEngineForRun(index, loop);
         if (!host->checkScript(luaOut, error))
             return {};
         m_scriptPhases[index] = ScriptRunPhase::Running;
@@ -843,10 +932,10 @@ QJsonObject ControlService::stopScript(const QJsonObject& args, QString& error)
         return {};
     }
 
-    m_workflow->scriptHost()->setLoopValid(index, false);
+    m_workflow->scriptHost()->requestStop(index);
     QJsonObject result;
     result.insert(QStringLiteral("index"), index);
-    result.insert(QStringLiteral("loop_valid"), false);
+    result.insert(QStringLiteral("stopped"), true);
     return result;
 }
 
